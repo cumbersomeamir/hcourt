@@ -15,9 +15,11 @@ export default function Home() {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchSchedule = async () => {
     try {
+      setError(null);
       const response = await fetch('/api/schedule/latest');
       const data = await response.json();
       if (data.success && data.schedule) {
@@ -30,9 +32,12 @@ export default function Home() {
         } else {
           setFilteredCourts(courtsData);
         }
+      } else {
+        setError(data.error || 'Failed to fetch schedule');
       }
     } catch (error) {
       console.error('Error fetching schedule:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch schedule');
     } finally {
       setLoading(false);
     }
