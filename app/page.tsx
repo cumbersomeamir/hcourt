@@ -289,6 +289,18 @@ export default function Home() {
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">Loading court schedule...</div>
           </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="text-red-600 dark:text-red-400 mb-4 text-center">
+              Error: {error}
+            </div>
+            <button
+              onClick={fetchSchedule}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Retry
+            </button>
+          </div>
         ) : searchTerm && filteredCourts.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">
@@ -297,7 +309,11 @@ export default function Home() {
           </div>
         ) : courts.length > 0 ? (
           <CourtTable courts={searchTerm ? filteredCourts : courts} lastUpdated={lastUpdated || undefined} />
-        ) : null}
+        ) : (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-gray-500 dark:text-gray-400">No schedule data available. Click &quot;Refresh&quot; to fetch data.</div>
+          </div>
+        )}
 
         <div className="mt-3 sm:mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-2">
           This page refreshes automatically every 30 seconds
