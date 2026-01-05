@@ -24,8 +24,12 @@ export default function Home() {
         const courtsData = data.schedule.courts || [];
         setCourts(courtsData);
         setLastUpdated(new Date(data.schedule.lastUpdated));
-        // Apply current search filter
-        applySearchFilter(courtsData, searchTerm);
+        // Apply current search filter or set all courts
+        if (searchTerm.trim()) {
+          applySearchFilter(courtsData, searchTerm);
+        } else {
+          setFilteredCourts(courtsData);
+        }
       }
     } catch (error) {
       console.error('Error fetching schedule:', error);
@@ -170,7 +174,7 @@ export default function Home() {
 
   // Initialize filtered courts when courts data changes
   useEffect(() => {
-    if (courts.length > 0 && filteredCourts.length === 0 && !searchTerm) {
+    if (courts.length > 0 && !searchTerm) {
       setFilteredCourts(courts);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,15 +284,15 @@ export default function Home() {
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">Loading court schedule...</div>
           </div>
-        ) : filteredCourts.length === 0 && searchTerm ? (
+        ) : searchTerm && filteredCourts.length === 0 ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">
               No courts found matching &quot;{searchTerm}&quot;
             </div>
           </div>
-        ) : (
-          <CourtTable courts={filteredCourts.length > 0 || searchTerm ? filteredCourts : courts} lastUpdated={lastUpdated || undefined} />
-        )}
+        ) : courts.length > 0 ? (
+          <CourtTable courts={searchTerm ? filteredCourts : courts} lastUpdated={lastUpdated || undefined} />
+        ) : null}
 
         <div className="mt-3 sm:mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-2">
           This page refreshes automatically every 30 seconds
