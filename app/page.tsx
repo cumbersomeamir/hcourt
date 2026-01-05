@@ -16,6 +16,42 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
 
+  const fetchAndSyncSchedule = async () => {
+    try {
+      // Fetch HTML directly from court website (browser can do this, no SSL issues)
+      const courtResponse = await fetch('https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do', {
+        mode: 'cors',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+      
+      if (!courtResponse.ok) {
+        throw new Error('Failed to fetch court website');
+      }
+      
+      const html = await courtResponse.text();
+      
+      // Send HTML to our API to parse and save
+      const uploadResponse = await fetch('/api/schedule/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html }),
+      });
+      
+      const uploadData = await uploadResponse.json();
+      
+      if (uploadData.success) {
+        // Now fetch the latest schedule from our DB
+        await fetchSchedule();
+      }
+    } catch (error) {
+      console.error('Error syncing schedule:', error);
+      // Fallback: try to get from DB anyway
+      await fetchSchedule();
+    }
+  };
+
   const fetchSchedule = async () => {
     try {
       const response = await fetch('/api/schedule/latest');
@@ -113,14 +149,30 @@ export default function Home() {
     }
   };
 
-  // Note: Monitoring is now handled by backend cron job
-  // This function is kept for manual trigger capability
+  // Client-side monitoring (fetches HTML in browser, sends to API)
   const startMonitoring = async () => {
     if (isMonitoring) return;
     setIsMonitoring(true);
 
     try {
-      const response = await fetch('/api/monitor', { method: 'POST' });
+      // Fetch HTML directly from court website (browser handles SSL fine)
+      const courtResponse = await fetch('https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do', {
+        mode: 'cors',
+      });
+      
+      if (!courtResponse.ok) {
+        throw new Error('Failed to fetch court website');
+      }
+      
+      const html = await courtResponse.text();
+      
+      // Send to API for change detection and saving
+      const response = await fetch('/api/monitor/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html }),
+      });
+      
       const data = await response.json();
       if (data.success) {
         if (data.changesDetected > 0) {
@@ -137,13 +189,19 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchSchedule();
+    // First load: fetch and sync schedule
+    fetchAndSyncSchedule();
     checkNotifications();
     fetchDbStats();
 
-    // Poll for schedule updates every 30 seconds (backend cron handles monitoring)
+    // Poll for schedule updates every 30 seconds (client-side fetch + sync)
     const scheduleInterval = setInterval(() => {
-      fetchSchedule();
+      fetchAndSyncSchedule();
+    }, 30000);
+
+    // Poll for monitoring changes every 30 seconds (client-side)
+    const monitorInterval = setInterval(() => {
+      startMonitoring();
     }, 30000);
 
     // Check for new notifications every 10 seconds
@@ -158,6 +216,7 @@ export default function Home() {
 
     return () => {
       clearInterval(scheduleInterval);
+      clearInterval(monitorInterval);
       clearInterval(notificationInterval);
       clearInterval(statsInterval);
     };
