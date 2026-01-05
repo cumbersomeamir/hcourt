@@ -23,18 +23,19 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Mobile optimizations */
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-button, a {
+/* Touch optimization */
+button, a, input {
   touch-action: manipulation;
 }
 
-/* Improve scrolling on mobile */
-.overflow-y-auto {
-  -webkit-overflow-scrolling: touch;
+/* Improve text rendering on mobile */
+@media (max-width: 640px) {
+  body {
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
 }

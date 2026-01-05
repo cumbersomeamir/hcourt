@@ -82,7 +82,7 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
       <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
       <div className="absolute right-0 top-0 h-full w-full sm:max-w-2xl bg-white dark:bg-gray-900 shadow-xl">
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-3 sm:py-4 gap-3">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
               Notifications {unreadCount > 0 && (
                 <span className="ml-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">
@@ -90,18 +90,18 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
                 </span>
               )}
             </h2>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-shrink-0">
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
-                  className="rounded-md bg-blue-600 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation"
+                  className="rounded-md bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation"
                 >
-                  Mark all read
+                  Mark all as read
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="rounded-md bg-gray-200 dark:bg-gray-700 px-2 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
+                className="rounded-md bg-gray-200 dark:bg-gray-700 px-3 py-2 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 active:bg-gray-400 dark:active:bg-gray-500 touch-manipulation"
               >
                 Close
               </button>
@@ -129,7 +129,7 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 mb-2">
                           <span className="text-lg sm:text-xl flex-shrink-0">{getNotificationIcon(notification.type)}</span>
                           <h3 className="font-semibold text-sm sm:text-base text-gray-900 dark:text-gray-100 break-words">
                             {notification.title}
@@ -138,7 +138,7 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
                             <span className="rounded-full bg-blue-500 h-2 w-2 flex-shrink-0"></span>
                           )}
                         </div>
-                        <div className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line break-words">
+                        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line break-words">
                           {notification.message}
                         </div>
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-500">
@@ -148,9 +148,9 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
                       {!notification.read && (
                         <button
                           onClick={() => markAsRead([notification._id!])}
-                          className="ml-2 text-xs text-blue-600 dark:text-blue-400 hover:underline active:opacity-70 touch-manipulation flex-shrink-0"
+                          className="ml-2 text-xs text-blue-600 dark:text-blue-400 hover:underline active:text-blue-800 dark:active:text-blue-300 touch-manipulation flex-shrink-0 min-w-[80px]"
                         >
-                          Mark read
+                          Mark as read
                         </button>
                       )}
                     </div>

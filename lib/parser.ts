@@ -33,6 +33,7 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
     const listText = $(cells[2]).text().trim();
     const progressText = $(cells[3]).text().trim();
     const caseDetailsCell = $(cells[4]);
+    const caseDetailsHtml = caseDetailsCell.html() || '';
     const caseDetailsText = caseDetailsCell.text().trim();
     
     // Check if court is in session
@@ -63,7 +64,7 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
 
         // Extract Title - can span multiple lines
         // Format: "Title :TITLE TEXT" (may continue on next line with spaces)
-        const titleMatch = caseDetailsText.match(/Title\s*:\s*([\s\S]+?)(?:\s+Petitioner|$)/);
+        const titleMatch = caseDetailsText.match(/Title\s*:\s*([^\n]+(?:\n\s+[^\n]+)*?)(?:\s+Petitioner|$)/);
         if (titleMatch) {
           title = titleMatch[1]
             .replace(/\s+/g, ' ')
@@ -72,7 +73,7 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
         }
 
         // Extract Petitioner's Counsels
-        const petitionerMatch = caseDetailsText.match(/Petitioner'?s?\s+Counsels?\s*[–\-]\s*([\s\S]+?)(?:\s+Respondent|$)/);
+        const petitionerMatch = caseDetailsText.match(/Petitioner'?s?\s+Counsels?\s*[–\-]\s*([^\n]+?)(?:\s+Respondent|$)/);
         if (petitionerMatch) {
           const counselsText = petitionerMatch[1].trim();
           const counsels = counselsText.split(',').map(c => c.trim()).filter(c => c);
@@ -80,7 +81,7 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
         }
 
         // Extract Respondent's Counsel
-        const respondentMatch = caseDetailsText.match(/Respondent'?s?\s+Counsels?\s*[–\-]\s*([\s\S]+?)(?:\s*$|$)/);
+        const respondentMatch = caseDetailsText.match(/Respondent'?s?\s+Counsels?\s*[–\-]\s*(.+?)(?:\s*$|$)/);
         if (respondentMatch) {
           const counselsText = respondentMatch[1].trim();
           const counsels = counselsText.split(',').map(c => c.trim()).filter(c => c);

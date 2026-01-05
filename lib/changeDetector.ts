@@ -1,18 +1,5 @@
 import { ParsedCourtCase } from './parser';
 import { CourtCase, ChangeRecord } from '@/types/court';
-import isEqual from 'lodash.isequal';
-
-/**
- * Deep comparison of case details using lodash.isEqual
- */
-function caseDetailsEqual(
-  old: { caseNumber: string; title: string; petitionerCounsels: string[]; respondentCounsels: string[] } | null,
-  newVal: { caseNumber: string; title: string; petitionerCounsels: string[]; respondentCounsels: string[] } | null
-): boolean {
-  if (!old && !newVal) return true;
-  if (!old || !newVal) return false;
-  return isEqual(old, newVal);
-}
 
 export function detectChanges(
   oldCourts: CourtCase[],
@@ -57,12 +44,12 @@ export function detectChanges(
           description: `Court ${newCourt.courtNo} session status changed from ${oldCourt.isInSession ? 'in session' : 'not in session'} to ${newCourt.isInSession ? 'in session' : 'not in session'}`,
         });
       } else if (oldCourt.isInSession && newCourt.isInSession) {
-        // Check for other changes in active cases using deep equality
+        // Check for other changes in active cases
         const hasChanged = 
           oldCourt.serialNo !== newCourt.serialNo ||
           oldCourt.list !== newCourt.list ||
           oldCourt.progress !== newCourt.progress ||
-          !caseDetailsEqual(oldCourt.caseDetails, newCourt.caseDetails);
+          JSON.stringify(oldCourt.caseDetails) !== JSON.stringify(newCourt.caseDetails);
 
         if (hasChanged) {
           changes.push({
@@ -93,3 +80,4 @@ export function detectChanges(
 
   return changes;
 }
+

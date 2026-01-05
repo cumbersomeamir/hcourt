@@ -10,13 +10,10 @@ export async function GET() {
     // Fetch the court schedule page
     const response = await fetch(COURT_VIEW_URL, {
       next: { revalidate: 0 }, // Always fetch fresh data
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch: ${response.statusText}`);
     }
 
     const html = await response.text();

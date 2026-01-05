@@ -16,42 +16,6 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
 
-  const fetchAndSyncSchedule = async () => {
-    try {
-      // Fetch HTML directly from court website (browser can do this, no SSL issues)
-      const courtResponse = await fetch('https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do', {
-        mode: 'cors',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      });
-      
-      if (!courtResponse.ok) {
-        throw new Error('Failed to fetch court website');
-      }
-      
-      const html = await courtResponse.text();
-      
-      // Send HTML to our API to parse and save
-      const uploadResponse = await fetch('/api/schedule/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html }),
-      });
-      
-      const uploadData = await uploadResponse.json();
-      
-      if (uploadData.success) {
-        // Now fetch the latest schedule from our DB
-        await fetchSchedule();
-      }
-    } catch (error) {
-      console.error('Error syncing schedule:', error);
-      // Fallback: try to get from DB anyway
-      await fetchSchedule();
-    }
-  };
-
   const fetchSchedule = async () => {
     try {
       const response = await fetch('/api/schedule/latest');
@@ -149,30 +113,12 @@ export default function Home() {
     }
   };
 
-  // Client-side monitoring (fetches HTML in browser, sends to API)
   const startMonitoring = async () => {
     if (isMonitoring) return;
     setIsMonitoring(true);
 
     try {
-      // Fetch HTML directly from court website (browser handles SSL fine)
-      const courtResponse = await fetch('https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do', {
-        mode: 'cors',
-      });
-      
-      if (!courtResponse.ok) {
-        throw new Error('Failed to fetch court website');
-      }
-      
-      const html = await courtResponse.text();
-      
-      // Send to API for change detection and saving
-      const response = await fetch('/api/monitor/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ html }),
-      });
-      
+      const response = await fetch('/api/monitor', { method: 'POST' });
       const data = await response.json();
       if (data.success) {
         if (data.changesDetected > 0) {
@@ -189,17 +135,16 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // First load: fetch and sync schedule
-    fetchAndSyncSchedule();
+    fetchSchedule();
     checkNotifications();
     fetchDbStats();
 
-    // Poll for schedule updates every 30 seconds (client-side fetch + sync)
+    // Poll for schedule updates every 30 seconds
     const scheduleInterval = setInterval(() => {
-      fetchAndSyncSchedule();
+      fetchSchedule();
     }, 30000);
 
-    // Poll for monitoring changes every 30 seconds (client-side)
+    // Poll for monitoring changes every 30 seconds
     const monitorInterval = setInterval(() => {
       startMonitoring();
     }, 30000);
@@ -232,43 +177,43 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        {/* Header */}
         <div className="mb-4 sm:mb-6">
-          <div className="mb-4 sm:mb-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-              High Court of Judicature at Allahabad, Lucknow Bench
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-              Court View - Online Court Activity Digital Display Board System
-            </p>
-            {dbStats && (
-              <div className="mt-2 sm:mt-3 flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
-                <span>📊 Schedules: {dbStats.schedules}</span>
-                <span>📝 Changes: {dbStats.changes}</span>
-                <span>🔔 Notifications: {dbStats.notifications}</span>
-              </div>
-            )}
-          </div>
-          {/* Buttons - Stack on mobile, row on desktop */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4 sm:mt-0 sm:absolute sm:top-4 sm:right-4">
-            <button
-              onClick={() => fetchSchedule()}
-              disabled={loading}
-              className="rounded-md bg-gray-600 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-gray-700 active:bg-gray-800 disabled:opacity-50 touch-manipulation w-full sm:w-auto"
-            >
-              {loading ? 'Loading...' : 'Refresh'}
-            </button>
-            <button
-              onClick={() => setNotificationsOpen(true)}
-              className="relative rounded-md bg-blue-600 px-4 py-2.5 sm:py-2 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation w-full sm:w-auto"
-            >
-              Notifications
-              {unreadCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
-                  {unreadCount}
-                </span>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
+                High Court of Judicature at Allahabad, Lucknow Bench
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                Court View - Online Court Activity Digital Display Board System
+              </p>
+              {dbStats && (
+                <div className="mt-2 sm:mt-3 flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
+                  <span>📊 Schedules: {dbStats.schedules}</span>
+                  <span>📝 Changes: {dbStats.changes}</span>
+                  <span>🔔 Notifications: {dbStats.notifications}</span>
+                </div>
               )}
-            </button>
+            </div>
+            <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+              <button
+                onClick={() => fetchSchedule()}
+                disabled={loading}
+                className="rounded-md bg-gray-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-gray-700 active:bg-gray-800 disabled:opacity-50 touch-manipulation"
+              >
+                {loading ? 'Loading...' : 'Refresh'}
+              </button>
+              <button
+                onClick={() => setNotificationsOpen(true)}
+                className="relative rounded-md bg-blue-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation"
+              >
+                Notifications
+                {unreadCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 sm:-right-2 sm:-top-2 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-red-500 text-[10px] sm:text-xs text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -277,12 +222,12 @@ export default function Home() {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search courts, cases, counsels..."
+              placeholder="Search by court number, case number, title, counsel name..."
               value={searchTerm}
               onChange={handleSearchChange}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-9 sm:pr-10 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none touch-manipulation"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 sm:px-4 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-9 sm:pr-10 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none touch-manipulation"
             />
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 sm:pl-3 pointer-events-none">
               <svg
                 className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400"
                 fill="none"
@@ -303,7 +248,7 @@ export default function Home() {
                   setSearchTerm('');
                   setFilteredCourts(courts);
                 }}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 active:opacity-70 touch-manipulation"
+                className="absolute inset-y-0 right-0 flex items-center pr-2.5 sm:pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation min-w-[44px]"
                 aria-label="Clear search"
               >
                 <svg
@@ -323,7 +268,7 @@ export default function Home() {
             )}
           </div>
           {searchTerm && (
-            <div className="mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               Showing {filteredCourts.length} of {courts.length} courts
             </div>
           )}
@@ -331,11 +276,11 @@ export default function Home() {
 
         {loading && courts.length === 0 ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-sm sm:text-base text-gray-500 dark:text-gray-400">Loading court schedule...</div>
+            <div className="text-gray-500 dark:text-gray-400">Loading court schedule...</div>
           </div>
         ) : filteredCourts.length === 0 && searchTerm ? (
           <div className="flex items-center justify-center py-12">
-            <div className="text-sm sm:text-base text-gray-500 dark:text-gray-400 text-center px-4">
+            <div className="text-gray-500 dark:text-gray-400">
               No courts found matching &quot;{searchTerm}&quot;
             </div>
           </div>
@@ -343,7 +288,7 @@ export default function Home() {
           <CourtTable courts={filteredCourts.length > 0 || searchTerm ? filteredCourts : courts} lastUpdated={lastUpdated || undefined} />
         )}
 
-        <div className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-4">
+        <div className="mt-3 sm:mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-2">
           This page refreshes automatically every 30 seconds
         </div>
       </div>
