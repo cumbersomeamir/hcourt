@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const db = await getDb();
     const notificationsCollection = db.collection('notifications');
 
-    const query: any = {};
+    const query: { read?: boolean } = {};
     if (unreadOnly) {
       query.read = false;
     }

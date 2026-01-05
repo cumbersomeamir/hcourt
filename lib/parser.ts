@@ -33,7 +33,6 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
     const listText = $(cells[2]).text().trim();
     const progressText = $(cells[3]).text().trim();
     const caseDetailsCell = $(cells[4]);
-    const caseDetailsHtml = caseDetailsCell.html() || '';
     const caseDetailsText = caseDetailsCell.text().trim();
     
     // Check if court is in session

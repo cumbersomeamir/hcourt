@@ -165,6 +165,7 @@ export default function Home() {
       clearInterval(notificationInterval);
       clearInterval(statsInterval);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Initialize filtered courts when courts data changes
@@ -172,6 +173,7 @@ export default function Home() {
     if (courts.length > 0 && filteredCourts.length === 0 && !searchTerm) {
       setFilteredCourts(courts);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courts, searchTerm]);
 
   return (

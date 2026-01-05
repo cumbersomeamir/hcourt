@@ -3,6 +3,7 @@ import { parseCourtSchedule } from '@/lib/parser';
 import { detectChanges } from '@/lib/changeDetector';
 import { getDb } from '@/lib/mongodb';
 import { CourtCase, ChangeRecord, Notification } from '@/types/court';
+import { Document } from 'mongodb';
 
 const COURT_VIEW_URL = 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do';
 
@@ -38,7 +39,7 @@ export async function POST() {
 
       // Save changes to database
       if (changes.length > 0) {
-        await changesCollection.insertMany(changes as any);
+        await changesCollection.insertMany(changes as Document[]);
 
         // Create notifications from changes
         notifications = changes.map((change) => {
@@ -87,7 +88,7 @@ export async function POST() {
 
         // Save notifications
         if (notifications.length > 0) {
-          await notificationsCollection.insertMany(notifications as any);
+          await notificationsCollection.insertMany(notifications as Document[]);
         }
       }
     }
