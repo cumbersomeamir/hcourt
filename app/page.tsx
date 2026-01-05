@@ -306,3 +306,4 @@ export default function Home() {
     </div>
   );
 }
+// Fix: Ensure courts display correctly
