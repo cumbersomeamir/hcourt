@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { CourtCase } from '@/types/court';
 
 export async function GET(request: Request) {
   try {
@@ -45,7 +46,8 @@ export async function GET(request: Request) {
     // Filter by tracked case IDs if any are provided
     let filteredSchedule = latestSchedule;
     if (trackedCaseIds.length > 0) {
-      const filteredCourts = (latestSchedule.courts || []).filter((court: { caseDetails?: { caseNumber?: string } }) => {
+      const courts = (latestSchedule.courts || []) as CourtCase[];
+      const filteredCourts = courts.filter((court) => {
         if (!court.caseDetails || !court.caseDetails.caseNumber) {
           return false; // Skip courts without case details
         }

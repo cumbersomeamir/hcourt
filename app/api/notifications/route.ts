@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
+import { Document, WithId } from 'mongodb';
+import { Notification, ChangeRecord } from '@/types/court';
 
 export async function GET(request: Request) {
   try {
@@ -45,14 +47,14 @@ export async function GET(request: Request) {
       .find(query)
       .sort({ timestamp: -1 })
       .limit(limit * 2) // Fetch more to filter later
-      .toArray();
+      .toArray() as WithId<Document>[];
 
     // Filter by tracked case IDs if any are provided
     if (trackedCaseIds.length > 0) {
       // We need to check the change records to see which case IDs they relate to
       const changeRecordIds = notifications
-        .map((n: { changeRecordId?: string }) => n.changeRecordId)
-        .filter(Boolean) as string[];
+        .map((n) => n.changeRecordId as string | undefined)
+        .filter((id): id is string => Boolean(id));
 
       if (changeRecordIds.length > 0) {
         const { ObjectId } = await import('mongodb');
@@ -63,16 +65,17 @@ export async function GET(request: Request) {
           .toArray();
 
         const changeRecordMap = new Map(
-          changeRecords.map((cr: { _id: { toString: () => string }; oldValue?: { caseDetails?: { caseNumber?: string } }; newValue?: { caseDetails?: { caseNumber?: string } } }) => [cr._id.toString(), cr])
+          changeRecords.map((cr) => [cr._id.toString(), cr as unknown as ChangeRecord])
         );
 
         // Filter notifications based on whether their change records match tracked case IDs
-        notifications = notifications.filter((notification: { changeRecordId?: string }) => {
-          if (!notification.changeRecordId) {
+        notifications = notifications.filter((notification) => {
+          const changeRecordId = notification.changeRecordId as string | undefined;
+          if (!changeRecordId) {
             return false; // Skip notifications without change records
           }
 
-          const changeRecord = changeRecordMap.get(notification.changeRecordId);
+          const changeRecord = changeRecordMap.get(changeRecordId);
           if (!changeRecord) {
             return false;
           }
