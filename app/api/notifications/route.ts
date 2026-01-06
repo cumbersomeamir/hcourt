@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 import { Document, WithId } from 'mongodb';
-import { Notification, ChangeRecord } from '@/types/court';
+import { ChangeRecord } from '@/types/court';
 
 export async function GET(request: Request) {
   try {

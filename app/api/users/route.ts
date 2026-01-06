@@ -78,7 +78,7 @@ export async function GET(request: Request) {
     const usersCollection = db.collection('users');
     const { ObjectId } = await import('mongodb');
 
-    const query: { _id?: typeof ObjectId; email?: string } = {};
+    const query: { _id?: InstanceType<typeof ObjectId>; email?: string } = {};
     if (userId) {
       query._id = new ObjectId(userId);
     } else if (email) {
@@ -135,7 +135,7 @@ export async function PATCH(request: Request) {
     const usersCollection = db.collection('users');
     const { ObjectId } = await import('mongodb');
 
-    const query: { _id?: typeof ObjectId; email?: string } = {};
+    const query: { _id?: InstanceType<typeof ObjectId>; email?: string } = {};
     if (userId) {
       query._id = new ObjectId(userId);
     } else if (email) {
