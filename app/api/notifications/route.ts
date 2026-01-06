@@ -26,7 +26,7 @@ export async function GET(request: Request) {
         if (user && user.caseIds) {
           trackedCaseIds = user.caseIds.map((id: string) => id.toUpperCase());
         }
-      } catch (e) {
+      } catch {
         // Invalid ObjectId, continue without filtering
       }
     }
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const notificationsCollection = db.collection('notifications');
     const changesCollection = db.collection('changes');
 
-    const query: any = {};
+    const query: { read?: boolean } = {};
     if (unreadOnly) {
       query.read = false;
     }
@@ -51,8 +51,8 @@ export async function GET(request: Request) {
     if (trackedCaseIds.length > 0) {
       // We need to check the change records to see which case IDs they relate to
       const changeRecordIds = notifications
-        .map((n: any) => n.changeRecordId)
-        .filter(Boolean);
+        .map((n: { changeRecordId?: string }) => n.changeRecordId)
+        .filter(Boolean) as string[];
 
       if (changeRecordIds.length > 0) {
         const { ObjectId } = await import('mongodb');
@@ -63,11 +63,11 @@ export async function GET(request: Request) {
           .toArray();
 
         const changeRecordMap = new Map(
-          changeRecords.map((cr: any) => [cr._id.toString(), cr])
+          changeRecords.map((cr: { _id: { toString: () => string }; oldValue?: { caseDetails?: { caseNumber?: string } }; newValue?: { caseDetails?: { caseNumber?: string } } }) => [cr._id.toString(), cr])
         );
 
         // Filter notifications based on whether their change records match tracked case IDs
-        notifications = notifications.filter((notification: any) => {
+        notifications = notifications.filter((notification: { changeRecordId?: string }) => {
           if (!notification.changeRecordId) {
             return false; // Skip notifications without change records
           }

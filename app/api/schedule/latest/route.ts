@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         if (user && user.caseIds) {
           trackedCaseIds = user.caseIds.map((id: string) => id.toUpperCase());
         }
-      } catch (e) {
+      } catch {
         // Invalid ObjectId, continue without filtering
       }
     }
@@ -45,7 +45,7 @@ export async function GET(request: Request) {
     // Filter by tracked case IDs if any are provided
     let filteredSchedule = latestSchedule;
     if (trackedCaseIds.length > 0) {
-      const filteredCourts = (latestSchedule.courts || []).filter((court: any) => {
+      const filteredCourts = (latestSchedule.courts || []).filter((court: { caseDetails?: { caseNumber?: string } }) => {
         if (!court.caseDetails || !court.caseDetails.caseNumber) {
           return false; // Skip courts without case details
         }

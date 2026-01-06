@@ -243,7 +243,6 @@ export default function Home() {
     if (courts.length > 0 && !searchTerm) {
       setFilteredCourts(courts);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courts, searchTerm]);
 
   return (

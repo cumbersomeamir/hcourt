@@ -81,7 +81,7 @@ export default function CaseIdModal({ isOpen, onClose, onSave, existingCaseIds =
         } else {
           setError(data.error || 'Failed to create account');
         }
-      } catch (error) {
+      } catch {
         setError('Failed to create account. Please try again.');
       }
     } else {
