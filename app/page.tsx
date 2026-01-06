@@ -266,6 +266,26 @@ export default function Home() {
               )}
             </div>
             <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+              <a
+                href="/web-diary"
+                className="rounded-md bg-purple-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-purple-700 active:bg-purple-800 touch-manipulation inline-flex items-center gap-2"
+                title="View Web Diary"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                  />
+                </svg>
+                Web Diary
+              </a>
               <button
                 onClick={() => setCaseIdModalOpen(true)}
                 className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
