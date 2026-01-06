@@ -6,20 +6,94 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50');
+    const caseIdsParam = searchParams.get('caseIds');
+    const userId = searchParams.get('userId');
+
+    // Get tracked case IDs
+    let trackedCaseIds: string[] = [];
+    
+    if (caseIdsParam) {
+      // Parse from query parameter (comma-separated)
+      trackedCaseIds = caseIdsParam.split(',').map(id => id.trim().toUpperCase()).filter(Boolean);
+    } else if (userId) {
+      // Fetch from user account
+      const db = await getDb();
+      const usersCollection = db.collection('users');
+      const { ObjectId } = await import('mongodb');
+      
+      try {
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        if (user && user.caseIds) {
+          trackedCaseIds = user.caseIds.map((id: string) => id.toUpperCase());
+        }
+      } catch (e) {
+        // Invalid ObjectId, continue without filtering
+      }
+    }
 
     const db = await getDb();
     const notificationsCollection = db.collection('notifications');
+    const changesCollection = db.collection('changes');
 
-    const query: { read?: boolean } = {};
+    const query: any = {};
     if (unreadOnly) {
       query.read = false;
     }
 
-    const notifications = await notificationsCollection
+    // Fetch notifications
+    let notifications = await notificationsCollection
       .find(query)
       .sort({ timestamp: -1 })
-      .limit(limit)
+      .limit(limit * 2) // Fetch more to filter later
       .toArray();
+
+    // Filter by tracked case IDs if any are provided
+    if (trackedCaseIds.length > 0) {
+      // We need to check the change records to see which case IDs they relate to
+      const changeRecordIds = notifications
+        .map((n: any) => n.changeRecordId)
+        .filter(Boolean);
+
+      if (changeRecordIds.length > 0) {
+        const { ObjectId } = await import('mongodb');
+        const changeRecords = await changesCollection
+          .find({
+            _id: { $in: changeRecordIds.map((id: string) => new ObjectId(id)) },
+          })
+          .toArray();
+
+        const changeRecordMap = new Map(
+          changeRecords.map((cr: any) => [cr._id.toString(), cr])
+        );
+
+        // Filter notifications based on whether their change records match tracked case IDs
+        notifications = notifications.filter((notification: any) => {
+          if (!notification.changeRecordId) {
+            return false; // Skip notifications without change records
+          }
+
+          const changeRecord = changeRecordMap.get(notification.changeRecordId);
+          if (!changeRecord) {
+            return false;
+          }
+
+          // Check both old and new values for case numbers
+          const oldCaseNumber = changeRecord.oldValue?.caseDetails?.caseNumber?.toUpperCase();
+          const newCaseNumber = changeRecord.newValue?.caseDetails?.caseNumber?.toUpperCase();
+
+          return (
+            (oldCaseNumber && trackedCaseIds.includes(oldCaseNumber)) ||
+            (newCaseNumber && trackedCaseIds.includes(newCaseNumber))
+          );
+        });
+
+        // Limit after filtering
+        notifications = notifications.slice(0, limit);
+      } else {
+        // No change records, return empty array
+        notifications = [];
+      }
+    }
 
     return NextResponse.json({
       success: true,

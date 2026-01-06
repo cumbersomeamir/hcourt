@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import CourtTable from '@/components/CourtTable';
 import NotificationsPanel from '@/components/NotificationsPanel';
+import CaseIdModal from '@/components/CaseIdModal';
 import { CourtCase } from '@/types/court';
 
 export default function Home() {
@@ -16,11 +17,27 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [caseIdModalOpen, setCaseIdModalOpen] = useState(false);
+  const [trackedCaseIds, setTrackedCaseIds] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const fetchSchedule = async () => {
     try {
       setError(null);
-      const response = await fetch('/api/schedule/latest');
+      // Build query params with tracked case IDs
+      const params = new URLSearchParams();
+      if (trackedCaseIds.length > 0) {
+        params.append('caseIds', trackedCaseIds.join(','));
+      }
+      if (userId) {
+        params.append('userId', userId);
+      }
+
+      const url = trackedCaseIds.length > 0 || userId
+        ? `/api/schedule/latest?${params.toString()}`
+        : '/api/schedule/latest';
+
+      const response = await fetch(url);
       const data = await response.json();
       if (data.success && data.schedule) {
         const courtsData = data.schedule.courts || [];
@@ -96,7 +113,17 @@ export default function Home() {
 
   const checkNotifications = async () => {
     try {
-      const response = await fetch('/api/notifications?unreadOnly=true&limit=1');
+      const params = new URLSearchParams();
+      params.append('unreadOnly', 'true');
+      params.append('limit', '1');
+      if (trackedCaseIds.length > 0) {
+        params.append('caseIds', trackedCaseIds.join(','));
+      }
+      if (userId) {
+        params.append('userId', userId);
+      }
+
+      const response = await fetch(`/api/notifications?${params.toString()}`);
       const data = await response.json();
       if (data.success) {
         setUnreadCount(data.count || 0);
@@ -143,6 +170,40 @@ export default function Home() {
     }
   };
 
+  // Load tracked case IDs and user info from localStorage on mount
+  useEffect(() => {
+    const storedCaseIds = localStorage.getItem('trackedCaseIds');
+    const storedUserId = localStorage.getItem('userId');
+    const hasSkipped = localStorage.getItem('hasSkippedCaseIdEntry');
+
+    if (storedCaseIds) {
+      try {
+        setTrackedCaseIds(JSON.parse(storedCaseIds));
+      } catch (e) {
+        console.error('Error parsing tracked case IDs:', e);
+      }
+    }
+
+    if (storedUserId) {
+      setUserId(storedUserId);
+      // Optionally fetch user's case IDs from DB
+      fetch(`/api/users?userId=${storedUserId}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.user.caseIds) {
+            setTrackedCaseIds(data.user.caseIds);
+            localStorage.setItem('trackedCaseIds', JSON.stringify(data.user.caseIds));
+          }
+        })
+        .catch(err => console.error('Error fetching user data:', err));
+    }
+
+    // Show modal if user hasn't entered case IDs and hasn't skipped
+    if (!storedCaseIds && !hasSkipped && !storedUserId) {
+      setCaseIdModalOpen(true);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSchedule();
     checkNotifications();
@@ -175,7 +236,7 @@ export default function Home() {
       clearInterval(statsInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [trackedCaseIds, userId]);
 
   // Initialize filtered courts when courts data changes
   useEffect(() => {
@@ -206,6 +267,13 @@ export default function Home() {
               )}
             </div>
             <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+              <button
+                onClick={() => setCaseIdModalOpen(true)}
+                className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
+                title="Manage tracked cases"
+              >
+                {trackedCaseIds.length > 0 ? `Tracked (${trackedCaseIds.length})` : 'Track Cases'}
+              </button>
               <button
                 onClick={() => fetchSchedule()}
                 disabled={loading}
@@ -278,9 +346,17 @@ export default function Home() {
               </button>
             )}
           </div>
-          {searchTerm && (
+          {(searchTerm || trackedCaseIds.length > 0) && (
             <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              Showing {filteredCourts.length} of {courts.length} courts
+              {searchTerm && trackedCaseIds.length > 0 && (
+                <span>Showing {filteredCourts.length} of {courts.length} courts (filtered by search & tracked cases)</span>
+              )}
+              {searchTerm && trackedCaseIds.length === 0 && (
+                <span>Showing {filteredCourts.length} of {courts.length} courts</span>
+              )}
+              {!searchTerm && trackedCaseIds.length > 0 && (
+                <span>Showing {filteredCourts.length} court{filteredCourts.length !== 1 ? 's' : ''} for your tracked case{trackedCaseIds.length !== 1 ? 's' : ''}</span>
+              )}
             </div>
           )}
         </div>
@@ -323,6 +399,23 @@ export default function Home() {
       <NotificationsPanel
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
+        trackedCaseIds={trackedCaseIds}
+        userId={userId}
+      />
+
+      <CaseIdModal
+        isOpen={caseIdModalOpen}
+        onClose={() => setCaseIdModalOpen(false)}
+        onSave={(caseIds, newUserId) => {
+          setTrackedCaseIds(caseIds);
+          if (newUserId) {
+            setUserId(newUserId);
+          }
+          // Refresh schedule and notifications after saving
+          fetchSchedule();
+          checkNotifications();
+        }}
+        existingCaseIds={trackedCaseIds}
       />
     </div>
   );

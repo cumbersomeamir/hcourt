@@ -6,9 +6,11 @@ import { Notification } from '@/types/court';
 interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  trackedCaseIds?: string[];
+  userId?: string | null;
 }
 
-export default function NotificationsPanel({ isOpen, onClose }: NotificationsPanelProps) {
+export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [], userId }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -17,12 +19,22 @@ export default function NotificationsPanel({ isOpen, onClose }: NotificationsPan
     if (isOpen) {
       fetchNotifications();
     }
-  }, [isOpen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, trackedCaseIds, userId]);
 
   const fetchNotifications = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/notifications?limit=100');
+      const params = new URLSearchParams();
+      params.append('limit', '100');
+      if (trackedCaseIds.length > 0) {
+        params.append('caseIds', trackedCaseIds.join(','));
+      }
+      if (userId) {
+        params.append('userId', userId);
+      }
+
+      const response = await fetch(`/api/notifications?${params.toString()}`);
       const data = await response.json();
       if (data.success) {
         setNotifications(data.notifications);
