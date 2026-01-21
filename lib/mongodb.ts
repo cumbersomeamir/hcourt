@@ -1,6 +1,43 @@
 import { MongoClient, Db } from 'mongodb';
+import dns from 'node:dns';
 
-const uri: string = process.env.MONGODB_URI || 'mongodb+srv://amir_db_user:Yb7807wnukFnfQCp@hcourt.dmrq5ne.mongodb.net/?retryWrites=true&w=majority&appName=hcourt';
+// Work around environments where Node's c-ares resolver can't use a scoped (link-local) DNS server
+// like `fe80::...%en0`, which can cause `querySrv ECONNREFUSED` for Atlas SRV lookups.
+const dnsServersEnv = process.env.MONGODB_DNS_SERVERS;
+if (dnsServersEnv) {
+  dns.setServers(
+    dnsServersEnv
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
+} else {
+  const currentServers = dns.getServers();
+  const likelyBrokenForSrv =
+    currentServers.length > 0 &&
+    currentServers.every(
+      (s) =>
+        s === '127.0.0.1' ||
+        s === '::1' ||
+        s.startsWith('fe80:') ||
+        s.startsWith('169.254.')
+    );
+  if (likelyBrokenForSrv) {
+    // Safe defaults; user can override via MONGODB_DNS_SERVERS
+    dns.setServers(['1.1.1.1', '8.8.8.8']);
+    console.warn(
+      '[mongodb] Detected local/loopback/link-local DNS servers; forcing public DNS servers for SRV lookups. ' +
+        'Override with MONGODB_DNS_SERVERS.'
+    );
+  }
+}
+
+const uri = process.env.MONGODB_URI;
+if (!uri) {
+  throw new Error(
+    'Missing MONGODB_URI. Create a .env.local file in the project root and set MONGODB_URI.'
+  );
+}
 const options = {};
 
 let client: MongoClient;

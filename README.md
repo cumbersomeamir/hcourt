@@ -35,3 +35,11 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 # hcourt
+
+## Local setup
+
+Create a `.env.local` file (not committed) with:
+
+- `MONGODB_URI` (Atlas connection string)
+
+You can start from `env.local.template` and fill in your credentials.

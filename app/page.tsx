@@ -286,6 +286,26 @@ export default function Home() {
                 </svg>
                 Web Diary
               </a>
+              <a
+                href="/orders"
+                className="rounded-md bg-orange-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-orange-700 active:bg-orange-800 touch-manipulation inline-flex items-center gap-2"
+                title="Fetch case orders/details and download PDF + Excel"
+              >
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 6H7a2 2 0 01-2-2V4a2 2 0 012-2h6l6 6v12a2 2 0 01-2 2z"
+                  />
+                </svg>
+                Orders
+              </a>
               <button
                 onClick={() => setCaseIdModalOpen(true)}
                 className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
