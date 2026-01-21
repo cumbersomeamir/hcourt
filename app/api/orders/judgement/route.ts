@@ -63,10 +63,14 @@ export async function GET(request: Request) {
     const safeDate = String(item.date || '').trim().replace(/[^0-9\\-_.]/g, '') || `idx-${index}`;
     const filename = `order-judgement-${safeCase}-${safeDate}.pdf`;
 
+    // Check if this is a "view" request (open in browser) vs "download" (attachment)
+    const view = searchParams.get('view') === 'true';
+    const disposition = view ? `inline; filename="${filename}"` : `attachment; filename="${filename}"`;
+
     return new NextResponse(buf, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': disposition,
       },
     });
   } catch (error) {

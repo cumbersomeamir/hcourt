@@ -572,10 +572,11 @@ export default function OrdersPage() {
                                       <td className="px-3 py-2">
                                         <div className="flex flex-wrap gap-3">
                                           <a
-                                            href={j.url}
+                                            href={`/api/orders/judgement?orderId=${encodeURIComponent(o._id)}&index=${j.index}&view=true`}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="text-blue-600 dark:text-blue-400 hover:underline"
+                                            title="View (captcha solved automatically)"
                                           >
                                             Open
                                           </a>
