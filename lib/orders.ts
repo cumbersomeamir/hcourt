@@ -28,10 +28,24 @@ export type OrdersFetchResult = {
   excel: { filename: string; base64: string };
 };
 
+export type OrdersStored = {
+  caseId: string; // e.g. WRIC/10721/2025
+  caseTypeValue: string;
+  caseTypeLabel: string;
+  caseNo: string;
+  caseYear: string;
+  upstream: { cino: string; source: string; iemi?: string };
+  caseInfo: OrdersFetchResult['caseInfo'];
+  details: OrdersFetchResult['details'];
+  orderJudgements?: Array<{ index: number; date: string; url: string }>;
+  fetchedAt: string; // ISO
+};
+
 const BASE = 'https://hclko.allahabadhighcourt.in/status';
 const CASE_NUMBER_URL = `${BASE}/index.php/case-number`;
 const CASE_INFO_URL = `${BASE}/index.php/get_CaseInfo`;
 const CASE_DETAILS_URL = `${BASE}/index.php/get_CaseDetails`;
+const ORDER_SHEETS_URL = `${BASE}/index.php/get-order-sheets`;
 
 function normalizeText(s: string) {
   return s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
@@ -186,6 +200,7 @@ async function buildExcel(params: {
   caseNo: string;
   caseYear: string;
   details: ReturnType<typeof parseDetails>;
+  orderJudgements?: Array<{ index: number; date: string; url: string }>;
 }) {
   const wb = new ExcelJS.Workbook();
   wb.creator = 'hcourt';
@@ -220,6 +235,19 @@ async function buildExcel(params: {
     for (const row of params.details.iaDetails) ia.addRow(row);
   } else {
     ia.addRow(['No IA details found']);
+  }
+
+  const oj = wb.addWorksheet('Order-Judgement');
+  const ojRows = params.orderJudgements || [];
+  if (ojRows.length > 0) {
+    oj.columns = [
+      { header: '#', key: 'index', width: 6 },
+      { header: 'Date', key: 'date', width: 16 },
+      { header: 'Link', key: 'url', width: 90 },
+    ];
+    for (const r of ojRows) oj.addRow(r);
+  } else {
+    oj.addRow(['No order/judgement entries found']);
   }
 
   const buf = (await wb.xlsx.writeBuffer()) as ArrayBuffer;
@@ -257,6 +285,153 @@ async function buildPdf(detailsHtml: string) {
   } finally {
     await browser.close();
   }
+}
+
+export async function fetchDetailsHtml(upstream: { cino: string; source: string; iemi?: string }) {
+  const detailsForm = new URLSearchParams();
+  detailsForm.set('cino', upstream.cino);
+  detailsForm.set('source', upstream.source || '');
+  if (upstream.iemi) detailsForm.set('iemi', upstream.iemi);
+
+  const detailsRes = await fetch(CASE_DETAILS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0',
+      'Origin': BASE,
+      'Referer': CASE_NUMBER_URL,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: detailsForm.toString(),
+    cache: 'no-store',
+  });
+  if (!detailsRes.ok) throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
+  return await detailsRes.text();
+}
+
+export async function fetchOrderJudgements(params: { ct: string; cn: string; cy: string }) {
+  const form = new URLSearchParams();
+  form.set('ct', params.ct);
+  form.set('cn', params.cn);
+  form.set('cy', params.cy);
+
+  const res = await fetch(ORDER_SHEETS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0',
+      'Origin': BASE,
+      'Referer': CASE_NUMBER_URL,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: form.toString(),
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Failed to fetch order sheets: ${res.status}`);
+  const html = await res.text();
+  const $ = cheerio.load(html);
+
+  const rows: Array<{ index: number; date: string; url: string }> = [];
+  $('table tr')
+    .slice(1)
+    .each((_, tr) => {
+      const tds = $(tr).find('td');
+      const idxText = normalizeText($(tds.get(0)).text()).replace(/[^0-9]/g, '');
+      const date = normalizeText($(tds.get(1)).text());
+      const a = $(tds.get(2)).find('a[href]').first();
+      const href = (a.attr('href') || '').trim();
+      const index = idxText ? parseInt(idxText, 10) : rows.length + 1;
+      if (href) rows.push({ index, date, url: href });
+    });
+
+  return rows;
+}
+
+export async function generatePdfFromUpstream(upstream: { cino: string; source: string; iemi?: string }) {
+  const html = await fetchDetailsHtml(upstream);
+  return await buildPdf(html);
+}
+
+export async function generateExcelFromUpstream(params: {
+  caseTypeLabel: string;
+  caseNo: string;
+  caseYear: string;
+  upstream: { cino: string; source: string; iemi?: string };
+}) {
+  const html = await fetchDetailsHtml(params.upstream);
+  const details = parseDetails(html);
+  const ct = (params.caseTypeLabel.split('-')[0] || params.caseTypeLabel).trim().toUpperCase();
+  const orderJudgements = await fetchOrderJudgements({ ct, cn: params.caseNo, cy: params.caseYear }).catch(() => []);
+  return await buildExcel({ caseTypeLabel: params.caseTypeLabel, caseNo: params.caseNo, caseYear: params.caseYear, details, orderJudgements });
+}
+
+export async function fetchOrdersForStorage(input: OrdersFetchInput): Promise<OrdersStored> {
+  const caseNo = input.caseNo.trim();
+  const caseYear = input.caseYear.trim();
+  const caseTypeValue = input.caseType.trim();
+  if (!caseTypeValue) throw new Error('Missing caseType');
+  if (!/^\d+$/.test(caseNo)) throw new Error('Case No must be numeric');
+  if (!/^\d{4}$/.test(caseYear)) throw new Error('Case Year must be 4 digits');
+
+  const types = await fetchCaseTypes();
+  const caseTypeLabel = types.find((t) => t.value === caseTypeValue)?.label || caseTypeValue;
+
+  const form = new URLSearchParams();
+  form.set('case_type', caseTypeValue);
+  form.set('case_no', caseNo);
+  form.set('case_year', caseYear);
+  form.set('captchacode', '0000');
+
+  const infoRes = await fetch(CASE_INFO_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0',
+      'Origin': BASE,
+      'Referer': CASE_NUMBER_URL,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+    body: form.toString(),
+    cache: 'no-store',
+  });
+  if (!infoRes.ok) throw new Error(`Failed to fetch case info: ${infoRes.status}`);
+  const caseInfoHtml = await infoRes.text();
+
+  if (/Record\s+Not\s+Found/i.test(caseInfoHtml)) {
+    throw new Error(`Record not found for ${caseTypeLabel} / ${caseNo} / ${caseYear}. Check Case Year/No and try again.`);
+  }
+
+  const viewParams = extractViewParams(caseInfoHtml);
+  if (!viewParams) throw new Error('Could not find a "view" link in case search results');
+
+  const infoParsed = parseCaseInfo(caseInfoHtml);
+  const detailsHtml = await fetchDetailsHtml(viewParams);
+  const details = parseDetails(detailsHtml);
+
+  // Case ID we track everywhere else is "TYPE/NO/YEAR" where TYPE is the abbreviation (e.g. WRIC).
+  // caseTypeLabel begins with "WRIC - ..."
+  const abbrev = (caseTypeLabel.split('-')[0] || caseTypeLabel).trim().toUpperCase();
+  const caseId = `${abbrev}/${caseNo}/${caseYear}`.toUpperCase();
+  const orderJudgements = await fetchOrderJudgements({ ct: abbrev, cn: caseNo, cy: caseYear }).catch(() => []);
+
+  return {
+    caseId,
+    caseTypeValue,
+    caseTypeLabel,
+    caseNo,
+    caseYear,
+    upstream: viewParams,
+    caseInfo: {
+      caseType: caseTypeLabel,
+      caseNo,
+      caseYear,
+      status: infoParsed.status,
+      petitionerVsRespondent: infoParsed.petitionerVsRespondent,
+    },
+    details,
+    orderJudgements,
+    fetchedAt: new Date().toISOString(),
+  };
 }
 
 export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
@@ -303,31 +478,15 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
 
   const infoParsed = parseCaseInfo(caseInfoHtml);
 
-  const detailsForm = new URLSearchParams();
-  detailsForm.set('cino', viewParams.cino);
-  detailsForm.set('source', viewParams.source);
-  if (viewParams.iemi) detailsForm.set('iemi', viewParams.iemi);
-
-  const detailsRes = await fetch(CASE_DETAILS_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'User-Agent': 'Mozilla/5.0',
-      'Origin': BASE,
-      'Referer': CASE_NUMBER_URL,
-      'X-Requested-With': 'XMLHttpRequest',
-    },
-    body: detailsForm.toString(),
-    cache: 'no-store',
-  });
-  if (!detailsRes.ok) throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
-  const detailsHtml = await detailsRes.text();
+  const detailsHtml = await fetchDetailsHtml(viewParams);
 
   const details = parseDetails(detailsHtml);
+  const abbrev = (caseTypeLabel.split('-')[0] || caseTypeLabel).trim().toUpperCase();
+  const orderJudgements = await fetchOrderJudgements({ ct: abbrev, cn: caseNo, cy: caseYear }).catch(() => []);
 
   const [pdfBuf, xlsxBuf] = await Promise.all([
     buildPdf(detailsHtml),
-    buildExcel({ caseTypeLabel, caseNo, caseYear, details }),
+    buildExcel({ caseTypeLabel, caseNo, caseYear, details, orderJudgements }),
   ]);
 
   const safeName = `${caseType}-${caseNo}-${caseYear}`.replace(/[^a-z0-9\\-_.]/gi, '_');
