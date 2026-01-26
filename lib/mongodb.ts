@@ -1,4 +1,4 @@
-// Server-only module
+// Server-only module - prevent browser usage
 if (typeof window !== 'undefined') {
   throw new Error('MongoDB client cannot be used in browser');
 }
