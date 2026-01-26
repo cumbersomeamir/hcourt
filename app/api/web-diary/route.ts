@@ -173,7 +173,9 @@ export async function GET(request: Request) {
               $li.find('font').each((_, font) => {
                 const $font = $date(font);
                 // Clone and remove links to get clean text
-                const $fontClone = $date($font.get(0).cloneNode(true) as cheerio.Element);
+                const fontElement = $font.get(0);
+                if (!fontElement) return;
+                const $fontClone = $date(fontElement.cloneNode(true));
                 $fontClone.find('a').remove();
                 const fontText = $fontClone.text().trim();
                 // Only add meaningful text (not just "PDF", "ODT", etc.)
