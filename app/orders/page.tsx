@@ -180,7 +180,7 @@ export default function OrdersPage() {
                 <input
                   value={caseNo}
                   onChange={(e) => setCaseNo(e.target.value.replace(/[^0-9]/g, ''))}
-                  placeholder="e.g. 10721"
+                  placeholder="Enter case number"
                   className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 sm:px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
               </div>
@@ -198,14 +198,14 @@ export default function OrdersPage() {
             </div>
 
             <div className="mt-3 sm:mt-4 flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
-              <div className="text-xs text-gray-600 dark:text-gray-400">
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-2 sm:mb-0">
                 Quickly search case details. Captcha is handled automatically. Results are not saved.
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 w-full sm:w-auto">
                 <button
                   onClick={runFetch}
                   disabled={loading || !caseType || !caseNo || caseYear.length !== 4}
-                  className="rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+                  className="rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 active:bg-gray-800 disabled:opacity-50 touch-manipulation w-full sm:w-auto"
                 >
                   {loading ? 'Searching…' : 'Search'}
                 </button>
@@ -215,7 +215,9 @@ export default function OrdersPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-4 sm:mb-6">
+        {/* Regular Fetch Orders Form - hidden when search form is visible */}
+        {!showSearchForm && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-4 sm:mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
             <div>
               <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
@@ -243,7 +245,7 @@ export default function OrdersPage() {
               <input
                 value={caseNo}
                 onChange={(e) => setCaseNo(e.target.value.replace(/[^0-9]/g, ''))}
-                placeholder="e.g. 10721"
+                placeholder="Enter case number"
                 className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 sm:px-3 py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
               />
             </div>
@@ -273,7 +275,8 @@ export default function OrdersPage() {
             </button>
           </div>
           {error && <div className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</div>}
-        </div>
+          </div>
+        )}
 
         {result && (
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4">
@@ -291,10 +294,10 @@ export default function OrdersPage() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
                 <button
                   onClick={() => downloadBase64(result.pdf.filename, result.pdf.base64, 'application/pdf')}
-                  className="rounded-md bg-blue-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700"
+                  className="rounded-md bg-blue-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation w-full sm:w-auto"
                 >
                   Download PDF
                 </button>
@@ -306,7 +309,7 @@ export default function OrdersPage() {
                       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
                     )
                   }
-                  className="rounded-md bg-green-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700"
+                  className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation w-full sm:w-auto"
                 >
                   Download Excel
                 </button>
@@ -314,20 +317,20 @@ export default function OrdersPage() {
             </div>
 
             <div className="mt-4">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Key details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 sm:mb-3">Key details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 {result.details.keyValues.slice(0, 40).map((kv, idx) => (
                   <div
                     key={`${kv.key}-${idx}`}
-                    className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-3 py-2"
+                    className="rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 px-2.5 sm:px-3 py-2"
                   >
-                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400">{kv.key}</div>
-                    <div className="text-sm text-gray-900 dark:text-gray-100 break-words">{kv.value}</div>
+                    <div className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-0.5">{kv.key}</div>
+                    <div className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 break-words">{kv.value}</div>
                   </div>
                 ))}
               </div>
               {result.details.keyValues.length > 40 && (
-                <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <div className="mt-2 sm:mt-3 text-xs text-gray-500 dark:text-gray-400 px-1">
                   Showing first 40 fields. Download Excel for the full structured output.
                 </div>
               )}

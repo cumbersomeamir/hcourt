@@ -13,7 +13,6 @@ export default function Home() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [isMonitoring, setIsMonitoring] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,26 +148,6 @@ export default function Home() {
     }
   };
 
-  const startMonitoring = async () => {
-    if (isMonitoring) return;
-    setIsMonitoring(true);
-
-    try {
-      const response = await fetch('/api/monitor', { method: 'POST' });
-      const data = await response.json();
-      if (data.success) {
-        if (data.changesDetected > 0) {
-          // Refresh schedule and notifications
-          await fetchSchedule();
-          await checkNotifications();
-        }
-      }
-    } catch (error) {
-      console.error('Error monitoring:', error);
-    } finally {
-      setIsMonitoring(false);
-    }
-  };
 
   // Load tracked case IDs and user info from localStorage on mount
   useEffect(() => {
@@ -205,18 +184,14 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Initial load
     fetchSchedule();
     checkNotifications();
     fetchDbStats();
 
-    // Poll for schedule updates every 30 seconds
+    // Poll for schedule updates every 30 seconds (backend worker handles change detection)
     const scheduleInterval = setInterval(() => {
       fetchSchedule();
-    }, 30000);
-
-    // Poll for monitoring changes every 30 seconds
-    const monitorInterval = setInterval(() => {
-      startMonitoring();
     }, 30000);
 
     // Check for new notifications every 10 seconds
@@ -231,7 +206,6 @@ export default function Home() {
 
     return () => {
       clearInterval(scheduleInterval);
-      clearInterval(monitorInterval);
       clearInterval(notificationInterval);
       clearInterval(statsInterval);
     };
@@ -431,7 +405,7 @@ export default function Home() {
         )}
 
         <div className="mt-3 sm:mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-2">
-          This page refreshes automatically every 30 seconds
+          Schedule updates automatically every 30 seconds. Change detection runs in the background.
         </div>
       </div>
 
