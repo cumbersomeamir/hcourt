@@ -227,7 +227,31 @@ async function buildExcel(params: {
 }
 
 async function buildPdf(detailsHtml: string) {
-  const browser = await chromium.launch();
+  // For Vercel serverless, ensure Chromium is available
+  // Use headless shell if available (lighter for serverless)
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+      ],
+    });
+  } catch (error) {
+    // Fallback: try with minimal args if the above fails
+    console.error('Failed to launch browser with full args, trying minimal:', error);
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  }
   try {
     const page = await browser.newPage();
     await page.setContent(
