@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+// Ensure this is server-only
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const WEB_DIARY_URL = 'https://www.allahabadhighcourt.in/calendar/dateWise.jsp';
 
 export async function GET(request: Request) {
