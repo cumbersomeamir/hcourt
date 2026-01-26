@@ -1,3 +1,8 @@
+// Server-only module - ensure this is not imported in client code
+if (typeof window !== 'undefined') {
+  throw new Error('lib/changeDetector.ts can only be used on the server');
+}
+
 import { ParsedCourtCase } from './parser';
 import { CourtCase, ChangeRecord } from '@/types/court';
 

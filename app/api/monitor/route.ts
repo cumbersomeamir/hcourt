@@ -5,6 +5,10 @@ import { getDb } from '@/lib/mongodb';
 import { CourtCase, ChangeRecord, Notification } from '@/types/court';
 import { Document } from 'mongodb';
 
+// Server-only route configuration
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 const COURT_VIEW_URL = 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do';
 
 export async function POST() {

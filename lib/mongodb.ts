@@ -1,3 +1,8 @@
+// Server-only module
+if (typeof window !== 'undefined') {
+  throw new Error('MongoDB client cannot be used in browser');
+}
+
 import { MongoClient, Db } from 'mongodb';
 import dns from 'node:dns';
 

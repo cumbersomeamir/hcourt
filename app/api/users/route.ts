@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/lib/mongodb';
 
+// Server-only route configuration
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
