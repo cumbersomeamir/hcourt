@@ -6,6 +6,10 @@ export {
   fetchAllahabadCourtPdfLinks,
 } from '@/lib/causeListAllahabad';
 export {
+  downloadMediationListFile,
+  fetchMediationCauseLists,
+} from '@/lib/causeListMediation';
+export {
   downloadLucknowCourtPdf,
   fetchLucknowCauseListDates,
   fetchLucknowCounselCauseList,
@@ -18,6 +22,10 @@ export type {
   CauseListDateOption,
   CauseListPdfDownload,
 } from '@/lib/causeListAllahabad';
+export type {
+  MediationDownloadResult,
+  MediationListResult,
+} from '@/lib/causeListMediation';
 export type {
   LucknowCourtSearchResult,
   LucknowCounselSearchResult,

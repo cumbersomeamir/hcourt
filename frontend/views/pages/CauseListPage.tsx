@@ -37,6 +37,21 @@ type CounselSearchResult = {
   };
 };
 
+type MediationListLink = {
+  label: string;
+  url: string;
+};
+
+type MediationListRow = {
+  date: string;
+  lists: MediationListLink[];
+};
+
+type MediationResult = {
+  allahabad: MediationListRow[];
+  lucknow: MediationListRow[];
+};
+
 type ApiSuccess<T> = {
   success: true;
   result: T;
@@ -48,6 +63,7 @@ type ApiFailure = {
 };
 
 type BenchKey = 'allahabad' | 'lucknow';
+type MediationCity = 'allahabad' | 'lucknow';
 type ActiveTile = 'allahabad' | 'lucknow' | 'mediation' | null;
 type SearchType = 'court' | 'counsel';
 
@@ -71,7 +87,7 @@ const tiles: Array<{
   {
     key: 'mediation',
     label: 'Mediation Causelist',
-    caption: 'Coming soon',
+    caption: 'In-app city tabs + downloads',
   },
 ];
 
@@ -131,6 +147,10 @@ export default function CauseListPage() {
 
   const [counselName, setCounselName] = useState('');
   const [counselResult, setCounselResult] = useState<CounselSearchResult | null>(null);
+  const [mediationData, setMediationData] = useState<MediationResult | null>(null);
+  const [mediationCity, setMediationCity] = useState<MediationCity>('allahabad');
+  const [loadingMediation, setLoadingMediation] = useState(false);
+  const [downloadingMediationUrl, setDownloadingMediationUrl] = useState<string | null>(null);
 
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
@@ -162,6 +182,10 @@ export default function CauseListPage() {
     resetResultState();
   }
 
+  function resetMediationState() {
+    setMediationCity('allahabad');
+  }
+
   async function loadDates(bench: BenchKey) {
     setError('');
     setInfo('');
@@ -188,8 +212,38 @@ export default function CauseListPage() {
     setError('');
     setInfo('');
     resetBenchState();
+    resetMediationState();
     if (!loadingDates) {
       await loadDates(bench);
+    }
+  }
+
+  async function loadMediationData() {
+    setError('');
+    setInfo('');
+    setLoadingMediation(true);
+    try {
+      const response = await fetch('/api/cause-list/mediation/list');
+      const result = await parseApiResult<MediationResult>(response);
+      setMediationData(result);
+      setInfo(
+        `Loaded mediation lists: Allahabad ${result.allahabad.length}, Lucknow ${result.lucknow.length}.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load mediation cause lists');
+    } finally {
+      setLoadingMediation(false);
+    }
+  }
+
+  async function activateMediationTile() {
+    setActiveTile('mediation');
+    setError('');
+    setInfo('');
+    resetBenchState();
+    resetMediationState();
+    if (!mediationData && !loadingMediation) {
+      await loadMediationData();
     }
   }
 
@@ -358,6 +412,34 @@ export default function CauseListPage() {
     );
   }
 
+  async function handleDownloadMediationFile(fileUrl: string) {
+    setError('');
+    setDownloadingMediationUrl(fileUrl);
+    try {
+      const response = await fetch('/api/cause-list/mediation/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileUrl }),
+      });
+      const result = await parseApiResult<{
+        filename: string;
+        mimeType: string;
+        base64: string;
+      }>(response);
+      downloadBase64File(result.filename, result.mimeType, result.base64);
+      setInfo('Mediation list downloaded.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download mediation file');
+    } finally {
+      setDownloadingMediationUrl(null);
+    }
+  }
+
+  const mediationRows =
+    mediationCity === 'allahabad'
+      ? mediationData?.allahabad || []
+      : mediationData?.lucknow || [];
+
   return (
     <div
       className={`min-h-screen bg-slate-950 ${manrope.className}`}
@@ -389,9 +471,9 @@ export default function CauseListPage() {
                     await activateBenchTile(tile.key);
                     return;
                   }
-                  setActiveTile(tile.key);
-                  setError('');
-                  setInfo(tile.caption);
+                  if (tile.key === 'mediation') {
+                    await activateMediationTile();
+                  }
                 }}
                 className={`rounded-2xl border p-5 text-left transition ${
                   activeTile === tile.key
@@ -621,8 +703,95 @@ export default function CauseListPage() {
           )}
 
           {activeTile === 'mediation' && (
-            <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-white/15 bg-slate-900/45 p-5 text-center text-sm text-slate-300">
-              Mediation Causelist flow will be added next.
+            <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-cyan-200/20 bg-slate-900/55 p-4 sm:mt-10 sm:p-6">
+              <h2 className="text-base font-semibold uppercase tracking-[0.08em] text-cyan-100 sm:text-lg">
+                Mediation Causelist
+              </h2>
+              <p className="mt-1 text-xs text-slate-300">
+                In-app mediation lists for Allahabad and Lucknow with direct download buttons.
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMediationCity('allahabad')}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+                    mediationCity === 'allahabad'
+                      ? 'bg-cyan-600 text-white'
+                      : 'border border-slate-400/40 text-slate-100 hover:border-cyan-300/70'
+                  }`}
+                >
+                  Allahabad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMediationCity('lucknow')}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold ${
+                    mediationCity === 'lucknow'
+                      ? 'bg-cyan-600 text-white'
+                      : 'border border-slate-400/40 text-slate-100 hover:border-cyan-300/70'
+                  }`}
+                >
+                  Lucknow
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={loadMediationData}
+                  className="rounded-lg border border-slate-400/40 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/70 disabled:opacity-60"
+                  disabled={loadingMediation}
+                >
+                  {loadingMediation ? 'Loading...' : 'Refresh Lists'}
+                </button>
+              </div>
+
+              <div className="mt-5 overflow-auto rounded-xl border border-slate-600/40">
+                <table className="min-w-full text-left text-sm text-slate-100">
+                  <thead className="bg-slate-800/90 text-slate-100">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Date</th>
+                      <th className="px-3 py-2 font-semibold">List(s)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mediationRows.length === 0 && (
+                      <tr>
+                        <td colSpan={2} className="px-3 py-4 text-sm text-slate-300">
+                          {loadingMediation
+                            ? 'Loading mediation lists...'
+                            : 'No mediation rows available right now.'}
+                        </td>
+                      </tr>
+                    )}
+                    {mediationRows.map((row, index) => (
+                      <tr key={`${row.date}-${index}`} className="border-t border-slate-700/50">
+                        <td className="px-3 py-3 align-top">{row.date}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            {row.lists.map((item) => (
+                              <button
+                                key={`${row.date}-${item.url}`}
+                                type="button"
+                                onClick={() => {
+                                  void handleDownloadMediationFile(item.url);
+                                }}
+                                className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
+                                disabled={downloadingMediationUrl === item.url}
+                              >
+                                {downloadingMediationUrl === item.url
+                                  ? `Downloading ${item.label}...`
+                                  : `Download ${item.label}`}
+                              </button>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
