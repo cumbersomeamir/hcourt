@@ -43,3 +43,7 @@ next-env.d.ts
 # logs
 logs/
 *.log
+
+# nested apps
+node_modules/
+.next/
