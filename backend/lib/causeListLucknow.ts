@@ -4,6 +4,7 @@ if (typeof window !== 'undefined') {
 }
 
 import * as cheerio from 'cheerio';
+import type { Element } from 'domhandler';
 import ExcelJS from 'exceljs';
 
 const USER_AGENT = 'Mozilla/5.0';
@@ -112,7 +113,7 @@ function ensureOk(response: Response, message: string) {
   }
 }
 
-function htmlCellToTextWithLines($: cheerio.CheerioAPI, element: cheerio.Element): string {
+function htmlCellToTextWithLines($: cheerio.CheerioAPI, element: Element): string {
   const clone = $(element).clone();
   clone.find('br').replaceWith('\n');
   const raw = clone.text();
@@ -220,11 +221,11 @@ function parseCounselRows(html: string): LucknowCounselRow[] {
     const cells = dataRow.children('div');
     if (cells.length < 5) return;
 
-    const srNo = htmlCellToTextWithLines($, cells.get(0));
-    const caseNo = htmlCellToTextWithLines($, cells.get(1));
-    const party = htmlCellToTextWithLines($, cells.get(2));
-    const petitionerAdvocate = htmlCellToTextWithLines($, cells.get(3));
-    const respondentAdvocate = htmlCellToTextWithLines($, cells.get(4));
+    const srNo = htmlCellToTextWithLines($, cells.get(0)!);
+    const caseNo = htmlCellToTextWithLines($, cells.get(1)!);
+    const party = htmlCellToTextWithLines($, cells.get(2)!);
+    const petitionerAdvocate = htmlCellToTextWithLines($, cells.get(3)!);
+    const respondentAdvocate = htmlCellToTextWithLines($, cells.get(4)!);
 
     if (!srNo && !caseNo && !party) return;
 

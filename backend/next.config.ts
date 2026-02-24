@@ -1,6 +1,8 @@
+import path from 'path';
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname, '../'),
   serverExternalPackages: ['playwright', 'cheerio', 'exceljs', 'mongodb'],
   webpack: (config, { isServer }) => {
     if (isServer) {
