@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { parseCourtSchedule } from '@/models/parserModel';
 import { detectChanges } from '@/models/changeDetectorModel';
+import { appendCourtHistorySnapshot } from '@/lib/courtHistory';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase, ChangeRecord, Notification } from '@/types/court';
 import { Document } from 'mongodb';
@@ -112,6 +113,14 @@ export async function POST() {
       courts: courtsToStore,
     });
 
+    await appendCourtHistorySnapshot({
+      db,
+      date: dateStr,
+      timestamp: now,
+      courts: courtsToStore,
+      source: 'monitor_api',
+    });
+
     return NextResponse.json({
       success: true,
       changesDetected: changes.length,
@@ -127,4 +136,3 @@ export async function POST() {
     );
   }
 }
-

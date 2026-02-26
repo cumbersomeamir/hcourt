@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "eslint",
-    "worker": "tsx scripts/poll-worker.ts",
-    "worker:dev": "tsx watch scripts/poll-worker.ts"
+    "worker": "node --env-file=.env.local --import tsx scripts/poll-worker.ts",
+    "worker:dev": "node --env-file=.env.local --import tsx --watch scripts/poll-worker.ts"
   },
   "dependencies": {
     "cheerio": "^1.1.2",

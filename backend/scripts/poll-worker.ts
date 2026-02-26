@@ -6,6 +6,7 @@
 
 import { parseCourtSchedule } from '../lib/parser';
 import { detectChanges } from '../lib/changeDetector';
+import { appendCourtHistorySnapshot } from '../lib/courtHistory';
 import { getDb } from '../lib/mongodb';
 import { CourtCase, ChangeRecord, Notification } from '../types/court';
 import { Document } from 'mongodb';
@@ -139,9 +140,17 @@ async function pollSchedule() {
       courts: courtsToStore,
     });
 
+    const historyInserted = await appendCourtHistorySnapshot({
+      db,
+      date: dateStr,
+      timestamp: now,
+      courts: courtsToStore,
+      source: 'worker',
+    });
+
     const duration = Date.now() - startTime;
     console.log(
-      `[Worker] Poll completed in ${duration}ms - Changes: ${changes.length}, Notifications: ${notifications.length}`
+      `[Worker] Poll completed in ${duration}ms - Changes: ${changes.length}, Notifications: ${notifications.length}, History: ${historyInserted}`
     );
   } catch (error) {
     console.error('[Worker] Error during poll:', error);
