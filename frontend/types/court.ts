@@ -39,4 +39,17 @@ export interface Notification {
   read: boolean;
 }
 
+export interface CourtHistoryRecord {
+  _id?: string;
+  date: string;
+  courtNo: string;
+  timestamp: Date | string;
+  serialNo: string | null;
+  list: string | null;
+  progress: string | null;
+  isInSession: boolean;
+  caseDetails: CourtCase['caseDetails'] | null;
+  state: CourtCase;
+  source: string;
+}
 

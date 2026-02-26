@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { parseCourtSchedule } from '@/models/parserModel';
+import { appendCourtHistorySnapshot } from '@/lib/courtHistory';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase } from '@/types/court';
 
@@ -43,6 +44,14 @@ export async function GET() {
       courts: courtsToStore,
     });
 
+    await appendCourtHistorySnapshot({
+      db,
+      date: dateStr,
+      timestamp: now,
+      courts: courtsToStore,
+      source: 'schedule_api',
+    });
+
     return NextResponse.json({
       success: true,
       date: dateStr,
@@ -57,5 +66,4 @@ export async function GET() {
     );
   }
 }
-
 

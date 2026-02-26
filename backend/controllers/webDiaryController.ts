@@ -6,6 +6,51 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const WEB_DIARY_URL = 'https://www.allahabadhighcourt.in/calendar/dateWise.jsp';
+const WEB_DIARY_BASE_URL = 'https://www.allahabadhighcourt.in';
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+function parseMonthToNumber(input: string | null): number | null {
+  if (!input) return null;
+  const value = input.trim();
+  if (!value) return null;
+
+  if (/^\d{1,2}$/.test(value)) {
+    const month = parseInt(value, 10);
+    return month >= 1 && month <= 12 ? month : null;
+  }
+
+  const index = MONTH_NAMES.findIndex((name) => name.toLowerCase() === value.toLowerCase());
+  return index >= 0 ? index + 1 : null;
+}
+
+function parseYear(input: string | null): number | null {
+  if (!input) return null;
+  const value = input.trim();
+  if (!/^\d{4}$/.test(value)) return null;
+  return parseInt(value, 10);
+}
+
+function isSelectedDateLabel(label: string, day: number, month: number, year: number): boolean {
+  const match = label.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return false;
+  const labelDay = parseInt(match[1], 10);
+  const labelMonth = parseInt(match[2], 10);
+  const labelYear = parseInt(match[3], 10);
+  return labelDay === day && labelMonth === month && labelYear === year;
+}
 
 export async function GET(request: Request) {
   try {
@@ -15,12 +60,17 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
 
     let url = WEB_DIARY_URL;
-    if (month && year) {
-      url += `?month=${month}&year=${year}`;
+    const requestedMonthNumber = parseMonthToNumber(month);
+    const requestedYear = parseYear(year);
+    const requestedMonthName =
+      requestedMonthNumber !== null ? MONTH_NAMES[requestedMonthNumber - 1] : month?.trim() || '';
+
+    if (requestedMonthName && requestedYear !== null) {
+      url += `?month=${encodeURIComponent(requestedMonthName)}&year=${requestedYear}`;
     }
 
     const response = await fetch(url, {
-      next: { revalidate: 3600 }, // Cache for 1 hour
+      cache: 'no-store',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
@@ -98,25 +148,29 @@ export async function GET(request: Request) {
     // If date is provided, fetch diary links for that date
     if (date) {
       // Parse date - can be in format "day/month/year" or separate params
-      let day: string, monthNum: string, yearNum: string;
-      
+      let dayNum: number | null = null;
+      let monthNum: number | null = null;
+      let yearNum: number | null = null;
+
       if (date.includes('/')) {
-        [day, monthNum, yearNum] = date.split('/');
+        const [dayPart, monthPart, yearPart] = date.split('/');
+        dayNum = /^\d{1,2}$/.test(dayPart) ? parseInt(dayPart, 10) : null;
+        monthNum = /^\d{1,2}$/.test(monthPart)
+          ? parseInt(monthPart, 10)
+          : parseMonthToNumber(monthPart);
+        yearNum = parseYear(yearPart);
       } else {
-        // If only day is provided, use current month/year from params
-        day = date;
-        monthNum = month || '';
-        yearNum = year || '';
+        dayNum = /^\d{1,2}$/.test(date) ? parseInt(date, 10) : null;
+        monthNum = parseMonthToNumber(month);
+        yearNum = parseYear(year);
       }
-      
-      if (day && monthNum && yearNum) {
-        // The actual content is in frame.jsp, not dateWise.jsp
-        // Convert month number to month name
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-        const monthName = monthNames[parseInt(monthNum) - 1] || monthNum;
-        
-        const frameUrl = `https://www.allahabadhighcourt.in/calendar/frame.jsp?date=${day}&month=${monthName}&year=${yearNum}`;
-        
+
+      if (dayNum && monthNum && yearNum) {
+        const monthName = MONTH_NAMES[monthNum - 1];
+        const frameUrl =
+          `${WEB_DIARY_BASE_URL}/calendar/frame.jsp?` +
+          `date=${dayNum}&month=${encodeURIComponent(monthName)}&year=${yearNum}`;
+
         try {
           // Create AbortController for timeout with longer timeout for slow connections
           const controller = new AbortController();
@@ -126,6 +180,7 @@ export async function GET(request: Request) {
           try {
             dateResponse = await fetch(frameUrl, {
               signal: controller.signal,
+              cache: 'no-store',
               headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
               },
@@ -135,7 +190,7 @@ export async function GET(request: Request) {
             clearTimeout(timeoutId);
             // If timeout or network error, log and continue with empty data
             if (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('timeout'))) {
-              console.error(`Timeout fetching diary for date ${day}/${monthNum}/${yearNum}`);
+              console.error(`Timeout fetching diary for date ${dayNum}/${monthNum}/${yearNum}`);
               calendarData.diaryLinks = [];
               calendarData.notifications = [];
               return NextResponse.json({
@@ -149,223 +204,104 @@ export async function GET(request: Request) {
           if (dateResponse.ok) {
             const dateHtml = await dateResponse.text();
             const $date = cheerio.load(dateHtml);
-            
+
             const links: Array<{ judge: string; link: string }> = [];
             const notifications: Array<{ title: string; pdfLink?: string; date: string; allLinks?: Array<{ type: string; link: string }> }> = [];
-            
-            // The content is in <LI> elements with <FONT> and <A> tags
-            // Structure: <LI><FONT>TEXT <A HREF="pdf">PDF</A></FONT></LI>
-            // Each <LI> represents one notification/entry
-            $date('li').each((_, li) => {
-              const $li = $date(li);
-              
-              // Get all links in this LI (PDF, ODT, DOC, HTML)
-              const $allLinks = $li.find('a');
-              
-              if ($allLinks.length === 0) {
-                return; // Skip LIs without links
-              }
-              
-              // Get text only from FONT elements within this specific LI
-              let description = '';
-              
-              // Get text from FONT children only
-              $li.find('font').each((_, font) => {
-                const $font = $date(font);
-                // Clone and remove links to get clean text
-                const fontElement = $font.get(0);
-                if (!fontElement) return;
-                const $fontClone = $date(fontElement.cloneNode(true));
-                $fontClone.find('a').remove();
-                const fontText = $fontClone.text().trim();
-                // Only add meaningful text (not just "PDF", "ODT", etc.)
-                if (fontText && !fontText.match(/^\s*(PDF|ODT|DOC|HTML)\s*$/i) && fontText.length > 3) {
-                  if (description) {
-                    description += ' ' + fontText;
-                  } else {
-                    description = fontText;
-                  }
+
+            const daySection = $date('#datacontainer > ul > li')
+              .filter((_, dayLi) => {
+                const dayLabel = $date(dayLi)
+                  .clone()
+                  .children()
+                  .remove()
+                  .end()
+                  .text()
+                  .replace(/\u00a0/g, ' ')
+                  .replace(/\s+/g, ' ')
+                  .trim();
+                return isSelectedDateLabel(dayLabel, dayNum as number, monthNum as number, yearNum as number);
+              })
+              .first();
+
+            if (daySection.length > 0) {
+              daySection.find('> ul > li').each((_, entry) => {
+                const $entry = $date(entry);
+                const entryLinks = $entry.find('a');
+
+                if (entryLinks.length === 0) {
+                  return;
                 }
-              });
-              
-              // Clean up the description
-              description = description.replace(/\s+/g, ' ').replace(/&nbsp;/g, ' ').trim();
-              
-              if (!description) {
-                return; // Skip if no description
-              }
-              
-              // Collect all links for this notification
-              const allLinks: Array<{ type: string; link: string }> = [];
-              let pdfLink: string | undefined;
-              
-              $allLinks.each((_, link) => {
-                const $link = $date(link);
-                const href = $link.attr('href') || '';
-                const linkText = $link.text().trim().toUpperCase();
-                
-                if (href) {
-                  const fullUrl = href.startsWith('http') ? href : `https://www.allahabadhighcourt.in${href}`;
-                  const linkType = linkText || (href.includes('.pdf') ? 'PDF' : href.includes('.odt') ? 'ODT' : href.includes('.doc') ? 'DOC' : href.includes('.html') ? 'HTML' : 'Link');
-                  
-                  allLinks.push({ type: linkType, link: fullUrl });
-                  
-                  // Set PDF link if available
-                  if (!pdfLink && (linkText === 'PDF' || href.includes('.pdf'))) {
+
+                let description = '';
+                $entry.find('font').each((_, font) => {
+                  const fontElement = $date(font).get(0);
+                  if (!fontElement) return;
+                  const $fontClone = $date(fontElement.cloneNode(true));
+                  $fontClone.find('a').remove();
+                  const fontText = $fontClone
+                    .text()
+                    .replace(/\u00a0/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                  if (fontText && !fontText.match(/^\s*(PDF|ODT|DOC|HTML)\s*$/i) && fontText.length > 3) {
+                    description = description ? `${description} ${fontText}` : fontText;
+                  }
+                });
+
+                if (!description) {
+                  const $entryClone = $entry.clone();
+                  $entryClone.find('a').remove();
+                  description = $entryClone
+                    .text()
+                    .replace(/\u00a0/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                }
+
+                if (!description) {
+                  return;
+                }
+
+                const allLinks: Array<{ type: string; link: string }> = [];
+                let pdfLink: string | undefined;
+
+                entryLinks.each((_, link) => {
+                  const $link = $date(link);
+                  const href = ($link.attr('href') || '').trim();
+                  const linkText = ($link.text() || '').trim().toUpperCase();
+
+                  if (!href) return;
+
+                  const fullUrl = href.startsWith('http') ? href : `${WEB_DIARY_BASE_URL}${href}`;
+                  let linkType = linkText;
+                  if (!linkType) {
+                    if (/\.pdf(\?|$)/i.test(href)) linkType = 'PDF';
+                    else if (/\.odt(\?|$)/i.test(href)) linkType = 'ODT';
+                    else if (/\.doc(\?|$)/i.test(href)) linkType = 'DOC';
+                    else if (/\.html?(\?|$)/i.test(href)) linkType = 'HTML';
+                    else linkType = 'LINK';
+                  }
+
+                  if (!allLinks.some((item) => item.link === fullUrl && item.type === linkType)) {
+                    allLinks.push({ type: linkType, link: fullUrl });
+                  }
+
+                  if (!pdfLink && (linkType === 'PDF' || /\.pdf(\?|$)/i.test(href))) {
                     pdfLink = fullUrl;
                   }
-                  
-                  // Also add to legacy links array for backward compatibility
-                  if (linkText === 'PDF' || href.includes('.pdf')) {
-                    if (!links.some(l => l.link === fullUrl)) {
-                      links.push({ judge: description, link: fullUrl });
-                    }
-                  }
-                }
-              });
-              
-              // Create notification entry
-              notifications.push({
-                title: description,
-                pdfLink,
-                date: `${day}/${monthNum}/${yearNum}`,
-                allLinks: allLinks.length > 0 ? allLinks : undefined,
-              });
-            });
-            
-            // Fallback: Look for any PDF links not in list items
-            $date('a[href*=".pdf"], a[href*=".PDF"]').each((_, link) => {
-              const $link = $date(link);
-              const href = $link.attr('href') || '';
-              const linkText = $link.text().trim().toUpperCase();
-              
-              // Skip if already processed in list items
-              const alreadyAdded = links.some(l => {
-                const url = href.startsWith('http') ? href : `https://www.allahabadhighcourt.in${href}`;
-                return l.link === url;
-              });
-              
-              if (href && !alreadyAdded && (linkText === 'PDF' || href.includes('.pdf'))) {
-                // Try to get description from parent elements
-                let description = '';
-                let $parent = $link.parent();
-                
-                for (let i = 0; i < 3 && $parent.length; i++) {
-                  const $clone = $parent.clone();
-                  $clone.find('a').remove();
-                  const parentText = $clone.text().trim().replace(/\s+/g, ' ').replace(/&nbsp;/g, ' ');
-                  if (parentText && !parentText.match(/^\s*(PDF|ODT|DOC|HTML)\s*$/i)) {
-                    description = parentText;
-                    break;
-                  }
-                  $parent = $parent.parent();
-                }
-                
-                const fullUrl = href.startsWith('http') ? href : `https://www.allahabadhighcourt.in${href}`;
-                const displayText = description || 'Diary PDF';
-                
-                links.push({ judge: displayText, link: fullUrl });
-              }
-            });
 
-            // Method 3: Look for list items with buttons/links (judge buttons)
-            $date('li button, li a, li input[type="button"]').each((_, el) => {
-              const $el = $date(el);
-              const text = $el.text().trim() || $el.attr('value') || $el.attr('title') || '';
-              const onclick = $el.attr('onclick') || '';
-              const href = $el.attr('href') || '';
-              
-              let pdfUrl = '';
-              
-              if (onclick) {
-                const patterns = [
-                  /(?:window\.open|loadPDF|location\.href)\s*\(\s*['"]([^'"]+\.pdf[^'"]*)['"]/i,
-                  /(?:href|src|url)\s*[=:]\s*['"]([^'"]+\.pdf[^'"]*)['"]/i,
-                  /(https?:\/\/[^\s'"]+\.pdf)/i,
-                  /(\/[^\s'"]+\.pdf)/i,
-                ];
-                
-                for (const pattern of patterns) {
-                  const match = onclick.match(pattern);
-                  if (match) {
-                    pdfUrl = match[1];
-                    break;
+                  if ((linkType === 'PDF' || /\.pdf(\?|$)/i.test(href)) && !links.some((l) => l.link === fullUrl)) {
+                    links.push({ judge: description, link: fullUrl });
                   }
-                }
-              }
-              
-              if (!pdfUrl && href) {
-                pdfUrl = href;
-              }
-              
-              if (pdfUrl && text) {
-                const fullUrl = pdfUrl.startsWith('http') ? pdfUrl : `https://www.allahabadhighcourt.in${pdfUrl}`;
-                if (!links.some(l => l.link === fullUrl && l.judge === text)) {
-                  links.push({ judge: text, link: fullUrl });
-                }
-              }
-            });
+                });
 
-            // Method 4: Check iframe - might contain the actual content
-            const iframes: string[] = [];
-            $date('iframe').each((_, iframe) => {
-              const src = $date(iframe).attr('src');
-              if (src) {
-                iframes.push(src);
-              }
-            });
-            
-            // Process iframes sequentially
-            for (const iframeSrc of iframes) {
-              const iframeUrl = iframeSrc.startsWith('http') ? iframeSrc : `https://www.allahabadhighcourt.in${iframeSrc}`;
-              
-              // If iframe contains PDF directly
-              if (iframeSrc.includes('.pdf')) {
-                if (!links.some(l => l.link === iframeUrl)) {
-                  links.push({ judge: 'Diary PDF', link: iframeUrl });
-                }
-              } else {
-                // Try to fetch iframe content
-                try {
-                  const iframeResponse = await fetch(iframeUrl, {
-                    headers: {
-                      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    },
-                  });
-                  
-                  if (iframeResponse.ok) {
-                    const iframeHtml = await iframeResponse.text();
-                    const $iframe = cheerio.load(iframeHtml);
-                    
-                    // Parse links from iframe
-                    $iframe('a[href*="pdf"], a[href*="PDF"]').each((_, link) => {
-                      const $link = $iframe(link);
-                      const href = $link.attr('href') || '';
-                      
-                      if (href) {
-                        // Get row text
-                        const $row = $link.closest('tr');
-                        let description = '';
-                        
-                        if ($row.length) {
-                          const $rowClone = $row.clone();
-                          $rowClone.find('a').remove();
-                          description = $rowClone.text().trim().replace(/\s+/g, ' ');
-                        }
-                        
-                        const fullUrl = href.startsWith('http') ? href : `https://www.allahabadhighcourt.in${href}`;
-                        const displayText = description || $link.text().trim() || 'Diary PDF';
-                        
-                        if (!links.some(l => l.link === fullUrl)) {
-                          links.push({ judge: displayText, link: fullUrl });
-                        }
-                      }
-                    });
-                  }
-                } catch (err) {
-                  console.error('Error fetching iframe content:', err);
-                }
-              }
+                notifications.push({
+                  title: description,
+                  pdfLink,
+                  date: `${dayNum}/${monthNum}/${yearNum}`,
+                  allLinks: allLinks.length > 0 ? allLinks : undefined,
+                });
+              });
             }
 
             calendarData.diaryLinks = links;
@@ -393,4 +329,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

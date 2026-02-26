@@ -1,13 +1,26 @@
 'use client';
 
+import { useState } from 'react';
 import { CourtCase } from '@/types/court';
+import CourtHistoryModal from '@/components/CourtHistoryModal';
 
 interface CourtTableProps {
   courts: CourtCase[];
   lastUpdated?: Date;
+  historyDate?: string;
 }
 
-export default function CourtTable({ courts, lastUpdated }: CourtTableProps) {
+export default function CourtTable({ courts, lastUpdated, historyDate }: CourtTableProps) {
+  const [historyCourtNo, setHistoryCourtNo] = useState<string | null>(null);
+
+  const openHistory = (courtNo: string) => {
+    setHistoryCourtNo(courtNo);
+  };
+
+  const closeHistory = () => {
+    setHistoryCourtNo(null);
+  };
+
   return (
     <div className="w-full">
       {lastUpdated && (
@@ -36,11 +49,19 @@ export default function CourtTable({ courts, lastUpdated }: CourtTableProps) {
                   <span className="text-xs italic text-gray-400">Not in session</span>
                 )}
               </div>
-              {court.progress && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                  {court.progress}
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => openHistory(court.courtNo)}
+                  className="inline-flex items-center rounded-md bg-gray-200 px-2 py-0.5 text-[11px] font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                >
+                  History
+                </button>
+                {court.progress && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    {court.progress}
+                  </span>
+                )}
+              </div>
             </div>
             
             {court.isInSession && (
@@ -139,28 +160,36 @@ export default function CourtTable({ courts, lastUpdated }: CourtTableProps) {
                     ) : '-'}
                   </td>
                   <td className="px-3 sm:px-4 py-2 sm:py-3 text-sm text-gray-500 dark:text-gray-400">
-                    {court.isInSession && court.caseDetails ? (
-                      <div className="space-y-1">
-                        <div className="font-medium text-gray-900 dark:text-gray-100">
-                          {court.caseDetails.caseNumber}
-                        </div>
-                        <div className="text-xs text-gray-600 dark:text-gray-400">
-                          {court.caseDetails.title}
-                        </div>
-                        {court.caseDetails.petitionerCounsels.length > 0 && (
-                          <div className="text-xs mt-1">
-                            <span className="font-semibold">Petitioner:</span>{' '}
-                            {court.caseDetails.petitionerCounsels.join(', ')}
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => openHistory(court.courtNo)}
+                        className="inline-flex items-center rounded-md bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                      >
+                        History
+                      </button>
+                      {court.isInSession && court.caseDetails ? (
+                        <div className="space-y-1">
+                          <div className="font-medium text-gray-900 dark:text-gray-100">
+                            {court.caseDetails.caseNumber}
                           </div>
-                        )}
-                        {court.caseDetails.respondentCounsels.length > 0 && (
-                          <div className="text-xs">
-                            <span className="font-semibold">Respondent:</span>{' '}
-                            {court.caseDetails.respondentCounsels.join(', ')}
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {court.caseDetails.title}
                           </div>
-                        )}
-                      </div>
-                    ) : '-'}
+                          {court.caseDetails.petitionerCounsels.length > 0 && (
+                            <div className="text-xs mt-1">
+                              <span className="font-semibold">Petitioner:</span>{' '}
+                              {court.caseDetails.petitionerCounsels.join(', ')}
+                            </div>
+                          )}
+                          {court.caseDetails.respondentCounsels.length > 0 && (
+                            <div className="text-xs">
+                              <span className="font-semibold">Respondent:</span>{' '}
+                              {court.caseDetails.respondentCounsels.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      ) : '-'}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -168,6 +197,13 @@ export default function CourtTable({ courts, lastUpdated }: CourtTableProps) {
           </table>
         </div>
       </div>
+
+      <CourtHistoryModal
+        isOpen={Boolean(historyCourtNo)}
+        courtNo={historyCourtNo}
+        date={historyDate || ''}
+        onClose={closeHistory}
+      />
     </div>
   );
 }

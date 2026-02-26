@@ -11,6 +11,7 @@ export default function Home() {
   const [filteredCourts, setFilteredCourts] = useState<CourtCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [scheduleDate, setScheduleDate] = useState<string>('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +43,10 @@ export default function Home() {
         const courtsData = data.schedule.courts || [];
         setCourts(courtsData);
         setLastUpdated(new Date(data.schedule.lastUpdated));
+        setScheduleDate(
+          data.schedule.date ||
+            new Date(data.schedule.lastUpdated).toISOString().split('T')[0]
+        );
         // Apply current search filter or set all courts
         if (searchTerm.trim()) {
           applySearchFilter(courtsData, searchTerm);
@@ -417,7 +422,11 @@ export default function Home() {
             </div>
           </div>
         ) : courts.length > 0 ? (
-          <CourtTable courts={searchTerm ? filteredCourts : courts} lastUpdated={lastUpdated || undefined} />
+          <CourtTable
+            courts={searchTerm ? filteredCourts : courts}
+            lastUpdated={lastUpdated || undefined}
+            historyDate={scheduleDate}
+          />
         ) : (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">No schedule data available. Click &quot;Refresh&quot; to fetch data.</div>
