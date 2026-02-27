@@ -15,6 +15,19 @@ function buildOrderTrackingKey(params: {
   return `${params.city}|${params.caseType}|${params.caseNo}|${params.caseYear}`;
 }
 
+function deriveCaseIdFromTrackedOrderCase(trackedCase: TrackedOrderCase): string | null {
+  const caseNo = String(trackedCase.caseNo || '').trim();
+  const caseYear = String(trackedCase.caseYear || '').trim();
+  if (!/^\d+$/.test(caseNo) || !/^\d{4}$/.test(caseYear)) return null;
+
+  const label = String(trackedCase.caseTypeLabel || '').trim();
+  const primaryToken = label ? label.split('-')[0]?.trim() || label : '';
+  const caseCode = primaryToken.split(/\s+/)[0]?.trim().toUpperCase() || '';
+  if (!/^[A-Z0-9]+$/.test(caseCode)) return null;
+
+  return `${caseCode}/${caseNo}/${caseYear}`;
+}
+
 function normalizeTrackedOrderCases(trackedCases: unknown): TrackedOrderCase[] {
   if (!Array.isArray(trackedCases)) return [];
   const byKey = new Map<string, TrackedOrderCase>();
@@ -59,25 +72,41 @@ export default function Home() {
   const [caseIdModalOpen, setCaseIdModalOpen] = useState(false);
   const [trackedCaseIds, setTrackedCaseIds] = useState<string[]>([]);
   const [trackedOrderCases, setTrackedOrderCases] = useState<TrackedOrderCase[]>([]);
+  const [scheduleFilterEnabled, setScheduleFilterEnabled] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const trackedOrderTrackingKeys = useMemo(
     () => trackedOrderCases.map((trackedCase) => trackedCase.trackingKey),
     [trackedOrderCases]
   );
+  const derivedTrackedCaseIdsFromOrders = useMemo(
+    () =>
+      trackedOrderCases
+        .map((trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase))
+        .filter((caseId): caseId is string => Boolean(caseId)),
+    [trackedOrderCases]
+  );
+  const effectiveTrackedCaseIds = useMemo(() => {
+    const normalized = [...trackedCaseIds, ...derivedTrackedCaseIdsFromOrders]
+      .map((id) => String(id || '').trim().toUpperCase())
+      .filter(Boolean);
+    return Array.from(new Set(normalized));
+  }, [trackedCaseIds, derivedTrackedCaseIdsFromOrders]);
+  const hasTrackedScheduleCases = effectiveTrackedCaseIds.length > 0;
+  const shouldApplyScheduleFilter = scheduleFilterEnabled && hasTrackedScheduleCases;
 
   const fetchSchedule = async () => {
     try {
       setError(null);
-      // Build query params with tracked case IDs
+      // Build query params with tracked case IDs when filter is enabled
       const params = new URLSearchParams();
-      if (trackedCaseIds.length > 0) {
-        params.append('caseIds', trackedCaseIds.join(','));
+      if (shouldApplyScheduleFilter) {
+        params.append('caseIds', effectiveTrackedCaseIds.join(','));
       }
-      if (userId) {
+      if (!shouldApplyScheduleFilter && scheduleFilterEnabled && userId) {
         params.append('userId', userId);
       }
 
-      const url = trackedCaseIds.length > 0 || userId
+      const url = shouldApplyScheduleFilter || (scheduleFilterEnabled && userId)
         ? `/api/schedule/latest?${params.toString()}`
         : '/api/schedule/latest';
 
@@ -164,8 +193,8 @@ export default function Home() {
       const params = new URLSearchParams();
       params.append('unreadOnly', 'true');
       params.append('limit', '1');
-      if (trackedCaseIds.length > 0) {
-        params.append('caseIds', trackedCaseIds.join(','));
+      if (effectiveTrackedCaseIds.length > 0) {
+        params.append('caseIds', effectiveTrackedCaseIds.join(','));
       }
       if (trackedOrderTrackingKeys.length > 0) {
         params.append('orderTrackingKeys', trackedOrderTrackingKeys.join(','));
@@ -274,7 +303,7 @@ export default function Home() {
       clearInterval(statsInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackedCaseIds, trackedOrderTrackingKeys, userId]);
+  }, [effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
 
   // Initialize filtered courts when courts data changes
   useEffect(() => {
@@ -445,17 +474,28 @@ export default function Home() {
               </button>
             )}
           </div>
-          {(searchTerm || trackedCaseIds.length > 0) && (
+          {(searchTerm || shouldApplyScheduleFilter) && (
             <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {searchTerm && trackedCaseIds.length > 0 && (
+              {searchTerm && shouldApplyScheduleFilter && (
                 <span>Showing {filteredCourts.length} of {courts.length} courts (filtered by search & tracked cases)</span>
               )}
-              {searchTerm && trackedCaseIds.length === 0 && (
+              {searchTerm && !shouldApplyScheduleFilter && (
                 <span>Showing {filteredCourts.length} of {courts.length} courts</span>
               )}
-              {!searchTerm && trackedCaseIds.length > 0 && (
-                <span>Showing {filteredCourts.length} court{filteredCourts.length !== 1 ? 's' : ''} for your tracked case{trackedCaseIds.length !== 1 ? 's' : ''}</span>
+              {!searchTerm && shouldApplyScheduleFilter && (
+                <span>Showing {filteredCourts.length} court{filteredCourts.length !== 1 ? 's' : ''} for your tracked case{effectiveTrackedCaseIds.length !== 1 ? 's' : ''}</span>
               )}
+            </div>
+          )}
+          {!scheduleFilterEnabled && hasTrackedScheduleCases && (
+            <div className="mt-2 text-sm text-amber-300">
+              Tracked-case filter is off. You are seeing all courts.
+              <button
+                onClick={() => setScheduleFilterEnabled(true)}
+                className="ml-2 text-blue-400 hover:underline"
+              >
+                Reapply filter
+              </button>
             </div>
           )}
         </div>
@@ -488,6 +528,18 @@ export default function Home() {
             lastUpdated={lastUpdated || undefined}
             historyDate={scheduleDate}
           />
+        ) : shouldApplyScheduleFilter ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4">
+            <div className="text-gray-400 text-center mb-4">
+              Your tracked case is not in session right now.
+            </div>
+            <button
+              onClick={() => setScheduleFilterEnabled(false)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Remove filter and see all courts
+            </button>
+          </div>
         ) : (
           <div className="flex items-center justify-center py-12">
             <div className="text-gray-500 dark:text-gray-400">No schedule data available. Click &quot;Refresh&quot; to fetch data.</div>
