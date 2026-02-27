@@ -32,11 +32,33 @@ export interface Notification {
   _id?: string;
   timestamp: Date;
   courtNo: string;
-  type: 'change' | 'new_case' | 'status_change';
+  type: 'change' | 'new_case' | 'status_change' | 'order_update';
   title: string;
   message: string;
   changeRecordId?: string;
+  orderTrackingKey?: string;
+  orderJudgment?: {
+    viewUrl: string;
+    date: string;
+    judgmentId: string;
+  };
+  metadata?: {
+    city?: string;
+    caseType?: string;
+    caseTypeLabel?: string;
+    caseNo?: string;
+    caseYear?: string;
+  };
   read: boolean;
+}
+
+export interface TrackedOrderCase {
+  city: 'lucknow' | 'allahabad';
+  caseType: string;
+  caseTypeLabel?: string;
+  caseNo: string;
+  caseYear: string;
+  trackingKey: string;
 }
 
 export interface CourtHistoryRecord {
@@ -52,4 +74,3 @@ export interface CourtHistoryRecord {
   state: CourtCase;
   source: string;
 }
-

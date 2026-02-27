@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
-import { Document, WithId } from 'mongodb';
+import { Document, ObjectId, WithId } from 'mongodb';
 import { ChangeRecord } from '@/types/court';
+import { normalizeCaseIds, normalizeTrackedOrderCases } from '@/lib/tracking';
+import { monitorTrackedOrderCasesByKeys } from '@/lib/trackedOrdersMonitor';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -13,24 +15,36 @@ export async function GET(request: Request) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(searchParams.get('limit') || '50');
     const caseIdsParam = searchParams.get('caseIds');
+    const orderTrackingKeysParam = searchParams.get('orderTrackingKeys');
     const userId = searchParams.get('userId');
 
-    // Get tracked case IDs
+    // Get tracked filters
     let trackedCaseIds: string[] = [];
-    
+    let trackedOrderTrackingKeys: string[] = [];
+
     if (caseIdsParam) {
       // Parse from query parameter (comma-separated)
-      trackedCaseIds = caseIdsParam.split(',').map(id => id.trim().toUpperCase()).filter(Boolean);
-    } else if (userId) {
+      trackedCaseIds = normalizeCaseIds(caseIdsParam.split(','));
+    }
+    if (orderTrackingKeysParam) {
+      trackedOrderTrackingKeys = orderTrackingKeysParam
+        .split(',')
+        .map((key) => key.trim())
+        .filter(Boolean);
+    }
+
+    if (!caseIdsParam && !orderTrackingKeysParam && userId) {
       // Fetch from user account
       const db = await getDb();
       const usersCollection = db.collection('users');
-      const { ObjectId } = await import('mongodb');
-      
+
       try {
         const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
-        if (user && user.caseIds) {
-          trackedCaseIds = user.caseIds.map((id: string) => id.toUpperCase());
+        if (user) {
+          trackedCaseIds = normalizeCaseIds(user.caseIds);
+          trackedOrderTrackingKeys = normalizeTrackedOrderCases(user.trackedOrderCases).map(
+            (trackedCase) => trackedCase.trackingKey
+          );
         }
       } catch {
         // Invalid ObjectId, continue without filtering
@@ -41,6 +55,12 @@ export async function GET(request: Request) {
     const notificationsCollection = db.collection('notifications');
     const changesCollection = db.collection('changes');
 
+    if (trackedOrderTrackingKeys.length > 0) {
+      await monitorTrackedOrderCasesByKeys(db, trackedOrderTrackingKeys, {
+        minCheckIntervalMs: 30000,
+      });
+    }
+
     const query: { read?: boolean } = {};
     if (unreadOnly) {
       query.read = false;
@@ -50,57 +70,73 @@ export async function GET(request: Request) {
     let notifications = await notificationsCollection
       .find(query)
       .sort({ timestamp: -1 })
-      .limit(limit * 2) // Fetch more to filter later
+      .limit(limit * 3) // Fetch more to filter later
       .toArray() as WithId<Document>[];
 
-    // Filter by tracked case IDs if any are provided
-    if (trackedCaseIds.length > 0) {
-      // We need to check the change records to see which case IDs they relate to
-      const changeRecordIds = notifications
-        .map((n) => n.changeRecordId as string | undefined)
-        .filter((id): id is string => Boolean(id));
+    const hasCaseFilter = trackedCaseIds.length > 0;
+    const hasOrderFilter = trackedOrderTrackingKeys.length > 0;
+    const hasTrackedFilters = hasCaseFilter || hasOrderFilter;
 
-      if (changeRecordIds.length > 0) {
-        const { ObjectId } = await import('mongodb');
-        const changeRecords = await changesCollection
-          .find({
-            _id: { $in: changeRecordIds.map((id: string) => new ObjectId(id)) },
+    // Filter by tracked entities if any are provided
+    if (hasTrackedFilters) {
+      const trackedCaseIdSet = new Set(trackedCaseIds);
+      const trackedOrderKeySet = new Set(trackedOrderTrackingKeys);
+
+      const changeRecordMap = new Map<string, ChangeRecord>();
+      if (hasCaseFilter) {
+        const changeRecordObjectIds = notifications
+          .map((n) => String(n.changeRecordId || '').trim())
+          .filter(Boolean)
+          .map((id) => {
+            try {
+              return new ObjectId(id);
+            } catch {
+              return null;
+            }
           })
-          .toArray();
+          .filter((id): id is ObjectId => Boolean(id));
 
-        const changeRecordMap = new Map(
-          changeRecords.map((cr) => [cr._id.toString(), cr as unknown as ChangeRecord])
-        );
+        if (changeRecordObjectIds.length > 0) {
+          const changeRecords = await changesCollection
+            .find({
+              _id: { $in: changeRecordObjectIds },
+            })
+            .toArray();
 
-        // Filter notifications based on whether their change records match tracked case IDs
-        notifications = notifications.filter((notification) => {
-          const changeRecordId = notification.changeRecordId as string | undefined;
-          if (!changeRecordId) {
-            return false; // Skip notifications without change records
+          for (const changeRecord of changeRecords) {
+            changeRecordMap.set(
+              changeRecord._id.toString(),
+              changeRecord as unknown as ChangeRecord
+            );
           }
-
-          const changeRecord = changeRecordMap.get(changeRecordId);
-          if (!changeRecord) {
-            return false;
-          }
-
-          // Check both old and new values for case numbers
-          const oldCaseNumber = changeRecord.oldValue?.caseDetails?.caseNumber?.toUpperCase();
-          const newCaseNumber = changeRecord.newValue?.caseDetails?.caseNumber?.toUpperCase();
-
-          return (
-            (oldCaseNumber && trackedCaseIds.includes(oldCaseNumber)) ||
-            (newCaseNumber && trackedCaseIds.includes(newCaseNumber))
-          );
-        });
-
-        // Limit after filtering
-        notifications = notifications.slice(0, limit);
-      } else {
-        // No change records, return empty array
-        notifications = [];
+        }
       }
+
+      notifications = notifications.filter((notification) => {
+        if (notification.type === 'order_update') {
+          if (!hasOrderFilter) return false;
+          const trackingKey = String(notification.orderTrackingKey || '').trim();
+          return Boolean(trackingKey && trackedOrderKeySet.has(trackingKey));
+        }
+
+        if (!hasCaseFilter) return false;
+        const changeRecordId = String(notification.changeRecordId || '').trim();
+        if (!changeRecordId) return false;
+
+        const changeRecord = changeRecordMap.get(changeRecordId);
+        if (!changeRecord) return false;
+
+        const oldCaseNumber = changeRecord.oldValue?.caseDetails?.caseNumber?.toUpperCase();
+        const newCaseNumber = changeRecord.newValue?.caseDetails?.caseNumber?.toUpperCase();
+
+        return (
+          (oldCaseNumber && trackedCaseIdSet.has(oldCaseNumber)) ||
+          (newCaseNumber && trackedCaseIdSet.has(newCaseNumber))
+        );
+      });
     }
+
+    notifications = notifications.slice(0, limit);
 
     return NextResponse.json({
       success: true,
@@ -151,4 +187,3 @@ export async function PATCH(request: Request) {
     );
   }
 }
-

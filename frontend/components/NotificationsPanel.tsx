@@ -7,20 +7,41 @@ interface NotificationsPanelProps {
   isOpen: boolean;
   onClose: () => void;
   trackedCaseIds?: string[];
+  trackedOrderTrackingKeys?: string[];
   userId?: string | null;
 }
 
-export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [], userId }: NotificationsPanelProps) {
+function downloadBase64(filename: string, base64: string, mime: string) {
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const blob = new Blob([bytes], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export default function NotificationsPanel({
+  isOpen,
+  onClose,
+  trackedCaseIds = [],
+  trackedOrderTrackingKeys = [],
+  userId,
+}: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [judgmentLoadingId, setJudgmentLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       fetchNotifications();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, trackedCaseIds, userId]);
+  }, [isOpen, trackedCaseIds, trackedOrderTrackingKeys, userId]);
 
   const fetchNotifications = async () => {
     try {
@@ -29,6 +50,9 @@ export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [
       params.append('limit', '100');
       if (trackedCaseIds.length > 0) {
         params.append('caseIds', trackedCaseIds.join(','));
+      }
+      if (trackedOrderTrackingKeys.length > 0) {
+        params.append('orderTrackingKeys', trackedOrderTrackingKeys.join(','));
       }
       if (userId) {
         params.append('userId', userId);
@@ -44,6 +68,30 @@ export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [
       console.error('Error fetching notifications:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadJudgment = async (viewUrl: string, date: string, judgmentId: string) => {
+    try {
+      setJudgmentLoadingId(judgmentId);
+      const res = await fetch('/api/orders/judgment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ viewUrl, date }),
+      });
+      const data = await res.json();
+      if (!data.success || !data.result) {
+        throw new Error(data.error || 'Failed to download order/judgment');
+      }
+      downloadBase64(
+        data.result.filename,
+        data.result.base64,
+        data.result.mimeType || 'application/pdf'
+      );
+    } catch (error) {
+      console.error('Error downloading order/judgment:', error);
+    } finally {
+      setJudgmentLoadingId(null);
     }
   };
 
@@ -82,6 +130,8 @@ export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [
         return '🔄';
       case 'change':
         return '📝';
+      case 'order_update':
+        return '📄';
       default:
         return '🔔';
     }
@@ -153,6 +203,25 @@ export default function NotificationsPanel({ isOpen, onClose, trackedCaseIds = [
                         <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-pre-line break-words">
                           {notification.message}
                         </div>
+                        {notification.type === 'order_update' && notification.orderJudgment && (
+                          <div className="mt-3">
+                            <button
+                              onClick={() =>
+                                downloadJudgment(
+                                  notification.orderJudgment!.viewUrl,
+                                  notification.orderJudgment!.date,
+                                  notification.orderJudgment!.judgmentId
+                                )
+                              }
+                              disabled={judgmentLoadingId === notification.orderJudgment.judgmentId}
+                              className="rounded-md bg-indigo-600 px-3 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-60"
+                            >
+                              {judgmentLoadingId === notification.orderJudgment.judgmentId
+                                ? 'Downloading...'
+                                : 'Download Order/Judgment'}
+                            </button>
+                          </div>
+                        )}
                         <div className="mt-2 text-xs text-gray-500 dark:text-gray-500">
                           {formatDate(notification.timestamp)} • Court {notification.courtNo}
                         </div>

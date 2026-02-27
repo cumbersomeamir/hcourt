@@ -1,10 +1,49 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import CaseIdModal from '@/views/components/CaseIdModal';
-import { CourtCase } from '@/types/court';
+import { CourtCase, TrackedOrderCase } from '@/types/court';
+
+function buildOrderTrackingKey(params: {
+  city: string;
+  caseType: string;
+  caseNo: string;
+  caseYear: string;
+}) {
+  return `${params.city}|${params.caseType}|${params.caseNo}|${params.caseYear}`;
+}
+
+function normalizeTrackedOrderCases(trackedCases: unknown): TrackedOrderCase[] {
+  if (!Array.isArray(trackedCases)) return [];
+  const byKey = new Map<string, TrackedOrderCase>();
+  for (const item of trackedCases) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    const city = String(raw.city || 'lucknow').toLowerCase() === 'allahabad' ? 'allahabad' : 'lucknow';
+    const caseType = String(raw.caseType || '').trim();
+    const caseNo = String(raw.caseNo || '').trim();
+    const caseYear = String(raw.caseYear || '').trim();
+    const caseTypeLabel = String(raw.caseTypeLabel || '').trim();
+    if (!caseType || !/^\d+$/.test(caseNo) || !/^\d{4}$/.test(caseYear)) continue;
+    const trackingKey = String(raw.trackingKey || '').trim() || buildOrderTrackingKey({
+      city,
+      caseType,
+      caseNo,
+      caseYear,
+    });
+    byKey.set(trackingKey, {
+      city,
+      caseType,
+      caseTypeLabel: caseTypeLabel || undefined,
+      caseNo,
+      caseYear,
+      trackingKey,
+    });
+  }
+  return Array.from(byKey.values());
+}
 
 export default function Home() {
   const [courts, setCourts] = useState<CourtCase[]>([]);
@@ -19,7 +58,12 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [caseIdModalOpen, setCaseIdModalOpen] = useState(false);
   const [trackedCaseIds, setTrackedCaseIds] = useState<string[]>([]);
+  const [trackedOrderCases, setTrackedOrderCases] = useState<TrackedOrderCase[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
+  const trackedOrderTrackingKeys = useMemo(
+    () => trackedOrderCases.map((trackedCase) => trackedCase.trackingKey),
+    [trackedOrderCases]
+  );
 
   const fetchSchedule = async () => {
     try {
@@ -123,6 +167,9 @@ export default function Home() {
       if (trackedCaseIds.length > 0) {
         params.append('caseIds', trackedCaseIds.join(','));
       }
+      if (trackedOrderTrackingKeys.length > 0) {
+        params.append('orderTrackingKeys', trackedOrderTrackingKeys.join(','));
+      }
       if (userId) {
         params.append('userId', userId);
       }
@@ -157,6 +204,7 @@ export default function Home() {
   // Load tracked case IDs and user info from localStorage on mount
   useEffect(() => {
     const storedCaseIds = localStorage.getItem('trackedCaseIds');
+    const storedTrackedOrderCases = localStorage.getItem('trackedOrderCases');
     const storedUserId = localStorage.getItem('userId');
     const hasSkipped = localStorage.getItem('hasSkippedCaseIdEntry');
 
@@ -167,6 +215,13 @@ export default function Home() {
         console.error('Error parsing tracked case IDs:', e);
       }
     }
+    if (storedTrackedOrderCases) {
+      try {
+        setTrackedOrderCases(normalizeTrackedOrderCases(JSON.parse(storedTrackedOrderCases)));
+      } catch (e) {
+        console.error('Error parsing tracked order cases:', e);
+      }
+    }
 
     if (storedUserId) {
       setUserId(storedUserId);
@@ -174,16 +229,20 @@ export default function Home() {
       fetch(`/api/users?userId=${storedUserId}`)
         .then(res => res.json())
         .then(data => {
-          if (data.success && data.user.caseIds) {
-            setTrackedCaseIds(data.user.caseIds);
-            localStorage.setItem('trackedCaseIds', JSON.stringify(data.user.caseIds));
+          if (data.success && data.user) {
+            const userCaseIds = Array.isArray(data.user.caseIds) ? data.user.caseIds : [];
+            const userTrackedOrderCases = normalizeTrackedOrderCases(data.user.trackedOrderCases);
+            setTrackedCaseIds(userCaseIds);
+            setTrackedOrderCases(userTrackedOrderCases);
+            localStorage.setItem('trackedCaseIds', JSON.stringify(userCaseIds));
+            localStorage.setItem('trackedOrderCases', JSON.stringify(userTrackedOrderCases));
           }
         })
         .catch(err => console.error('Error fetching user data:', err));
     }
 
     // Show modal if user hasn't entered case IDs and hasn't skipped
-    if (!storedCaseIds && !hasSkipped && !storedUserId) {
+    if (!storedCaseIds && !storedTrackedOrderCases && !hasSkipped && !storedUserId) {
       setCaseIdModalOpen(true);
     }
   }, []);
@@ -215,7 +274,7 @@ export default function Home() {
       clearInterval(statsInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trackedCaseIds, userId]);
+  }, [trackedCaseIds, trackedOrderTrackingKeys, userId]);
 
   // Initialize filtered courts when courts data changes
   useEffect(() => {
@@ -310,7 +369,9 @@ export default function Home() {
                 className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
                 title="Manage tracked cases"
               >
-                {trackedCaseIds.length > 0 ? `Tracked (${trackedCaseIds.length})` : 'Track Cases'}
+                {trackedCaseIds.length + trackedOrderCases.length > 0
+                  ? `Tracked (${trackedCaseIds.length + trackedOrderCases.length})`
+                  : 'Track Cases'}
               </button>
               <button
                 onClick={() => fetchSchedule()}
@@ -442,14 +503,16 @@ export default function Home() {
         isOpen={notificationsOpen}
         onClose={() => setNotificationsOpen(false)}
         trackedCaseIds={trackedCaseIds}
+        trackedOrderTrackingKeys={trackedOrderTrackingKeys}
         userId={userId}
       />
 
       <CaseIdModal
         isOpen={caseIdModalOpen}
         onClose={() => setCaseIdModalOpen(false)}
-        onSave={(caseIds, newUserId) => {
+        onSave={(caseIds, orderCases, newUserId) => {
           setTrackedCaseIds(caseIds);
+          setTrackedOrderCases(orderCases);
           if (newUserId) {
             setUserId(newUserId);
           }
@@ -458,6 +521,7 @@ export default function Home() {
           checkNotifications();
         }}
         existingCaseIds={trackedCaseIds}
+        existingTrackedOrderCases={trackedOrderCases}
       />
     </div>
   );
