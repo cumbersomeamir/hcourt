@@ -7,6 +7,7 @@
 import { parseCourtSchedule } from '../lib/parser';
 import { detectChanges } from '../lib/changeDetector';
 import { appendCourtHistorySnapshot } from '../lib/courtHistory';
+import { monitorTrackedOrderCases } from '../lib/trackedOrdersMonitor';
 import { getDb } from '../lib/mongodb';
 import { CourtCase, ChangeRecord, Notification } from '../types/court';
 import { Document } from 'mongodb';
@@ -148,9 +149,11 @@ async function pollSchedule() {
       source: 'worker',
     });
 
+    const trackedOrdersSummary = await monitorTrackedOrderCases(db);
+
     const duration = Date.now() - startTime;
     console.log(
-      `[Worker] Poll completed in ${duration}ms - Changes: ${changes.length}, Notifications: ${notifications.length}, History: ${historyInserted}`
+      `[Worker] Poll completed in ${duration}ms - Changes: ${changes.length}, Notifications: ${notifications.length}, History: ${historyInserted}, Tracked Orders: ${trackedOrdersSummary.trackedCases}, Order Notifications: ${trackedOrdersSummary.notifications}`
     );
   } catch (error) {
     console.error('[Worker] Error during poll:', error);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { parseCourtSchedule } from '@/models/parserModel';
 import { detectChanges } from '@/models/changeDetectorModel';
 import { appendCourtHistorySnapshot } from '@/lib/courtHistory';
+import { monitorTrackedOrderCases } from '@/lib/trackedOrdersMonitor';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase, ChangeRecord, Notification } from '@/types/court';
 import { Document } from 'mongodb';
@@ -121,11 +122,14 @@ export async function POST() {
       source: 'monitor_api',
     });
 
+    const trackedOrdersSummary = await monitorTrackedOrderCases(db);
+
     return NextResponse.json({
       success: true,
       changesDetected: changes.length,
       changes,
       notifications: notifications.length,
+      trackedOrders: trackedOrdersSummary,
       timestamp: now,
     });
   } catch (error) {

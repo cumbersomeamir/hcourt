@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase } from '@/types/court';
+import { normalizeCaseIds } from '@/lib/tracking';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     
     if (caseIdsParam) {
       // Parse from query parameter (comma-separated)
-      trackedCaseIds = caseIdsParam.split(',').map(id => id.trim().toUpperCase()).filter(Boolean);
+      trackedCaseIds = normalizeCaseIds(caseIdsParam.split(','));
     } else if (userId) {
       // Fetch from user account
       const db = await getDb();
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
       try {
         const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
         if (user && user.caseIds) {
-          trackedCaseIds = user.caseIds.map((id: string) => id.toUpperCase());
+          trackedCaseIds = normalizeCaseIds(user.caseIds);
         }
       } catch {
         // Invalid ObjectId, continue without filtering
@@ -77,5 +78,4 @@ export async function GET(request: Request) {
     );
   }
 }
-
 

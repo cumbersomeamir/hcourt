@@ -57,6 +57,18 @@ export type OrdersFetchResult = {
   orderJudgments: OrderJudgmentEntry[];
 };
 
+export type OrderJudgmentCaseFetchResult = {
+  city: OrdersCity;
+  caseInfo: {
+    caseType: string;
+    caseNo: string;
+    caseYear: string;
+    status?: string;
+    petitionerVsRespondent?: string;
+  };
+  orderJudgments: OrderJudgmentEntry[];
+};
+
 type OrdersSourceConfig = {
   city: OrdersCity;
   label: string;
@@ -732,7 +744,7 @@ async function buildPdf(detailsHtml: string) {
   }
 }
 
-export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
+async function fetchCaseDataForOrders(input: OrdersFetchInput) {
   const source = getSourceConfig(input.city);
   const caseNo = input.caseNo.trim();
   const caseYear = input.caseYear.trim();
@@ -741,7 +753,7 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
   if (!/^\d+$/.test(caseNo)) throw new Error('Case No must be numeric');
   if (!/^\d{4}$/.test(caseYear)) throw new Error('Case Year must be 4 digits');
 
-  // Fetch case types to get the display label (keeps output user-friendly)
+  // Fetch case types to keep labels user-friendly.
   const types = await fetchCaseTypes(source.city);
   const caseTypeLabel = types.find((t) => t.value === caseType)?.label || caseType;
 
@@ -773,9 +785,11 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
     caseInfoHtml = await infoRes.text();
   }
 
-  // When the upstream site doesn't find a record, it returns a small card with this message
+  // When the upstream site doesn't find a record, it returns a small card with this message.
   if (/Record\s+Not\s+Found/i.test(caseInfoHtml)) {
-    throw new Error(`Record not found for ${caseTypeLabel} / ${caseNo} / ${caseYear}. Check Case Year/No and try again.`);
+    throw new Error(
+      `Record not found for ${caseTypeLabel} / ${caseNo} / ${caseYear}. Check Case Year/No and try again.`
+    );
   }
 
   const viewParams = extractViewParams(caseInfoHtml);
@@ -809,26 +823,47 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
   if (!detailsRes.ok) throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
   const detailsHtml = await detailsRes.text();
 
-  const details = parseDetails(detailsHtml);
+  return {
+    source,
+    caseNo,
+    caseYear,
+    caseType,
+    caseTypeLabel,
+    infoParsed,
+    detailsHtml,
+    details: parseDetails(detailsHtml),
+    orderJudgments: await fetchOrderJudgments(detailsHtml, source),
+  };
+}
 
-  const [pdfBuf, xlsxBuf, orderJudgments] = await Promise.all([
-    buildPdf(detailsHtml),
-    buildExcel({ caseTypeLabel, caseNo, caseYear, details }),
-    fetchOrderJudgments(detailsHtml, source),
+export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
+  const caseData = await fetchCaseDataForOrders(input);
+
+  const [pdfBuf, xlsxBuf] = await Promise.all([
+    buildPdf(caseData.detailsHtml),
+    buildExcel({
+      caseTypeLabel: caseData.caseTypeLabel,
+      caseNo: caseData.caseNo,
+      caseYear: caseData.caseYear,
+      details: caseData.details,
+    }),
   ]);
 
-  const safeName = `${caseType}-${caseNo}-${caseYear}`.replace(/[^a-z0-9\\-_.]/gi, '_');
+  const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(
+    /[^a-z0-9\\-_.]/gi,
+    '_'
+  );
 
   return {
-    city: source.city,
+    city: caseData.source.city,
     caseInfo: {
-      caseType: caseTypeLabel,
-      caseNo,
-      caseYear,
-      status: infoParsed.status,
-      petitionerVsRespondent: infoParsed.petitionerVsRespondent,
+      caseType: caseData.caseTypeLabel,
+      caseNo: caseData.caseNo,
+      caseYear: caseData.caseYear,
+      status: caseData.infoParsed.status,
+      petitionerVsRespondent: caseData.infoParsed.petitionerVsRespondent,
     },
-    details,
+    details: caseData.details,
     pdf: {
       filename: `orders-${safeName}.pdf`,
       base64: pdfBuf.toString('base64'),
@@ -837,6 +872,24 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
       filename: `orders-${safeName}.xlsx`,
       base64: xlsxBuf.toString('base64'),
     },
-    orderJudgments,
+    orderJudgments: caseData.orderJudgments,
+  };
+}
+
+export async function fetchOrderJudgmentsForCase(
+  input: OrdersFetchInput
+): Promise<OrderJudgmentCaseFetchResult> {
+  const caseData = await fetchCaseDataForOrders(input);
+
+  return {
+    city: caseData.source.city,
+    caseInfo: {
+      caseType: caseData.caseTypeLabel,
+      caseNo: caseData.caseNo,
+      caseYear: caseData.caseYear,
+      status: caseData.infoParsed.status,
+      petitionerVsRespondent: caseData.infoParsed.petitionerVsRespondent,
+    },
+    orderJudgments: caseData.orderJudgments,
   };
 }

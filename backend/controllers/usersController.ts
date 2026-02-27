@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
+import { normalizeCaseIds, normalizeTrackedOrderCases } from '@/lib/tracking';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -8,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, name, caseIds } = body;
+    const { email, name, caseIds, trackedOrderCases } = body;
 
     if (!email || !name) {
       return NextResponse.json(
@@ -16,6 +17,9 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    const normalizedCaseIds = normalizeCaseIds(caseIds);
+    const normalizedTrackedOrderCases = normalizeTrackedOrderCases(trackedOrderCases);
 
     const db = await getDb();
     const usersCollection = db.collection('users');
@@ -29,7 +33,8 @@ export async function POST(request: Request) {
         { email },
         {
           $set: {
-            caseIds: caseIds || [],
+            caseIds: normalizedCaseIds,
+            trackedOrderCases: normalizedTrackedOrderCases,
             updatedAt: new Date(),
           },
         }
@@ -46,7 +51,8 @@ export async function POST(request: Request) {
     const result = await usersCollection.insertOne({
       email,
       name,
-      caseIds: caseIds || [],
+      caseIds: normalizedCaseIds,
+      trackedOrderCases: normalizedTrackedOrderCases,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -104,7 +110,8 @@ export async function GET(request: Request) {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
-        caseIds: user.caseIds || [],
+        caseIds: normalizeCaseIds(user.caseIds),
+        trackedOrderCases: normalizeTrackedOrderCases(user.trackedOrderCases),
       },
     });
   } catch (error) {
@@ -119,7 +126,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json();
-    const { userId, email, caseIds } = body;
+    const { userId, email, caseIds, trackedOrderCases } = body;
 
     if (!userId && !email) {
       return NextResponse.json(
@@ -128,9 +135,22 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (!Array.isArray(caseIds)) {
+    if (caseIds !== undefined && !Array.isArray(caseIds)) {
       return NextResponse.json(
         { success: false, error: 'caseIds must be an array' },
+        { status: 400 }
+      );
+    }
+    if (trackedOrderCases !== undefined && !Array.isArray(trackedOrderCases)) {
+      return NextResponse.json(
+        { success: false, error: 'trackedOrderCases must be an array' },
+        { status: 400 }
+      );
+    }
+
+    if (caseIds === undefined && trackedOrderCases === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'caseIds or trackedOrderCases is required' },
         { status: 400 }
       );
     }
@@ -146,13 +166,24 @@ export async function PATCH(request: Request) {
       query.email = email;
     }
 
+    const updateFields: {
+      caseIds?: string[];
+      trackedOrderCases?: ReturnType<typeof normalizeTrackedOrderCases>;
+      updatedAt: Date;
+    } = {
+      updatedAt: new Date(),
+    };
+    if (caseIds !== undefined) {
+      updateFields.caseIds = normalizeCaseIds(caseIds);
+    }
+    if (trackedOrderCases !== undefined) {
+      updateFields.trackedOrderCases = normalizeTrackedOrderCases(trackedOrderCases);
+    }
+
     const result = await usersCollection.updateOne(
       query,
       {
-        $set: {
-          caseIds,
-          updatedAt: new Date(),
-        },
+        $set: updateFields,
       }
     );
 
@@ -165,7 +196,7 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Case IDs updated',
+      message: 'Tracking preferences updated',
     });
   } catch (error) {
     console.error('Error updating user:', error);
@@ -175,4 +206,3 @@ export async function PATCH(request: Request) {
     );
   }
 }
-
