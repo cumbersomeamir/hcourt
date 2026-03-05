@@ -218,34 +218,44 @@ export default function CaseIdModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={handleSkip}></div>
-      <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl bg-white dark:bg-gray-900 rounded-lg shadow-xl p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-          Track Your Cases
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Track by case ID for schedule filtering, and by case type/no/year for order/judgment update notifications.
-        </p>
+    <div className="modal-overlay">
+      <div className="absolute inset-0" onClick={handleSkip}></div>
+      <div className="relative w-full max-w-2xl glass-card-lg p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center gap-3 mb-2">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-400/20 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-slate-100">
+              Track Your Cases
+            </h2>
+            <p className="text-xs text-slate-400">
+              Track by case ID for schedule filtering, and by case type/no/year for order notifications.
+            </p>
+          </div>
+        </div>
 
-        <div className="mb-4">
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="mt-5 mb-5">
+          <label className="flex items-center gap-2.5 cursor-pointer group">
             <input
               type="checkbox"
               checked={isCreatingAccount}
               onChange={(e) => setIsCreatingAccount(e.target.checked)}
-              className="rounded border-gray-300"
+              className="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-400/30"
             />
-            <span className="text-sm text-gray-700 dark:text-gray-300">
+            <span className="text-sm text-slate-300 group-hover:text-slate-200">
               Create an account to track cases across devices
             </span>
           </label>
         </div>
 
         {isCreatingAccount && (
-          <div className="mb-4 space-y-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div className="mb-5 space-y-3 p-4 rounded-xl border border-slate-700/40 bg-slate-800/30">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">
                 Name
               </label>
               <input
@@ -253,11 +263,11 @@ export default function CaseIdModal({
                 value={accountInfo.name}
                 onChange={(e) => setAccountInfo({ ...accountInfo, name: e.target.value })}
                 placeholder="Your name"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs font-medium text-slate-400 mb-1.5">
                 Email
               </label>
               <input
@@ -265,14 +275,15 @@ export default function CaseIdModal({
                 value={accountInfo.email}
                 onChange={(e) => setAccountInfo({ ...accountInfo, email: e.target.value })}
                 placeholder="your.email@example.com"
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               />
             </div>
           </div>
         )}
 
-        <div className="mb-4 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="mb-5 p-4 rounded-xl border border-slate-700/40 bg-slate-800/20">
+          <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-cyan-400/70"></span>
             Schedule Tracking (Case ID)
           </h3>
           <div className="flex gap-2">
@@ -289,11 +300,11 @@ export default function CaseIdModal({
                 }
               }}
               placeholder="e.g., WRIC/11985/2025"
-              className="flex-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              className="flex-1 rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
             />
             <button
               onClick={handleAddCaseId}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+              className="inline-flex items-center rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
             >
               Add
             </button>
@@ -303,14 +314,14 @@ export default function CaseIdModal({
               {caseIds.map((caseId, index) => (
                 <div
                   key={`${caseId}-${index}`}
-                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg"
+                  className="flex items-center justify-between rounded-lg border border-slate-700/30 bg-slate-800/30 px-3 py-2"
                 >
-                  <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                  <span className="text-sm font-mono text-slate-200">
                     {caseId}
                   </span>
                   <button
                     onClick={() => handleRemoveCaseId(index)}
-                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
+                    className="text-red-400 hover:text-red-300 text-xs font-medium"
                   >
                     Remove
                   </button>
@@ -320,8 +331,9 @@ export default function CaseIdModal({
           )}
         </div>
 
-        <div className="mb-4 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">
+        <div className="mb-5 p-4 rounded-xl border border-slate-700/40 bg-slate-800/20">
+          <h3 className="text-sm font-semibold text-slate-200 mb-3 flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400/70"></span>
             Order/Judgment Tracking (Case Type / No / Year)
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
@@ -329,7 +341,7 @@ export default function CaseIdModal({
               value={orderCaseForm.caseType}
               onChange={(e) => setOrderCaseForm((prev) => ({ ...prev, caseType: e.target.value }))}
               disabled={caseTypeLoading}
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              className="rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
             >
               <option value="">
                 {caseTypeLoading ? 'Loading case types...' : 'Select case type'}
@@ -350,7 +362,7 @@ export default function CaseIdModal({
                 }))
               }
               placeholder="Case no"
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              className="rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
             />
             <input
               type="text"
@@ -362,13 +374,13 @@ export default function CaseIdModal({
                 }))
               }
               placeholder="Case year"
-              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-gray-100"
+              className="rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
             />
           </div>
-          <div className="mt-2">
+          <div className="mt-2.5">
             <button
               onClick={handleAddOrderCase}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium"
+              className="inline-flex items-center rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25"
             >
               Add Order Tracking
             </button>
@@ -378,15 +390,15 @@ export default function CaseIdModal({
               {trackedOrderCases.map((trackedCase) => (
                 <div
                   key={trackedCase.trackingKey}
-                  className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 px-3 py-2 rounded-lg"
+                  className="flex items-center justify-between rounded-lg border border-slate-700/30 bg-slate-800/30 px-3 py-2"
                 >
-                  <span className="text-sm text-gray-900 dark:text-gray-100">
+                  <span className="text-sm text-slate-200">
                     {(trackedCase.caseTypeLabel || trackedCase.caseType) +
                       ` / ${trackedCase.caseNo}/${trackedCase.caseYear}`}
                   </span>
                   <button
                     onClick={() => handleRemoveOrderCase(trackedCase.trackingKey)}
-                    className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-sm"
+                    className="text-red-400 hover:text-red-300 text-xs font-medium"
                   >
                     Remove
                   </button>
@@ -396,18 +408,22 @@ export default function CaseIdModal({
           )}
         </div>
 
-        {error && <p className="mt-2 mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        {error && (
+          <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-sm text-red-300">
+            {error}
+          </div>
+        )}
 
         <div className="flex gap-3">
           <button
             onClick={handleSkip}
-            className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 text-sm font-medium"
+            className="flex-1 inline-flex items-center justify-center rounded-xl bg-slate-700/40 border border-slate-600/20 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700/60"
           >
             Skip
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium"
+            className="flex-1 inline-flex items-center justify-center rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
           >
             {isCreatingAccount ? 'Create Account & Save' : 'Save'}
           </button>
