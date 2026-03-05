@@ -97,7 +97,6 @@ export default function Home() {
   const fetchSchedule = async () => {
     try {
       setError(null);
-      // Build query params with tracked case IDs when filter is enabled
       const params = new URLSearchParams();
       if (shouldApplyScheduleFilter) {
         params.append('caseIds', effectiveTrackedCaseIds.join(','));
@@ -120,7 +119,6 @@ export default function Home() {
           data.schedule.date ||
             new Date(data.schedule.lastUpdated).toISOString().split('T')[0]
         );
-        // Apply current search filter or set all courts
         if (searchTerm.trim()) {
           applySearchFilter(courtsData, searchTerm);
         } else {
@@ -145,40 +143,23 @@ export default function Home() {
 
     const searchLower = term.toLowerCase().trim();
     const filtered = courtsToFilter.filter((court) => {
-      // Search in court number
       if (court.courtNo.toLowerCase().includes(searchLower)) return true;
-      
-      // Search in serial number
       if (court.serialNo && court.serialNo.toLowerCase().includes(searchLower)) return true;
-      
-      // Search in list
       if (court.list && court.list.toLowerCase().includes(searchLower)) return true;
-      
-      // Search in progress
       if (court.progress && court.progress.toLowerCase().includes(searchLower)) return true;
-      
-      // Search in case details
       if (court.caseDetails) {
-        // Case number
         if (court.caseDetails.caseNumber.toLowerCase().includes(searchLower)) return true;
-        
-        // Title
         if (court.caseDetails.title.toLowerCase().includes(searchLower)) return true;
-        
-        // Petitioner counsels
         if (court.caseDetails.petitionerCounsels.some(
           (counsel) => counsel.toLowerCase().includes(searchLower)
         )) return true;
-        
-        // Respondent counsels
         if (court.caseDetails.respondentCounsels.some(
           (counsel) => counsel.toLowerCase().includes(searchLower)
         )) return true;
       }
-      
       return false;
     });
-    
+
     setFilteredCourts(filtered);
   };
 
@@ -229,8 +210,6 @@ export default function Home() {
     }
   };
 
-
-  // Load tracked case IDs and user info from localStorage on mount
   useEffect(() => {
     const storedCaseIds = localStorage.getItem('trackedCaseIds');
     const storedTrackedOrderCases = localStorage.getItem('trackedOrderCases');
@@ -254,7 +233,6 @@ export default function Home() {
 
     if (storedUserId) {
       setUserId(storedUserId);
-      // Optionally fetch user's case IDs from DB
       fetch(`/api/users?userId=${storedUserId}`)
         .then(res => res.json())
         .then(data => {
@@ -270,29 +248,24 @@ export default function Home() {
         .catch(err => console.error('Error fetching user data:', err));
     }
 
-    // Show modal if user hasn't entered case IDs and hasn't skipped
     if (!storedCaseIds && !storedTrackedOrderCases && !hasSkipped && !storedUserId) {
       setCaseIdModalOpen(true);
     }
   }, []);
 
   useEffect(() => {
-    // Initial load
     fetchSchedule();
     checkNotifications();
     fetchDbStats();
 
-    // Poll for schedule updates every 30 seconds (backend worker handles change detection)
     const scheduleInterval = setInterval(() => {
       fetchSchedule();
     }, 30000);
 
-    // Check for new notifications every 10 seconds
     const notificationInterval = setInterval(() => {
       checkNotifications();
     }, 10000);
 
-    // Refresh DB stats every 60 seconds
     const statsInterval = setInterval(() => {
       fetchDbStats();
     }, 60000);
@@ -305,7 +278,6 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
 
-  // Initialize filtered courts when courts data changes
   useEffect(() => {
     if (courts.length > 0 && !searchTerm) {
       setFilteredCourts(courts);
@@ -313,91 +285,80 @@ export default function Home() {
   }, [courts, searchTerm]);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-8">
-        <div className="mb-4 sm:mb-6">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
+        {/* Header Card */}
+        <div className="glass-card-lg p-5 sm:p-8 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100 leading-tight">
-                High Court of Judicature at Allahabad, Lucknow Bench
+              <p className="text-[11px] sm:text-xs tracking-[0.25em] uppercase text-amber-400/80 font-medium mb-2">
+                Court View
+              </p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-100 leading-tight tracking-tight">
+                High Court of Judicature at Allahabad
               </h1>
-              <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                Court View - Online Court Activity Digital Display Board System
+              <p className="mt-1 text-xs sm:text-sm text-slate-400">
+                Lucknow Bench &mdash; Online Court Activity Digital Display Board
               </p>
               {dbStats && (
-                <div className="mt-2 sm:mt-3 flex flex-wrap gap-2 sm:gap-4 text-xs text-gray-500 dark:text-gray-400">
-                  <span>📊 Schedules: {dbStats.schedules}</span>
-                  <span>📝 Changes: {dbStats.changes}</span>
-                  <span>🔔 Notifications: {dbStats.notifications}</span>
+                <div className="mt-3 flex flex-wrap gap-3 sm:gap-5">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400/70"></span>
+                    <span>Schedules: <span className="text-slate-300 font-medium">{dbStats.schedules}</span></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400/70"></span>
+                    <span>Changes: <span className="text-slate-300 font-medium">{dbStats.changes}</span></span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400/70"></span>
+                    <span>Notifications: <span className="text-slate-300 font-medium">{dbStats.notifications}</span></span>
+                  </div>
                 </div>
               )}
             </div>
-            <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+            <div className="flex flex-wrap gap-2 sm:gap-2.5 flex-shrink-0">
               <a
                 href="/web-diary"
-                className="rounded-md bg-purple-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-purple-700 active:bg-purple-800 touch-manipulation inline-flex items-center gap-2"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-purple-500/15 border border-purple-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-purple-300 hover:bg-purple-500/25 hover:border-purple-400/40"
                 title="View Web Diary"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Web Diary
+                <span className="hidden sm:inline">Web Diary</span>
+                <span className="sm:hidden">Diary</span>
               </a>
               <a
                 href="/cause-list"
-                className="rounded-md bg-orange-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-orange-700 active:bg-orange-800 touch-manipulation inline-flex items-center gap-2"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500/15 border border-amber-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-amber-300 hover:bg-amber-500/25 hover:border-amber-400/40"
                 title="View Cause List"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M8 7h8m-8 4h8m-8 4h5M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
                 </svg>
-                Cause List
+                <span className="hidden sm:inline">Cause List</span>
+                <span className="sm:hidden">Causes</span>
               </a>
               <a
                 href="/status"
-                className="rounded-md bg-indigo-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-indigo-700 active:bg-indigo-800 touch-manipulation inline-flex items-center gap-2"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500/15 border border-indigo-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 hover:border-indigo-400/40"
                 title="View Status"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
                 </svg>
                 Status
               </a>
               <button
                 onClick={() => setCaseIdModalOpen(true)}
-                className="rounded-md bg-green-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-green-700 active:bg-green-800 touch-manipulation"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:border-emerald-400/40"
                 title="Manage tracked cases"
               >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
                 {trackedCaseIds.length + trackedOrderCases.length > 0
                   ? `Tracked (${trackedCaseIds.length + trackedOrderCases.length})`
                   : 'Track Cases'}
@@ -405,17 +366,23 @@ export default function Home() {
               <button
                 onClick={() => fetchSchedule()}
                 disabled={loading}
-                className="rounded-md bg-gray-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-gray-700 active:bg-gray-800 disabled:opacity-50 touch-manipulation"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-500/15 border border-slate-400/15 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-500/25 hover:border-slate-400/30 disabled:opacity-40"
               >
-                {loading ? 'Loading...' : 'Refresh'}
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="hidden sm:inline">{loading ? 'Loading...' : 'Refresh'}</span>
               </button>
               <button
                 onClick={() => setNotificationsOpen(true)}
-                className="relative rounded-md bg-blue-600 px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 touch-manipulation"
+                className="relative inline-flex items-center gap-1.5 rounded-xl bg-sky-500/15 border border-sky-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-sky-300 hover:bg-sky-500/25 hover:border-sky-400/40"
               >
-                Notifications
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <span className="hidden sm:inline">Alerts</span>
                 {unreadCount > 0 && (
-                  <span className="absolute -right-1.5 -top-1.5 sm:-right-2 sm:-top-2 flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-full bg-red-500 text-[10px] sm:text-xs text-white">
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-lg shadow-red-500/30">
                     {unreadCount}
                   </span>
                 )}
@@ -425,28 +392,18 @@ export default function Home() {
         </div>
 
         {/* Search Bar */}
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-5 sm:mb-6">
           <div className="relative">
             <input
               type="text"
               placeholder="Search by court number, case number, title, counsel name..."
               value={searchTerm}
               onChange={handleSearchChange}
-              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 sm:px-4 py-2.5 sm:py-3 pl-9 sm:pl-10 pr-9 sm:pr-10 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none touch-manipulation"
+              className="w-full rounded-xl border border-slate-600/25 bg-slate-900/50 backdrop-blur-sm px-4 py-3 pl-11 pr-10 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
             />
-            <div className="absolute inset-y-0 left-0 flex items-center pl-2.5 sm:pl-3 pointer-events-none">
-              <svg
-                className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                />
+            <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
+              <svg className="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             {searchTerm && (
@@ -455,27 +412,17 @@ export default function Home() {
                   setSearchTerm('');
                   setFilteredCourts(courts);
                 }}
-                className="absolute inset-y-0 right-0 flex items-center pr-2.5 sm:pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 touch-manipulation min-w-[44px]"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-300 min-w-[44px]"
                 aria-label="Clear search"
               >
-                <svg
-                  className="h-4 w-4 sm:h-5 sm:w-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
           </div>
           {(searchTerm || shouldApplyScheduleFilter) && (
-            <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="mt-2 text-sm text-slate-400 px-1">
               {searchTerm && shouldApplyScheduleFilter && (
                 <span>Showing {filteredCourts.length} of {courts.length} courts (filtered by search & tracked cases)</span>
               )}
@@ -488,11 +435,11 @@ export default function Home() {
             </div>
           )}
           {!scheduleFilterEnabled && hasTrackedScheduleCases && (
-            <div className="mt-2 text-sm text-amber-300">
+            <div className="mt-2 text-sm text-amber-400/80 px-1">
               Tracked-case filter is off. You are seeing all courts.
               <button
                 onClick={() => setScheduleFilterEnabled(true)}
-                className="ml-2 text-blue-400 hover:underline"
+                className="ml-2 text-cyan-400 hover:text-cyan-300 hover:underline"
               >
                 Reapply filter
               </button>
@@ -501,24 +448,28 @@ export default function Home() {
         </div>
 
         {loading && courts.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">Loading court schedule...</div>
+          <div className="glass-card p-12 flex flex-col items-center justify-center">
+            <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
+            <div className="text-slate-400 text-sm">Loading court schedule...</div>
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="text-red-600 dark:text-red-400 mb-4 text-center">
-              Error: {error}
+          <div className="glass-card p-12 flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-red-500/15 flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
             </div>
+            <div className="text-red-400 mb-4 text-center text-sm">{error}</div>
             <button
               onClick={fetchSchedule}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
             >
               Retry
             </button>
           </div>
         ) : searchTerm && filteredCourts.length === 0 ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">
+          <div className="glass-card p-12 flex items-center justify-center">
+            <div className="text-slate-400 text-sm">
               No courts found matching &quot;{searchTerm}&quot;
             </div>
           </div>
@@ -529,25 +480,26 @@ export default function Home() {
             historyDate={scheduleDate}
           />
         ) : shouldApplyScheduleFilter ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4">
-            <div className="text-gray-400 text-center mb-4">
+          <div className="glass-card p-12 flex flex-col items-center justify-center">
+            <div className="text-slate-400 text-center mb-4 text-sm">
               Your tracked case is not in session right now.
             </div>
             <button
               onClick={() => setScheduleFilterEnabled(false)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
             >
               Remove filter and see all courts
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">No schedule data available. Click &quot;Refresh&quot; to fetch data.</div>
+          <div className="glass-card p-12 flex items-center justify-center">
+            <div className="text-slate-400 text-sm">No schedule data available. Click &quot;Refresh&quot; to fetch data.</div>
           </div>
         )}
 
-        <div className="mt-3 sm:mt-4 text-center text-xs text-gray-500 dark:text-gray-400 px-2">
-          Schedule updates automatically every 30 seconds. Change detection runs in the background.
+        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 px-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500/60 animate-pulse-dot"></span>
+          Schedule updates automatically every 30 seconds
         </div>
       </div>
 
@@ -568,7 +520,6 @@ export default function Home() {
           if (newUserId) {
             setUserId(newUserId);
           }
-          // Refresh schedule and notifications after saving
           fetchSchedule();
           checkNotifications();
         }}

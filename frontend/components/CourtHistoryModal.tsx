@@ -68,30 +68,45 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose }: Co
   if (!isOpen || !courtNo) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-3xl rounded-xl border border-gray-700 bg-gray-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-gray-700 px-4 py-3 sm:px-5">
-          <div>
-            <h2 className="text-base sm:text-lg font-semibold text-gray-100">
-              Court {courtNo} History
-            </h2>
-            <p className="text-xs sm:text-sm text-gray-400">Date: {date}</p>
+    <div className="modal-overlay">
+      <div className="w-full max-w-3xl glass-card-lg overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-700/40 px-5 py-4 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-cyan-500/15 border border-cyan-400/20 flex items-center justify-center text-sm font-bold text-cyan-300">
+              {courtNo}
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-semibold text-slate-100">
+                Court {courtNo} History
+              </h2>
+              <p className="text-xs text-slate-400">Date: {date}</p>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-md bg-gray-700 px-3 py-1.5 text-xs sm:text-sm text-gray-200 hover:bg-gray-600"
+            className="inline-flex items-center rounded-lg bg-slate-700/40 border border-slate-600/20 px-3 py-1.5 text-xs sm:text-sm font-medium text-slate-300 hover:bg-slate-700/60"
           >
             Close
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-4 py-4 sm:px-5 sm:py-5">
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
           {loading ? (
-            <div className="py-8 text-center text-sm text-gray-400">Loading history...</div>
+            <div className="py-10 flex flex-col items-center">
+              <div className="w-7 h-7 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-3"></div>
+              <div className="text-sm text-slate-400">Loading history...</div>
+            </div>
           ) : error ? (
-            <div className="py-8 text-center text-sm text-red-400">{error}</div>
+            <div className="py-10 text-center">
+              <div className="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" />
+                </svg>
+              </div>
+              <div className="text-sm text-red-400">{error}</div>
+            </div>
           ) : history.length === 0 ? (
-            <div className="py-8 text-center text-sm text-gray-400">
+            <div className="py-10 text-center text-sm text-slate-400">
               No history available for this court on selected date.
             </div>
           ) : (
@@ -99,31 +114,34 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose }: Co
               {history.map((entry) => (
                 <div
                   key={entry._id || `${entry.courtNo}-${entry.timestamp}`}
-                  className="rounded-lg border border-gray-700 bg-gray-800/70 p-3 sm:p-4"
+                  className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="text-xs sm:text-sm font-medium text-blue-300">
+                    <div className="text-xs sm:text-sm font-semibold text-cyan-300">
                       {new Date(entry.timestamp).toLocaleTimeString()}
                     </div>
-                    <div className="text-[11px] sm:text-xs text-gray-400">{entry.source}</div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-700/40 text-slate-400 border border-slate-600/20">
+                      {entry.source}
+                    </span>
                   </div>
 
-                  <div className="mt-2 text-sm text-gray-100">
+                  <div className="mt-2 text-sm">
                     {entry.isInSession ? (
-                      <div className="space-y-1">
-                        <div className="font-semibold">
+                      <div className="space-y-1.5">
+                        <div className="font-semibold text-slate-100">
                           {entry.caseDetails?.caseNumber || 'Case in session'}
                         </div>
                         {entry.caseDetails?.title && (
-                          <div className="text-gray-300">{entry.caseDetails.title}</div>
+                          <div className="text-slate-400 text-xs leading-relaxed">{entry.caseDetails.title}</div>
                         )}
-                        <div className="text-xs text-gray-400">
-                          Serial: {entry.serialNo || '-'} | List: {entry.list || '-'} | Progress:{' '}
-                          {entry.progress || '-'}
+                        <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-1">
+                          <span>Serial: {entry.serialNo || '-'}</span>
+                          <span>List: {entry.list || '-'}</span>
+                          <span>Progress: {entry.progress || '-'}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="italic text-gray-400">Court NOT in session</div>
+                      <div className="italic text-slate-500 text-xs">Court NOT in session</div>
                     )}
                   </div>
                 </div>

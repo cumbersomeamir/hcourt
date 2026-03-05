@@ -442,14 +442,10 @@ export default function CauseListPage() {
 
   return (
     <div
-      className={`min-h-screen bg-slate-950 ${manrope.className}`}
-      style={{
-        backgroundImage:
-          'radial-gradient(1200px 420px at 50% -40px, rgba(249,115,22,0.22), transparent 60%), linear-gradient(180deg, #020617 0%, #0b1a3b 58%, #12284a 100%)',
-      }}
+      className={`min-h-screen ${manrope.className}`}
     >
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:pt-14">
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_24px_100px_rgba(0,0,0,0.45)] backdrop-blur-md sm:p-8">
+        <div className="glass-card-lg p-5 sm:p-8">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs tracking-[0.28em] text-orange-300/80 sm:text-sm">
               CAUSE LIST PORTAL

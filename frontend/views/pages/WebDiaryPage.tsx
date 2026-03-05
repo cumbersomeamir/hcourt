@@ -90,50 +90,53 @@ export default function WebDiaryPage() {
   const dayOptions = Array.from({ length: daysInMonth }, (_, i) => (i + 1).toString());
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+    <div className="min-h-screen">
+      <div className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
         {/* Header */}
-        <div className="mb-4 sm:mb-6">
+        <div className="mb-5 sm:mb-6">
           <div className="flex items-center gap-4 mb-3 sm:mb-4">
             <Link
               href="/"
-              className="text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium flex items-center gap-1"
+              className="text-cyan-400 hover:text-cyan-300 text-sm font-medium flex items-center gap-1.5 group"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
               Back to Court View
             </Link>
           </div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-gray-100">
-            Web Diary
-          </h1>
-          <p className="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-            High Court of Judicature at Allahabad - Daily Notifications & Cause Lists
-          </p>
+          <div className="glass-card-lg p-5 sm:p-8">
+            <p className="text-[11px] sm:text-xs tracking-[0.25em] uppercase text-amber-400/80 font-medium mb-2">
+              Web Diary
+            </p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-100">
+              Daily Notifications & Cause Lists
+            </h1>
+            <p className="mt-1 text-xs sm:text-sm text-slate-400">
+              High Court of Judicature at Allahabad
+            </p>
+          </div>
         </div>
 
-        {/* Date Selector - Mobile Optimized */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 mb-4 sm:mb-6">
+        {/* Date Selector */}
+        <div className="glass-card p-4 sm:p-5 mb-5 sm:mb-6">
           <div className="grid grid-cols-3 gap-2 sm:gap-4">
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
                 Day
               </label>
               <select
                 value={day}
                 onChange={(e) => handleDateChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               >
                 {dayOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
                 Month
               </label>
               <select
@@ -142,17 +145,15 @@ export default function WebDiaryPage() {
                   setMonth(e.target.value);
                   setDay('1');
                 }}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               >
                 {monthNames.map((name, idx) => (
-                  <option key={idx} value={(idx + 1).toString()}>
-                    {name}
-                  </option>
+                  <option key={idx} value={(idx + 1).toString()}>{name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 sm:mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
                 Year
               </label>
               <select
@@ -161,12 +162,10 @@ export default function WebDiaryPage() {
                   setYear(e.target.value);
                   setDay('1');
                 }}
-                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 sm:px-3 py-1.5 sm:py-2 text-sm text-gray-900 dark:text-gray-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               >
                 {Array.from({ length: 62 }, (_, i) => currentYear - 30 + i).map((y) => (
-                  <option key={y} value={y.toString()}>
-                    {y}
-                  </option>
+                  <option key={y} value={y.toString()}>{y}</option>
                 ))}
               </select>
             </div>
@@ -174,38 +173,44 @@ export default function WebDiaryPage() {
         </div>
 
         {/* Notifications */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-3 sm:p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-gray-100 mb-3 sm:mb-4">
+        <div className="glass-card p-4 sm:p-6">
+          <h2 className="text-lg sm:text-xl font-bold text-slate-100 mb-4">
             Notifications for {day} {monthNames[parseInt(month) - 1]} {year}
           </h2>
-          
+
           {loading ? (
-            <div className="flex items-center justify-center py-8 sm:py-12">
-              <div className="text-gray-500 dark:text-gray-400 text-sm sm:text-base">Loading notifications...</div>
+            <div className="flex flex-col items-center justify-center py-10">
+              <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
+              <div className="text-slate-400 text-sm">Loading notifications...</div>
             </div>
           ) : error ? (
-            <div className="text-center py-8 sm:py-12">
-              <div className="text-red-600 dark:text-red-400 text-sm sm:text-base mb-2">{error}</div>
+            <div className="text-center py-10">
+              <div className="w-12 h-12 rounded-full bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div className="text-red-400 text-sm mb-3">{error}</div>
               <button
                 onClick={() => fetchDiaryData(parseInt(day), parseInt(month), parseInt(year))}
-                className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
               >
                 Retry
               </button>
             </div>
           ) : notifications.length > 0 ? (
-            <div className="space-y-3 sm:space-y-4">
+            <div className="space-y-3">
               {notifications.map((notification, idx) => (
                 <div
                   key={idx}
-                  className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 hover:border-blue-300 dark:hover:border-blue-600 transition-all"
+                  className="rounded-xl border border-slate-700/40 bg-slate-800/30 p-4 hover:border-cyan-500/30 transition-colors"
                 >
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 mt-0.5">
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div className="flex-shrink-0 mt-1">
+                      <div className="w-2 h-2 rounded-full bg-cyan-400/80"></div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                      <h3 className="text-sm sm:text-base font-semibold text-slate-100 mb-2 leading-relaxed">
                         {notification.title}
                       </h3>
                       {notification.allLinks && notification.allLinks.length > 0 && (
@@ -216,14 +221,14 @@ export default function WebDiaryPage() {
                               href={linkItem.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                                 linkItem.type === 'PDF'
-                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50'
+                                  ? 'bg-red-500/15 text-red-300 border border-red-400/20 hover:bg-red-500/25'
                                   : linkItem.type === 'ODT'
-                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                                  ? 'bg-sky-500/15 text-sky-300 border border-sky-400/20 hover:bg-sky-500/25'
                                   : linkItem.type === 'DOC'
-                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                  : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/20 hover:bg-emerald-500/25'
+                                  : 'bg-slate-500/15 text-slate-300 border border-slate-400/20 hover:bg-slate-500/25'
                               }`}
                             >
                               {linkItem.type === 'PDF' && (
@@ -242,7 +247,7 @@ export default function WebDiaryPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 sm:py-12 text-gray-500 dark:text-gray-400 text-sm sm:text-base">
+            <div className="text-center py-10 text-slate-500 text-sm">
               No notifications available for this date.
             </div>
           )}
