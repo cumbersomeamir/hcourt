@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase } from '@/types/court';
 import { normalizeCaseIds } from '@/lib/tracking';
+import { syncSchedule } from '@/lib/scheduleSync';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -12,6 +13,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const caseIdsParam = searchParams.get('caseIds');
     const userId = searchParams.get('userId');
+    const forceRefresh = ['1', 'true', 'yes'].includes(
+      String(searchParams.get('force') || '').toLowerCase()
+    );
 
     // Get tracked case IDs
     let trackedCaseIds: string[] = [];
@@ -36,10 +40,12 @@ export async function GET(request: Request) {
     }
 
     const db = await getDb();
-    const scheduleCollection = db.collection('schedules');
-
-    const latestSchedule = await scheduleCollection
-      .findOne({}, { sort: { lastUpdated: -1 } });
+    const latestResult = await syncSchedule({
+      db,
+      force: forceRefresh,
+      source: forceRefresh ? 'schedule_latest_force' : 'schedule_latest',
+    });
+    const latestSchedule = latestResult.schedule;
 
     if (!latestSchedule) {
       return NextResponse.json({
@@ -69,6 +75,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       schedule: filteredSchedule,
+      refreshed: latestResult.refreshed,
+      stale: latestResult.stale,
+      warning: latestResult.warning,
     });
   } catch (error) {
     console.error('Error fetching latest schedule:', error);
@@ -78,4 +87,3 @@ export async function GET(request: Request) {
     );
   }
 }
-

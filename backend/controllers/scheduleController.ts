@@ -1,62 +1,28 @@
 import { NextResponse } from 'next/server';
-import { parseCourtSchedule } from '@/models/parserModel';
-import { appendCourtHistorySnapshot } from '@/lib/courtHistory';
 import { getDb } from '@/models/mongodbModel';
-import { CourtCase } from '@/types/court';
+import { syncSchedule } from '@/lib/scheduleSync';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const COURT_VIEW_URL = 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do';
-
 export async function GET() {
   try {
-    // Fetch the court schedule page
-    const response = await fetch(COURT_VIEW_URL, {
-      next: { revalidate: 0 }, // Always fetch fresh data
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch: ${response.statusText}`);
-    }
-
-    const html = await response.text();
-    const courts = parseCourtSchedule(html);
-
-    // Get current date
-    const now = new Date();
-    const dateStr = now.toISOString().split('T')[0];
-
-    // Save to database
     const db = await getDb();
-    const scheduleCollection = db.collection('schedules');
-    
-    // Convert to CourtCase format for storage
-    const courtsToStore: CourtCase[] = courts.map(court => ({
-      ...court,
-      caseDetails: court.caseDetails,
-    }));
-
-    await scheduleCollection.insertOne({
-      date: dateStr,
-      lastUpdated: now,
-      courts: courtsToStore,
-    });
-
-    await appendCourtHistorySnapshot({
+    const result = await syncSchedule({
       db,
-      date: dateStr,
-      timestamp: now,
-      courts: courtsToStore,
+      force: true,
       source: 'schedule_api',
+      runTrackedOrders: false,
     });
 
     return NextResponse.json({
       success: true,
-      date: dateStr,
-      lastUpdated: now,
-      courts: courtsToStore,
+      date: result.schedule.date,
+      lastUpdated: result.schedule.lastUpdated,
+      courts: result.schedule.courts,
+      stale: result.stale,
+      warning: result.warning,
     });
   } catch (error) {
     console.error('Error fetching schedule:', error);
@@ -66,4 +32,3 @@ export async function GET() {
     );
   }
 }
-

@@ -6,11 +6,13 @@ if (typeof window !== 'undefined') {
 import * as cheerio from 'cheerio';
 import ExcelJS from 'exceljs';
 import { chromium } from 'playwright';
+import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import { getDb } from './mongodb';
 
 export type CaseTypeOption = { value: string; label: string };
 export type OrdersCity = 'lucknow' | 'allahabad';
@@ -20,6 +22,15 @@ export type OrdersFetchInput = {
   caseNo: string;
   caseYear: string;
   city?: string;
+};
+
+export type OrdersCaptchaChallenge = {
+  challengeId: string;
+  city: OrdersCity;
+  imageBase64: string;
+  mimeType: string;
+  expiresAt: string;
+  prompt: string;
 };
 
 export type OrderJudgmentEntry = {
@@ -82,6 +93,36 @@ type OrdersSourceConfig = {
   captchaImageUrl?: string;
 };
 
+type OrdersCaptchaChallengeDoc = {
+  challengeId: string;
+  city: OrdersCity;
+  caseType: string;
+  caseNo: string;
+  caseYear: string;
+  cookieEntries: Array<{ name: string; value: string }>;
+  imageBase64: string;
+  mimeType: string;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date;
+  failedAttempts: number;
+};
+
+const ORDERS_CAPTCHA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+
+let ordersCaptchaIndexesEnsured = false;
+
+class OrdersCaptchaRequiredError extends Error {
+  readonly code = 'captcha_required';
+  readonly challenge: OrdersCaptchaChallenge;
+
+  constructor(message: string, challenge: OrdersCaptchaChallenge) {
+    super(message);
+    this.name = 'OrdersCaptchaRequiredError';
+    this.challenge = challenge;
+  }
+}
+
 const LUCKNOW_SOURCE: OrdersSourceConfig = {
   city: 'lucknow',
   label: 'Case Status Lucknow Bench',
@@ -107,6 +148,58 @@ const ALLAHABAD_SOURCE: OrdersSourceConfig = {
   captchaImageUrl:
     'https://www.allahabadhighcourt.in/apps/status_ccms/index.php/secureimage/securimage',
 };
+
+function sanitizeCaptchaCode(value: string): string {
+  return String(value || '').replace(/\D/g, '').slice(0, 8);
+}
+
+function cookieJarToEntries(cookieJar: Map<string, string>) {
+  return Array.from(cookieJar.entries()).map(([name, value]) => ({ name, value }));
+}
+
+function cookieEntriesToJar(entries: OrdersCaptchaChallengeDoc['cookieEntries']) {
+  const cookieJar = new Map<string, string>();
+  for (const entry of entries || []) {
+    if (!entry?.name) continue;
+    cookieJar.set(String(entry.name), String(entry.value || ''));
+  }
+  return cookieJar;
+}
+
+async function getOrdersCaptchaCollection() {
+  const db = await getDb();
+  const collection = db.collection<OrdersCaptchaChallengeDoc>('orders_captcha_challenges');
+
+  if (!ordersCaptchaIndexesEnsured) {
+    await Promise.all([
+      collection.createIndex({ challengeId: 1 }, { unique: true }),
+      collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+      collection.createIndex({ updatedAt: -1 }),
+    ]);
+    ordersCaptchaIndexesEnsured = true;
+  }
+
+  return collection;
+}
+
+function toCaptchaChallenge(
+  doc: Pick<OrdersCaptchaChallengeDoc, 'challengeId' | 'city' | 'imageBase64' | 'mimeType' | 'expiresAt'>
+): OrdersCaptchaChallenge {
+  return {
+    challengeId: doc.challengeId,
+    city: doc.city,
+    imageBase64: doc.imageBase64,
+    mimeType: doc.mimeType,
+    expiresAt: new Date(doc.expiresAt).toISOString(),
+    prompt: 'Enter the captcha shown below to continue the Allahabad case search.',
+  };
+}
+
+export function isOrdersCaptchaRequiredError(
+  error: unknown
+): error is OrdersCaptchaRequiredError {
+  return error instanceof OrdersCaptchaRequiredError;
+}
 
 function normalizeCity(city?: string): OrdersCity {
   return city?.toLowerCase() === 'allahabad' ? 'allahabad' : 'lucknow';
@@ -207,6 +300,37 @@ function toCookieHeader(cookieJar: Map<string, string>): string {
     .join('; ');
 }
 
+async function fetchAllahabadCaptchaImage(
+  source: OrdersSourceConfig,
+  cookieJar: Map<string, string>,
+  cacheBuster?: string
+) {
+  if (!source.captchaImageUrl) {
+    throw new Error('Captcha image URL is not configured for this source');
+  }
+
+  const imageRes = await fetch(
+    `${source.captchaImageUrl}?_t=${Date.now()}${cacheBuster || ''}`,
+    {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        Cookie: toCookieHeader(cookieJar),
+        Referer: source.caseNumberUrl,
+      },
+      cache: 'no-store',
+    }
+  );
+  updateCookieJar(cookieJar, imageRes);
+  if (!imageRes.ok) {
+    throw new Error(`Failed to fetch Allahabad captcha image: ${imageRes.status}`);
+  }
+
+  return {
+    image: Buffer.from(await imageRes.arrayBuffer()),
+    mimeType: imageRes.headers.get('content-type') || 'image/png',
+  };
+}
+
 function decodeCaptchaToken(token: string): string {
   const clean = token.trim();
   if (/^\d{6}$/.test(clean)) return clean;
@@ -234,7 +358,10 @@ function runTesseractDigits(imagePath: string, psm: number): string {
         '-c',
         'tessedit_char_whitelist=0123456789',
       ],
-      { encoding: 'utf8' }
+      {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      }
     );
     return out.replace(/\D/g, '').trim();
   } catch (error) {
@@ -244,10 +371,127 @@ function runTesseractDigits(imagePath: string, psm: number): string {
   }
 }
 
+function extractFourDigitWindows(value: string): string[] {
+  const digits = sanitizeCaptchaCode(value);
+  if (!digits) return [];
+  if (digits.length <= 4) return [digits];
+
+  const windows = new Set<string>();
+  for (let i = 0; i <= digits.length - 4; i++) {
+    windows.add(digits.slice(i, i + 4));
+  }
+  windows.add(digits.slice(0, 4));
+  windows.add(digits.slice(-4));
+  return Array.from(windows);
+}
+
+function addScoredCaptchaCandidate(
+  scored: Map<string, number>,
+  candidate: string,
+  weight: number
+) {
+  const normalized = sanitizeCaptchaCode(candidate);
+  if (!normalized) return;
+
+  const variants = new Set<string>([normalized, ...extractFourDigitWindows(normalized)]);
+  for (const value of variants) {
+    const score =
+      weight +
+      (/^\d{4}$/.test(value) ? 8 : 0) +
+      (value.length === 4 ? 2 : 0) -
+      Math.abs(value.length - 4);
+    scored.set(value, (scored.get(value) || 0) + score);
+  }
+}
+
+async function buildAllahabadColorMaskVariant(
+  image: Buffer,
+  options: {
+    name: string;
+    minBlue: number;
+    minGreen: number;
+    blueDelta: number;
+    greenDelta: number;
+    minSaturation: number;
+  }
+): Promise<{ name: string; buffer: Buffer }> {
+  const scaled = await sharp(image)
+    .resize({ width: 1000, height: 400, kernel: sharp.kernel.nearest })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+
+  const { data, info } = scaled;
+  const out = Buffer.alloc(info.width * info.height);
+
+  for (let i = 0, o = 0; i < data.length; i += info.channels, o += 1) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const a = info.channels > 3 ? data[i + 3] : 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const saturation = max - min;
+
+    const isDigit =
+      a > 0 &&
+      b >= options.minBlue &&
+      g >= options.minGreen &&
+      b - r >= options.blueDelta &&
+      g - r >= options.greenDelta &&
+      saturation >= options.minSaturation;
+
+    out[o] = isDigit ? 0 : 255;
+  }
+
+  const buffer = await sharp(out, {
+    raw: {
+      width: info.width,
+      height: info.height,
+      channels: 1,
+    },
+  })
+    .median(1)
+    .png()
+    .toBuffer();
+
+  return {
+    name: options.name,
+    buffer,
+  };
+}
+
 async function getAllahabadCaptchaCandidates(image: Buffer): Promise<string[]> {
   const tmpRoot = realpathSync(os.tmpdir());
   const workDir = mkdtempSync(path.join(tmpRoot, 'hcourt-allahabad-cap-'));
   try {
+    const colorMaskVariants = await Promise.all([
+      buildAllahabadColorMaskVariant(image, {
+        name: 'color-mask-1',
+        minBlue: 80,
+        minGreen: 70,
+        blueDelta: 20,
+        greenDelta: 8,
+        minSaturation: 25,
+      }),
+      buildAllahabadColorMaskVariant(image, {
+        name: 'color-mask-2',
+        minBlue: 90,
+        minGreen: 80,
+        blueDelta: 28,
+        greenDelta: 12,
+        minSaturation: 35,
+      }),
+      buildAllahabadColorMaskVariant(image, {
+        name: 'color-mask-3',
+        minBlue: 70,
+        minGreen: 60,
+        blueDelta: 14,
+        greenDelta: 6,
+        minSaturation: 18,
+      }),
+    ]);
+
     const variants: Array<{ name: string; buffer: Buffer }> = [
       { name: 'orig', buffer: image },
       {
@@ -280,16 +524,45 @@ async function getAllahabadCaptchaCandidates(image: Buffer): Promise<string[]> {
           .threshold(170)
           .toBuffer(),
       },
+      {
+        name: 'resize4-165',
+        buffer: await sharp(image)
+          .resize({ width: 1000, height: 400, kernel: sharp.kernel.nearest })
+          .grayscale()
+          .normalize()
+          .sharpen()
+          .threshold(165)
+          .toBuffer(),
+      },
+      {
+        name: 'negate-160',
+        buffer: await sharp(image)
+          .resize({ width: 1000, height: 400, kernel: sharp.kernel.nearest })
+          .grayscale()
+          .normalize()
+          .negate()
+          .threshold(160)
+          .negate()
+          .toBuffer(),
+      },
+      ...colorMaskVariants,
     ];
 
     const scored = new Map<string, number>();
     for (const variant of variants) {
       const file = path.join(workDir, `${variant.name}.png`);
       writeFileSync(file, variant.buffer);
-      for (const psm of [8, 7, 13]) {
+      for (const psm of [8, 7, 13, 6]) {
         const candidate = runTesseractDigits(file, psm);
         if (!candidate) continue;
-        scored.set(candidate, (scored.get(candidate) || 0) + 1);
+        const weight = variant.name.startsWith('color-mask')
+          ? 5
+          : variant.name.startsWith('resize4')
+            ? 4
+            : variant.name.startsWith('resize3')
+              ? 3
+              : 2;
+        addScoredCaptchaCandidate(scored, candidate, weight);
       }
     }
 
@@ -485,6 +758,111 @@ function isAllahabadCaptchaMismatch(html: string): boolean {
   return /captcha\s*code\s*was\s*not\s*match/i.test(html);
 }
 
+async function postAllahabadCaseInfoHtml(
+  source: OrdersSourceConfig,
+  form: URLSearchParams,
+  cookieJar: Map<string, string>
+): Promise<string | null> {
+  const response = await fetch(source.caseInfoUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0',
+      Origin: source.origin,
+      Referer: source.caseNumberUrl,
+      'X-Requested-With': 'XMLHttpRequest',
+      Cookie: toCookieHeader(cookieJar),
+    },
+    body: form.toString(),
+    cache: 'no-store',
+  });
+  updateCookieJar(cookieJar, response);
+  if (!response.ok) return null;
+
+  return response.text();
+}
+
+async function upsertAllahabadCaptchaChallenge(params: {
+  source: OrdersSourceConfig;
+  form: URLSearchParams;
+  cookieJar: Map<string, string>;
+  challengeId?: string;
+  failedAttempts?: number;
+  createdAt?: Date;
+}): Promise<OrdersCaptchaChallenge> {
+  const collection = await getOrdersCaptchaCollection();
+  const captcha = await fetchAllahabadCaptchaImage(
+    params.source,
+    params.cookieJar,
+    params.challengeId ? `-${params.challengeId.slice(0, 8)}` : ''
+  );
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + ORDERS_CAPTCHA_CHALLENGE_TTL_MS);
+  const challengeId = params.challengeId || randomUUID();
+  const doc: OrdersCaptchaChallengeDoc = {
+    challengeId,
+    city: params.source.city,
+    caseType: String(params.form.get('case_type') || ''),
+    caseNo: String(params.form.get('case_no') || ''),
+    caseYear: String(params.form.get('case_year') || ''),
+    cookieEntries: cookieJarToEntries(params.cookieJar),
+    imageBase64: captcha.image.toString('base64'),
+    mimeType: captcha.mimeType,
+    createdAt: params.createdAt || now,
+    updatedAt: now,
+    expiresAt,
+    failedAttempts: Math.max(0, params.failedAttempts || 0),
+  };
+  const {
+    createdAt,
+    ...updatableFields
+  } = doc;
+
+  await collection.updateOne(
+    { challengeId },
+    {
+      $set: updatableFields,
+      $setOnInsert: {
+        createdAt,
+      },
+    },
+    { upsert: true }
+  );
+
+  return toCaptchaChallenge(doc);
+}
+
+export async function refreshOrdersCaptchaChallenge(
+  challengeId: string
+): Promise<OrdersCaptchaChallenge> {
+  const normalizedId = String(challengeId || '').trim();
+  if (!normalizedId) {
+    throw new Error('Missing captcha challenge ID');
+  }
+
+  const collection = await getOrdersCaptchaCollection();
+  const existing = await collection.findOne({ challengeId: normalizedId });
+  if (!existing) {
+    throw new Error('Captcha session expired. Start the search again.');
+  }
+
+  const source = getSourceConfig(existing.city);
+  const form = new URLSearchParams();
+  form.set('case_type', existing.caseType);
+  form.set('case_no', existing.caseNo);
+  form.set('case_year', existing.caseYear);
+
+  return upsertAllahabadCaptchaChallenge({
+    source,
+    form,
+    cookieJar: cookieEntriesToJar(existing.cookieEntries),
+    challengeId: existing.challengeId,
+    failedAttempts: existing.failedAttempts,
+    createdAt: new Date(existing.createdAt),
+  });
+}
+
 async function fetchAllahabadCaseInfoHtml(
   source: OrdersSourceConfig,
   form: URLSearchParams,
@@ -507,51 +885,98 @@ async function fetchAllahabadCaseInfoHtml(
   const maxImages = 10;
   const maxCodesPerImage = 8;
   for (let imageAttempt = 1; imageAttempt <= maxImages; imageAttempt++) {
-    const imageRes = await fetch(
-      `${source.captchaImageUrl}?_t=${Date.now()}${imageAttempt}`,
-      {
-        headers: {
-          'User-Agent': 'Mozilla/5.0',
-          Cookie: toCookieHeader(cookieJar),
-          Referer: source.caseNumberUrl,
-        },
-        cache: 'no-store',
-      }
-    );
-    updateCookieJar(cookieJar, imageRes);
-    if (!imageRes.ok) continue;
-
-    const image = Buffer.from(await imageRes.arrayBuffer());
+    let image: Buffer;
+    try {
+      const captcha = await fetchAllahabadCaptchaImage(source, cookieJar, String(imageAttempt));
+      image = captcha.image;
+    } catch {
+      continue;
+    }
     const candidates = await getAllahabadCaptchaCandidates(image);
     if (candidates.length === 0) continue;
 
     for (const code of candidates.slice(0, maxCodesPerImage)) {
       form.set('captchacode', code);
-      const response = await fetch(source.caseInfoUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-          'User-Agent': 'Mozilla/5.0',
-          Origin: source.origin,
-          Referer: source.caseNumberUrl,
-          'X-Requested-With': 'XMLHttpRequest',
-          Cookie: toCookieHeader(cookieJar),
-        },
-        body: form.toString(),
-        cache: 'no-store',
-      });
-      updateCookieJar(cookieJar, response);
-      if (!response.ok) continue;
-
-      const html = await response.text();
+      const html = await postAllahabadCaseInfoHtml(source, form, cookieJar);
+      if (!html) continue;
       if (isAllahabadCaptchaMismatch(html)) continue;
+      if (!extractViewParams(html)) continue;
       return html;
     }
   }
 
-  throw new Error(
-    'Unable to solve Allahabad captcha automatically after multiple attempts'
+  const challenge = await upsertAllahabadCaptchaChallenge({
+    source,
+    form,
+    cookieJar,
+  });
+  throw new OrdersCaptchaRequiredError(
+    'Automatic Allahabad captcha solving was not reliable for this attempt. Enter the captcha below to continue.',
+    challenge
   );
+}
+
+async function buildCaseDataFromCaseInfo(params: {
+  source: OrdersSourceConfig;
+  caseType: string;
+  caseTypeLabel: string;
+  caseNo: string;
+  caseYear: string;
+  caseInfoHtml: string;
+  cookieJar: Map<string, string>;
+}) {
+  if (/Record\s+Not\s+Found/i.test(params.caseInfoHtml)) {
+    throw new Error(
+      `Record not found for ${params.caseTypeLabel} / ${params.caseNo} / ${params.caseYear}. Check Case Year/No and try again.`
+    );
+  }
+
+  const viewParams = extractViewParams(params.caseInfoHtml);
+  if (!viewParams) {
+    throw new Error('Could not find a "view" link in case search results');
+  }
+
+  const infoParsed = parseCaseInfo(params.caseInfoHtml);
+
+  const detailsForm = new URLSearchParams();
+  detailsForm.set('cino', viewParams.cino);
+  if (viewParams.source) detailsForm.set('source', viewParams.source);
+  if (viewParams.iemi) detailsForm.set('iemi', viewParams.iemi);
+
+  const detailsHeaders: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    'User-Agent': 'Mozilla/5.0',
+    Origin: params.source.origin,
+    Referer: params.source.caseNumberUrl,
+    'X-Requested-With': 'XMLHttpRequest',
+  };
+  const cookieHeader = toCookieHeader(params.cookieJar);
+  if (cookieHeader) {
+    detailsHeaders.Cookie = cookieHeader;
+  }
+
+  const detailsRes = await fetch(params.source.caseDetailsUrl, {
+    method: 'POST',
+    headers: detailsHeaders,
+    body: detailsForm.toString(),
+    cache: 'no-store',
+  });
+  if (!detailsRes.ok) {
+    throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
+  }
+  const detailsHtml = await detailsRes.text();
+
+  return {
+    source: params.source,
+    caseNo: params.caseNo,
+    caseYear: params.caseYear,
+    caseType: params.caseType,
+    caseTypeLabel: params.caseTypeLabel,
+    infoParsed,
+    detailsHtml,
+    details: parseDetails(detailsHtml),
+    orderJudgments: await fetchOrderJudgments(detailsHtml, params.source),
+  };
 }
 
 function parseDetails(detailsHtml: string) {
@@ -785,54 +1210,118 @@ async function fetchCaseDataForOrders(input: OrdersFetchInput) {
     caseInfoHtml = await infoRes.text();
   }
 
-  // When the upstream site doesn't find a record, it returns a small card with this message.
-  if (/Record\s+Not\s+Found/i.test(caseInfoHtml)) {
-    throw new Error(
-      `Record not found for ${caseTypeLabel} / ${caseNo} / ${caseYear}. Check Case Year/No and try again.`
+  return buildCaseDataFromCaseInfo({
+    source,
+    caseType,
+    caseTypeLabel,
+    caseNo,
+    caseYear,
+    caseInfoHtml,
+    cookieJar,
+  });
+}
+
+export async function submitOrdersCaptchaChallenge(params: {
+  challengeId: string;
+  captchaCode: string;
+}): Promise<OrdersFetchResult> {
+  const challengeId = String(params.challengeId || '').trim();
+  const captchaCode = sanitizeCaptchaCode(params.captchaCode);
+  if (!challengeId) {
+    throw new Error('Missing captcha challenge ID');
+  }
+  if (!captchaCode) {
+    throw new Error('Enter the captcha to continue');
+  }
+
+  const collection = await getOrdersCaptchaCollection();
+  const existing = await collection.findOne({ challengeId });
+  if (!existing) {
+    throw new Error('Captcha session expired. Start the search again.');
+  }
+
+  const source = getSourceConfig(existing.city);
+  if (!source.requiresServerCaptcha) {
+    throw new Error('This captcha challenge is not valid for the selected source');
+  }
+
+  const cookieJar = cookieEntriesToJar(existing.cookieEntries);
+  const form = new URLSearchParams();
+  form.set('case_type', existing.caseType);
+  form.set('case_no', existing.caseNo);
+  form.set('case_year', existing.caseYear);
+  form.set('captchacode', captchaCode);
+
+  const html = await postAllahabadCaseInfoHtml(source, form, cookieJar);
+  if (!html) {
+    throw new Error(`Failed to fetch case info from ${source.label}`);
+  }
+
+  if (isAllahabadCaptchaMismatch(html)) {
+    const refreshedChallenge = await upsertAllahabadCaptchaChallenge({
+      source,
+      form,
+      cookieJar,
+      challengeId: existing.challengeId,
+      failedAttempts: (existing.failedAttempts || 0) + 1,
+      createdAt: new Date(existing.createdAt),
+    });
+    throw new OrdersCaptchaRequiredError(
+      'Captcha did not match. Enter the new captcha image to continue.',
+      refreshedChallenge
     );
   }
 
-  const viewParams = extractViewParams(caseInfoHtml);
-  if (!viewParams) throw new Error('Could not find a "view" link in case search results');
+  await collection.deleteOne({ challengeId: existing.challengeId });
 
-  const infoParsed = parseCaseInfo(caseInfoHtml);
+  const types = await fetchCaseTypes(source.city);
+  const caseTypeLabel =
+    types.find((type) => type.value === existing.caseType)?.label || existing.caseType;
 
-  const detailsForm = new URLSearchParams();
-  detailsForm.set('cino', viewParams.cino);
-  if (viewParams.source) detailsForm.set('source', viewParams.source);
-  if (viewParams.iemi) detailsForm.set('iemi', viewParams.iemi);
-
-  const detailsHeaders: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'User-Agent': 'Mozilla/5.0',
-    Origin: source.origin,
-    Referer: source.caseNumberUrl,
-    'X-Requested-With': 'XMLHttpRequest',
-  };
-  const cookieHeader = toCookieHeader(cookieJar);
-  if (cookieHeader) {
-    detailsHeaders.Cookie = cookieHeader;
-  }
-
-  const detailsRes = await fetch(source.caseDetailsUrl, {
-    method: 'POST',
-    headers: detailsHeaders,
-    body: detailsForm.toString(),
-    cache: 'no-store',
+  const caseData = await buildCaseDataFromCaseInfo({
+    source,
+    caseType: existing.caseType,
+    caseTypeLabel,
+    caseNo: existing.caseNo,
+    caseYear: existing.caseYear,
+    caseInfoHtml: html,
+    cookieJar,
   });
-  if (!detailsRes.ok) throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
-  const detailsHtml = await detailsRes.text();
+
+  const [pdfBuf, xlsxBuf] = await Promise.all([
+    buildPdf(caseData.detailsHtml),
+    buildExcel({
+      caseTypeLabel: caseData.caseTypeLabel,
+      caseNo: caseData.caseNo,
+      caseYear: caseData.caseYear,
+      details: caseData.details,
+    }),
+  ]);
+
+  const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(
+    /[^a-z0-9\\-_.]/gi,
+    '_'
+  );
 
   return {
-    source,
-    caseNo,
-    caseYear,
-    caseType,
-    caseTypeLabel,
-    infoParsed,
-    detailsHtml,
-    details: parseDetails(detailsHtml),
-    orderJudgments: await fetchOrderJudgments(detailsHtml, source),
+    city: caseData.source.city,
+    caseInfo: {
+      caseType: caseData.caseTypeLabel,
+      caseNo: caseData.caseNo,
+      caseYear: caseData.caseYear,
+      status: caseData.infoParsed.status,
+      petitionerVsRespondent: caseData.infoParsed.petitionerVsRespondent,
+    },
+    details: caseData.details,
+    pdf: {
+      filename: `orders-${safeName}.pdf`,
+      base64: pdfBuf.toString('base64'),
+    },
+    excel: {
+      filename: `orders-${safeName}.xlsx`,
+      base64: xlsxBuf.toString('base64'),
+    },
+    orderJudgments: caseData.orderJudgments,
   };
 }
 
