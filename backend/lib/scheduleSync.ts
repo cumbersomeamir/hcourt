@@ -154,8 +154,8 @@ async function syncScheduleInternal(
   const dateStr = now.toISOString().split('T')[0];
 
   const scheduleCollection = db.collection<ScheduleDocument>('schedules');
-  const changesCollection = db.collection('changes');
-  const notificationsCollection = db.collection('notifications');
+  const changesCollection = db.collection<ChangeRecord>('changes');
+  const notificationsCollection = db.collection<Notification>('notifications');
 
   const changes =
     latestBeforeSync?.courts && latestBeforeSync.courts.length > 0

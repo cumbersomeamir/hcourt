@@ -1,3 +1,5 @@
+import { ObjectId } from 'mongodb';
+
 export interface CourtCase {
   courtNo: string;
   serialNo: string | null;
@@ -19,7 +21,7 @@ export interface CourtSchedule {
 }
 
 export interface ChangeRecord {
-  _id?: string;
+  _id?: ObjectId | string;
   timestamp: Date;
   courtNo: string;
   changeType: 'added' | 'updated' | 'removed' | 'status_changed';
@@ -29,7 +31,7 @@ export interface ChangeRecord {
 }
 
 export interface Notification {
-  _id?: string;
+  _id?: ObjectId | string;
   timestamp: Date;
   courtNo: string;
   type: 'change' | 'new_case' | 'status_change' | 'order_update';

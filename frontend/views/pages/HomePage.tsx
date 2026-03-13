@@ -464,7 +464,7 @@ export default function Home() {
             </div>
             <div className="text-red-400 mb-4 text-center text-sm">{error}</div>
             <button
-              onClick={fetchSchedule}
+              onClick={() => fetchSchedule()}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
             >
               Retry

@@ -53,7 +53,7 @@ async function processTrackedOrderCases(
   await ensureIndexes(db);
 
   const stateCollection = db.collection<TrackedOrderStateDoc>('tracked_order_state');
-  const notificationsCollection = db.collection('notifications');
+  const notificationsCollection = db.collection<Notification>('notifications');
   const summary: MonitorTrackedOrdersSummary = {
     trackedCases: trackedOrderCasesByKey.size,
     initialized: 0,
