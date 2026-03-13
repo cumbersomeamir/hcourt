@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 
 type CaseTypeOption = { value: string; label: string };
@@ -28,6 +29,15 @@ type OrdersResult = {
     viewUrl: string;
     judgmentId: string;
   }>;
+};
+
+type OrdersCaptchaChallenge = {
+  challengeId: string;
+  city: 'lucknow' | 'allahabad';
+  imageBase64: string;
+  mimeType: string;
+  expiresAt: string;
+  prompt: string;
 };
 
 function downloadBase64(filename: string, base64: string, mime: string) {
@@ -61,6 +71,8 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrdersResult | null>(null);
   const [showSearchForm, setShowSearchForm] = useState(false);
+  const [captchaChallenge, setCaptchaChallenge] = useState<OrdersCaptchaChallenge | null>(null);
+  const [captchaCode, setCaptchaCode] = useState('');
 
   useEffect(() => {
     if (searchParams.get('mode') === 'quick') {
@@ -75,6 +87,8 @@ export default function OrdersPage() {
         setTypesError(null);
         setCaseType('');
         setResult(null);
+        setCaptchaChallenge(null);
+        setCaptchaCode('');
         const res = await fetch(`/api/orders/case-types?city=${city}`);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Failed to load case types');
@@ -92,7 +106,77 @@ export default function OrdersPage() {
     [types, caseType]
   );
 
+  const resetCaptchaChallenge = () => {
+    setCaptchaChallenge(null);
+    setCaptchaCode('');
+  };
+
+  const handleCaseTypeChange = (value: string) => {
+    setCaseType(value);
+    resetCaptchaChallenge();
+    setError(null);
+  };
+
+  const handleCaseNoChange = (value: string) => {
+    setCaseNo(value.replace(/[^0-9]/g, ''));
+    resetCaptchaChallenge();
+    setError(null);
+  };
+
+  const handleCaseYearChange = (value: string) => {
+    setCaseYear(value.replace(/[^0-9]/g, '').slice(0, 4));
+    resetCaptchaChallenge();
+    setError(null);
+  };
+
+  const handleOrdersResponse = (data: {
+    success?: boolean;
+    error?: string;
+    code?: string;
+    result?: OrdersResult;
+    captchaChallenge?: OrdersCaptchaChallenge;
+  }) => {
+    if (data.success && data.result) {
+      resetCaptchaChallenge();
+      setError(null);
+      setResult(data.result);
+      return;
+    }
+
+    if (data.code === 'captcha_required' && data.captchaChallenge) {
+      setCaptchaChallenge(data.captchaChallenge);
+      setCaptchaCode('');
+      setResult(null);
+      setError(data.error || 'Enter the captcha shown to continue.');
+      return;
+    }
+
+    throw new Error(data.error || 'Failed to fetch orders');
+  };
+
   const runFetch = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      resetCaptchaChallenge();
+      const res = await fetch('/api/orders/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ caseType, caseNo, caseYear, city }),
+      });
+      const data = await res.json();
+      handleOrdersResponse(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to fetch orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitCaptcha = async () => {
+    if (!captchaChallenge) return;
+
     try {
       setLoading(true);
       setError(null);
@@ -100,16 +184,96 @@ export default function OrdersPage() {
       const res = await fetch('/api/orders/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caseType, caseNo, caseYear, city }),
+        body: JSON.stringify({
+          challengeId: captchaChallenge.challengeId,
+          captchaCode,
+        }),
       });
       const data = await res.json();
-      if (!data.success) throw new Error(data.error || 'Failed to fetch orders');
-      setResult(data.result);
+      handleOrdersResponse(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch orders');
+      setError(e instanceof Error ? e.message : 'Failed to submit captcha');
     } finally {
       setLoading(false);
     }
+  };
+
+  const refreshCaptcha = async () => {
+    if (!captchaChallenge) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await fetch('/api/orders/fetch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challengeId: captchaChallenge.challengeId,
+          refreshCaptcha: true,
+        }),
+      });
+      const data = await res.json();
+      handleOrdersResponse(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to refresh captcha');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderCaptchaFallback = () => {
+    if (!captchaChallenge) return null;
+
+    return (
+      <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-500/10 p-4">
+        <div className="text-sm font-medium text-amber-200">
+          {captchaChallenge.prompt}
+        </div>
+        <div className="mt-3 flex flex-col lg:flex-row gap-4 lg:items-center">
+          <div className="rounded-lg border border-slate-700/40 bg-white px-3 py-2 self-start">
+            <Image
+              src={`data:${captchaChallenge.mimeType};base64,${captchaChallenge.imageBase64}`}
+              alt="Allahabad captcha"
+              className="h-16 w-auto"
+              width={240}
+              height={80}
+              unoptimized
+            />
+          </div>
+          <div className="flex-1 min-w-0">
+            <label className="block text-xs sm:text-sm font-medium text-slate-300 mb-1.5">
+              Captcha
+            </label>
+            <input
+              value={captchaCode}
+              onChange={(e) => setCaptchaCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))}
+              inputMode="numeric"
+              placeholder="Enter captcha"
+              className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
+            />
+            <div className="mt-1 text-xs text-slate-500">
+              Expires at {new Date(captchaChallenge.expiresAt).toLocaleTimeString()}
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 lg:self-end">
+            <button
+              onClick={submitCaptcha}
+              disabled={loading || captchaCode.trim().length < 4}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40"
+            >
+              {loading ? 'Submitting...' : 'Submit Captcha'}
+            </button>
+            <button
+              onClick={refreshCaptcha}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-700/40 border border-slate-600/20 px-4 py-2.5 text-sm font-semibold text-slate-300 hover:bg-slate-700/60 disabled:opacity-40"
+            >
+              New Captcha
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const downloadJudgment = async (viewUrl: string, date: string, judgmentId: string) => {
@@ -160,7 +324,7 @@ export default function OrdersPage() {
                   Case Orders & Judgments
                 </h1>
                 <p className="mt-1 text-xs sm:text-sm text-slate-400">
-                  Fetch case details from the High Court site and download as PDF + Excel.
+                  Fetch case details from the High Court site and download as PDF.
                 </p>
                 <p className="mt-1 text-xs sm:text-sm text-cyan-400/80 font-medium">
                   Source: {cityLabel}
@@ -200,7 +364,7 @@ export default function OrdersPage() {
                 </label>
                 <select
                   value={caseType}
-                  onChange={(e) => setCaseType(e.target.value)}
+                  onChange={(e) => handleCaseTypeChange(e.target.value)}
                   disabled={typesLoading}
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                 >
@@ -217,7 +381,7 @@ export default function OrdersPage() {
                 </label>
                 <input
                   value={caseNo}
-                  onChange={(e) => setCaseNo(e.target.value.replace(/[^0-9]/g, ''))}
+                  onChange={(e) => handleCaseNoChange(e.target.value)}
                   placeholder="Enter case number"
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                 />
@@ -228,7 +392,7 @@ export default function OrdersPage() {
                 </label>
                 <input
                   value={caseYear}
-                  onChange={(e) => setCaseYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                  onChange={(e) => handleCaseYearChange(e.target.value)}
                   placeholder="e.g. 2025"
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                 />
@@ -249,6 +413,7 @@ export default function OrdersPage() {
               </button>
             </div>
             {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
+            {renderCaptchaFallback()}
           </div>
         )}
 
@@ -262,7 +427,7 @@ export default function OrdersPage() {
                 </label>
                 <select
                   value={caseType}
-                  onChange={(e) => setCaseType(e.target.value)}
+                  onChange={(e) => handleCaseTypeChange(e.target.value)}
                   disabled={typesLoading}
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                 >
@@ -279,7 +444,7 @@ export default function OrdersPage() {
                 </label>
                 <input
                   value={caseNo}
-                  onChange={(e) => setCaseNo(e.target.value.replace(/[^0-9]/g, ''))}
+                  onChange={(e) => handleCaseNoChange(e.target.value)}
                   placeholder="Enter case number"
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                 />
@@ -290,7 +455,7 @@ export default function OrdersPage() {
                 </label>
                 <input
                   value={caseYear}
-                  onChange={(e) => setCaseYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+                  onChange={(e) => handleCaseYearChange(e.target.value)}
                   placeholder="e.g. 2025"
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                 />
@@ -311,6 +476,7 @@ export default function OrdersPage() {
               </button>
             </div>
             {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
+            {renderCaptchaFallback()}
           </div>
         )}
 
@@ -341,44 +507,11 @@ export default function OrdersPage() {
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   Download PDF
                 </button>
-                <button
-                  onClick={() =>
-                    downloadBase64(
-                      result.excel.filename,
-                      result.excel.base64,
-                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                    )
-                  }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 w-full sm:w-auto"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  Download Excel
-                </button>
               </div>
-            </div>
-
-            <div className="mt-5">
-              <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-3">Key details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                {result.details.keyValues.slice(0, 40).map((kv, idx) => (
-                  <div
-                    key={`${kv.key}-${idx}`}
-                    className="rounded-lg border border-slate-700/40 bg-slate-800/30 px-3 py-2.5"
-                  >
-                    <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-0.5">{kv.key}</div>
-                    <div className="text-xs sm:text-sm text-slate-200 break-words">{kv.value}</div>
-                  </div>
-                ))}
-              </div>
-              {result.details.keyValues.length > 40 && (
-                <div className="mt-3 text-xs text-slate-500 px-1">
-                  Showing first 40 fields. Download Excel for the full structured output.
-                </div>
-              )}
             </div>
 
             {result.orderJudgments && result.orderJudgments.length > 0 && (
-              <div className="mt-6">
+              <div className="mt-5">
                 <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-3">
                   Order/Judgment Documents
                 </h3>
@@ -406,6 +539,26 @@ export default function OrdersPage() {
                 </div>
               </div>
             )}
+
+            <div className="mt-6">
+              <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-3">Key details</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                {result.details.keyValues.slice(0, 40).map((kv, idx) => (
+                  <div
+                    key={`${kv.key}-${idx}`}
+                    className="rounded-lg border border-slate-700/40 bg-slate-800/30 px-3 py-2.5"
+                  >
+                    <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-0.5">{kv.key}</div>
+                    <div className="text-xs sm:text-sm text-slate-200 break-words">{kv.value}</div>
+                  </div>
+                ))}
+              </div>
+              {result.details.keyValues.length > 40 && (
+                <div className="mt-3 text-xs text-slate-500 px-1">
+                  Showing first 40 fields.
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

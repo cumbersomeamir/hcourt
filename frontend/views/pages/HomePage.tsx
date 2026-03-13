@@ -94,10 +94,13 @@ export default function Home() {
   const hasTrackedScheduleCases = effectiveTrackedCaseIds.length > 0;
   const shouldApplyScheduleFilter = scheduleFilterEnabled && hasTrackedScheduleCases;
 
-  const fetchSchedule = async () => {
+  const fetchSchedule = async (force = false) => {
     try {
       setError(null);
       const params = new URLSearchParams();
+      if (force) {
+        params.append('force', 'true');
+      }
       if (shouldApplyScheduleFilter) {
         params.append('caseIds', effectiveTrackedCaseIds.join(','));
       }
@@ -105,7 +108,7 @@ export default function Home() {
         params.append('userId', userId);
       }
 
-      const url = shouldApplyScheduleFilter || (scheduleFilterEnabled && userId)
+      const url = force || shouldApplyScheduleFilter || (scheduleFilterEnabled && userId)
         ? `/api/schedule/latest?${params.toString()}`
         : '/api/schedule/latest';
 
@@ -364,7 +367,7 @@ export default function Home() {
                   : 'Track Cases'}
               </button>
               <button
-                onClick={() => fetchSchedule()}
+                onClick={() => fetchSchedule(true)}
                 disabled={loading}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-slate-500/15 border border-slate-400/15 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-500/25 hover:border-slate-400/30 disabled:opacity-40"
               >
