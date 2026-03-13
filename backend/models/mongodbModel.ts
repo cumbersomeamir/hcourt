@@ -1,1 +1,1 @@
-export { default, getDb } from '@/lib/mongodb';
+export { getDb } from '@/lib/mongodb';
