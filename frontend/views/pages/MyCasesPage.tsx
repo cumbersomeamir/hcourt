@@ -185,11 +185,9 @@ export default function MyCasesPage() {
         userId={userId}
       />
 
-      <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
-        <div className="mb-6 flex justify-end lg:relative lg:overflow-hidden lg:rounded-[32px] lg:border lg:border-white/10 lg:bg-[#0b1224]/90 lg:p-5 lg:shadow-[0_28px_70px_rgba(2,6,23,0.35)]">
-          <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.10),transparent_30%)]" />
-          <div className="pointer-events-none absolute inset-x-6 top-0 hidden lg:block h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
-          <div className="relative">
+      <header className="border-b border-slate-800/80 bg-[#081127]/82 backdrop-blur-xl">
+        <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
+          <div className="flex justify-end">
             <WorkspaceNavigation
               current="my-cases"
               alertsCount={unreadCount}
@@ -197,7 +195,9 @@ export default function MyCasesPage() {
             />
           </div>
         </div>
+      </header>
 
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link
