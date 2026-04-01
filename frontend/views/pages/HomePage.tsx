@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useEffect, useMemo } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
@@ -349,6 +350,15 @@ export default function Home() {
               </span>
               <span className="text-base font-semibold text-slate-100">Orders</span>
             </a>
+            <Link href="/my-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-cyan-400/20`} title="View saved cases">
+              <span className={`${mobileMenuIconClass} border-cyan-400/20 bg-cyan-500/10 text-cyan-200`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20h6M8 8h8M8 12h5" />
+                </svg>
+              </span>
+              <span className="text-base font-semibold text-slate-100">My Cases</span>
+            </Link>
             <a href="/track-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-emerald-400/20`} title="Manage tracked cases">
               <span className={`${mobileMenuIconClass} border-emerald-400/20 bg-emerald-500/10 text-emerald-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -431,6 +441,13 @@ export default function Home() {
                   </svg>
                   Orders
                 </a>
+                <Link href="/my-cases" className={`${desktopNavItemClass} border-cyan-400/20 text-cyan-100 hover:border-cyan-300/40`} title="View saved cases">
+                  <svg className="w-4 h-4 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20h6M8 8h8M8 12h5" />
+                  </svg>
+                  My Cases
+                </Link>
                 <a href="/track-cases" className={`${desktopNavItemClass} border-emerald-400/20 text-emerald-100 hover:border-emerald-300/40`} title="Manage tracked cases">
                   <svg className="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
