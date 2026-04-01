@@ -67,7 +67,6 @@ export default function Home() {
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
-  const [dbStats, setDbStats] = useState<{ schedules: number; changes: number; notifications: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [caseIdModalOpen, setCaseIdModalOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -204,22 +203,6 @@ export default function Home() {
     }
   };
 
-  const fetchDbStats = async () => {
-    try {
-      const response = await fetch('/api/stats');
-      const data = await response.json();
-      if (data.success && data.stats) {
-        setDbStats({
-          schedules: data.stats.schedules,
-          changes: data.stats.changes,
-          notifications: data.stats.notifications,
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching DB stats:', error);
-    }
-  };
-
   useEffect(() => {
     const storedCaseIds = localStorage.getItem('trackedCaseIds');
     const storedTrackedOrderCases = localStorage.getItem('trackedOrderCases');
@@ -266,7 +249,6 @@ export default function Home() {
   useEffect(() => {
     fetchSchedule();
     checkNotifications();
-    fetchDbStats();
 
     const scheduleInterval = setInterval(() => {
       fetchSchedule();
@@ -276,14 +258,9 @@ export default function Home() {
       checkNotifications();
     }, 10000);
 
-    const statsInterval = setInterval(() => {
-      fetchDbStats();
-    }, 60000);
-
     return () => {
       clearInterval(scheduleInterval);
       clearInterval(notificationInterval);
-      clearInterval(statsInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
@@ -493,25 +470,6 @@ export default function Home() {
               <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400">
                 Lucknow Bench &mdash; Online Court Activity Digital Display Board
               </p>
-              {dbStats && (
-                <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full bg-cyan-400"></span>
-                    <span className="uppercase tracking-[0.18em] text-slate-500">Schedules</span>
-                    <span className="font-semibold text-slate-100">{dbStats.schedules}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
-                    <span className="uppercase tracking-[0.18em] text-slate-500">Changes</span>
-                    <span className="font-semibold text-slate-100">{dbStats.changes}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
-                    <span className="uppercase tracking-[0.18em] text-slate-500">Notifications</span>
-                    <span className="font-semibold text-slate-100">{dbStats.notifications}</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>
