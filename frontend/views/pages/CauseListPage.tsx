@@ -129,6 +129,14 @@ function downloadBase64File(filename: string, mimeType: string, base64: string) 
   URL.revokeObjectURL(url);
 }
 
+function formatPreviewColumnLabel(column: string): string {
+  return column
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 export default function CauseListPage() {
   const [activeTile, setActiveTile] = useState<ActiveTile>(null);
   const [searchType, setSearchType] = useState<SearchType>('court');
@@ -157,7 +165,13 @@ export default function CauseListPage() {
 
   const previewColumns = useMemo(() => {
     if (!counselResult?.previewRows?.length) return [] as string[];
-    return Object.keys(counselResult.previewRows[0]);
+    const seen = new Set<string>();
+    for (const row of counselResult.previewRows) {
+      for (const key of Object.keys(row)) {
+        seen.add(key);
+      }
+    }
+    return Array.from(seen);
   }, [counselResult]);
 
   const activeBench: BenchKey | null =
@@ -666,29 +680,47 @@ export default function CauseListPage() {
                       </div>
 
                       {counselResult.previewRows.length > 0 && (
-                        <div className="mt-4 overflow-auto rounded-lg border border-slate-600/40">
-                          <table className="min-w-full text-left text-xs text-slate-200">
-                            <thead className="bg-slate-800/90">
-                              <tr>
-                                {previewColumns.map((column) => (
-                                  <th key={column} className="px-2 py-2 font-semibold">
-                                    {column}
-                                  </th>
-                                ))}
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {counselResult.previewRows.map((row, idx) => (
-                                <tr key={`${idx}-${row.case_no || row.sr_no || 'row'}`} className="border-t border-slate-700/50">
-                                  {previewColumns.map((column) => (
-                                    <td key={column} className="px-2 py-2 align-top">
-                                      {row[column] == null ? '' : String(row[column])}
-                                    </td>
+                        <div className="mt-4 space-y-3">
+                          {counselResult.previewRows.map((row, idx) => {
+                            const rowEntries = previewColumns.filter((column) => {
+                              const value = row[column];
+                              return value != null && String(value).trim() !== '';
+                            });
+
+                            return (
+                              <div
+                                key={`${idx}-${row.case_no || row.sr_no || 'row'}`}
+                                className="rounded-lg border border-slate-600/40 bg-slate-950/50 p-3 sm:p-4"
+                              >
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="inline-flex items-center rounded-md border border-cyan-300/25 bg-cyan-500/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-cyan-200">
+                                    Row {idx + 1}
+                                  </span>
+                                  {row.case_no && (
+                                    <span className="text-sm font-semibold text-slate-100 break-all">
+                                      {String(row.case_no)}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                  {rowEntries.map((column) => (
+                                    <div
+                                      key={column}
+                                      className="rounded-lg border border-slate-700/40 bg-slate-900/60 px-3 py-2.5"
+                                    >
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                        {formatPreviewColumnLabel(column)}
+                                      </div>
+                                      <div className="mt-1 text-xs leading-5 text-slate-100 break-words">
+                                        {String(row[column])}
+                                      </div>
+                                    </div>
                                   ))}
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
