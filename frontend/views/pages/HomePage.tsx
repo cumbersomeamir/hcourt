@@ -342,14 +342,6 @@ export default function Home() {
               </span>
               <span className="text-base font-semibold text-slate-100">Status</span>
             </a>
-            <a href="/orders" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-rose-400/20`} title="View Orders">
-              <span className={`${mobileMenuIconClass} border-rose-400/20 bg-rose-500/10 text-rose-200`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                </svg>
-              </span>
-              <span className="text-base font-semibold text-slate-100">Orders</span>
-            </a>
             <Link href="/my-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-cyan-400/20`} title="View saved cases">
               <span className={`${mobileMenuIconClass} border-cyan-400/20 bg-cyan-500/10 text-cyan-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -434,12 +426,6 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
                   </svg>
                   Status
-                </a>
-                <a href="/orders" className={`${desktopNavItemClass} border-rose-400/20 text-rose-100 hover:border-rose-300/40`} title="View Orders">
-                  <svg className="w-4 h-4 text-rose-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
-                  </svg>
-                  Orders
                 </a>
                 <Link href="/my-cases" className={`${desktopNavItemClass} border-cyan-400/20 text-cyan-100 hover:border-cyan-300/40`} title="View saved cases">
                   <svg className="w-4 h-4 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
