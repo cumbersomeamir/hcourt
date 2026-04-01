@@ -27,13 +27,6 @@ const manrope = Manrope({
 
 type ScheduleMap = Record<string, CourtCase>;
 
-function formatTimestamp(value?: Date | string | null) {
-  if (!value) return 'No recent updates';
-  const date = typeof value === 'string' ? new Date(value) : value;
-  if (Number.isNaN(date.getTime())) return 'No recent updates';
-  return date.toLocaleString();
-}
-
 function getPrimaryLabel(profile: SavedCaseProfile, currentCourt?: CourtCase) {
   if (currentCourt?.caseDetails?.title) return currentCourt.caseDetails.title;
   if (profile.canonicalCaseId) return profile.canonicalCaseId;
@@ -65,9 +58,6 @@ export default function MyCasesPage() {
   const [profiles, setProfiles] = useState<SavedCaseProfile[]>([]);
   const [scheduleMap, setScheduleMap] = useState<ScheduleMap>({});
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [hasAccount, setHasAccount] = useState(false);
-  const [accountEmail, setAccountEmail] = useState('');
-  const [scheduleUpdatedAt, setScheduleUpdatedAt] = useState<string>('');
   const [trackedCaseIds, setTrackedCaseIds] = useState<string[]>([]);
   const [trackedOrderTrackingKeys, setTrackedOrderTrackingKeys] = useState<string[]>([]);
   const [userId, setUserId] = useState<string | null>(null);
@@ -86,8 +76,6 @@ export default function MyCasesPage() {
         const trackedState = await loadTrackedState();
         if (!mounted) return;
 
-        setHasAccount(trackedState.hasAccount);
-        setAccountEmail(trackedState.accountEmail);
         setTrackedCaseIds(trackedState.caseIds);
         setTrackedOrderTrackingKeys(
           trackedState.trackedOrderCases.map((trackedCase) => trackedCase.trackingKey)
@@ -121,11 +109,9 @@ export default function MyCasesPage() {
               }
             }
             setScheduleMap(nextScheduleMap);
-            setScheduleUpdatedAt(String(scheduleData.schedule.lastUpdated || ''));
           }
         } else if (mounted) {
           setScheduleMap({});
-          setScheduleUpdatedAt('');
         }
 
         if (effectiveCaseIds.length > 0 || orderTrackingKeys.length > 0) {
@@ -231,7 +217,7 @@ export default function MyCasesPage() {
           </div>
         </div>
 
-        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
             <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/70">
               Saved Cases
@@ -257,18 +243,6 @@ export default function MyCasesPage() {
             <p className="mt-3 text-3xl font-semibold text-amber-100">{notifications.length}</p>
             <p className="mt-2 text-sm text-amber-100/70">
               {unreadCount} unread in the latest fetched activity set.
-            </p>
-          </div>
-
-          <div className="rounded-3xl border border-slate-700/40 bg-slate-950/40 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Sync Mode</p>
-            <p className="mt-3 text-lg font-semibold text-slate-100">
-              {hasAccount ? accountEmail || 'Synced account' : 'Local only'}
-            </p>
-            <p className="mt-2 text-sm text-slate-400">
-              {scheduleUpdatedAt
-                ? `Board snapshot: ${formatTimestamp(scheduleUpdatedAt)}`
-                : 'Board snapshot will appear when a saved case matches the live board.'}
             </p>
           </div>
         </div>
@@ -363,31 +337,12 @@ export default function MyCasesPage() {
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-700/35 bg-slate-950/40 p-4">
-                        <p className="text-[11px] uppercase tracking-[0.2em] text-slate-500">
-                          Live board snapshot
-                        </p>
-                        {currentCourt ? (
-                          <div className="mt-3 space-y-2 text-sm text-slate-300">
-                            <p>
-                              Court {currentCourt.courtNo}
-                              {currentCourt.serialNo ? ` • Serial ${currentCourt.serialNo}` : ''}
-                            </p>
-                            <p>{currentCourt.progress || 'No progress text available yet.'}</p>
-                          </div>
-                        ) : (
-                          <p className="mt-3 text-sm text-slate-500">
-                            Not currently visible on the latest live board snapshot.
-                          </p>
-                        )}
-                      </div>
-
                       <div className="flex flex-wrap gap-3">
                         <Link
                           href={`/my-cases/${encodeCaseProfileSlug(profile.profileId)}`}
                           className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/15 px-5 py-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/25"
                         >
-                          View Profile
+                          View Case
                         </Link>
                         <Link
                           href="/track-cases"
