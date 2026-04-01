@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "eslint",
+    "judgments:backfill": "node --env-file=.env.local --import tsx scripts/backfill-order-judgments.ts",
     "worker": "node --env-file=.env.local --import tsx scripts/poll-worker.ts",
     "worker:dev": "node --env-file=.env.local --import tsx --watch scripts/poll-worker.ts"
   },

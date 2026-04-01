@@ -108,9 +108,24 @@ type OrdersCaptchaChallengeDoc = {
   failedAttempts: number;
 };
 
+type OrderJudgmentCacheDoc = {
+  judgmentId: string;
+  viewUrl: string;
+  date?: string;
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  base64: string;
+  source: 'direct' | 'proxy';
+  createdAt: Date;
+  updatedAt: Date;
+  lastAccessedAt: Date;
+};
+
 const ORDERS_CAPTCHA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
 let ordersCaptchaIndexesEnsured = false;
+let orderJudgmentCacheIndexesEnsured = false;
 
 class OrdersCaptchaRequiredError extends Error {
   readonly code = 'captcha_required';
@@ -180,6 +195,81 @@ async function getOrdersCaptchaCollection() {
   }
 
   return collection;
+}
+
+async function getOrderJudgmentCacheCollection() {
+  const db = await getDb();
+  const collection = db.collection<OrderJudgmentCacheDoc>('order_judgment_cache');
+
+  if (!orderJudgmentCacheIndexesEnsured) {
+    await Promise.all([
+      collection.createIndex({ judgmentId: 1 }, { unique: true }),
+      collection.createIndex({ updatedAt: -1 }),
+      collection.createIndex({ lastAccessedAt: -1 }),
+    ]);
+    orderJudgmentCacheIndexesEnsured = true;
+  }
+
+  return collection;
+}
+
+async function getCachedOrderJudgment(
+  judgmentId: string
+): Promise<OrderJudgmentDownload | null> {
+  const normalizedId = String(judgmentId || '').trim();
+  if (!normalizedId) return null;
+
+  const collection = await getOrderJudgmentCacheCollection();
+  const doc = await collection.findOne({ judgmentId: normalizedId });
+  if (!doc) return null;
+
+  await collection.updateOne(
+    { judgmentId: normalizedId },
+    { $set: { lastAccessedAt: new Date() } }
+  );
+
+  return {
+    judgmentId: doc.judgmentId,
+    filename: doc.filename,
+    mimeType: doc.mimeType,
+    sizeBytes: doc.sizeBytes,
+    base64: doc.base64,
+  };
+}
+
+async function cacheOrderJudgment(
+  download: OrderJudgmentDownload,
+  meta: {
+    viewUrl: string;
+    date?: string;
+    source: 'direct' | 'proxy';
+  }
+) {
+  const collection = await getOrderJudgmentCacheCollection();
+  const now = new Date();
+  const doc: OrderJudgmentCacheDoc = {
+    judgmentId: download.judgmentId,
+    viewUrl: meta.viewUrl,
+    date: meta.date,
+    filename: download.filename,
+    mimeType: download.mimeType,
+    sizeBytes: download.sizeBytes,
+    base64: download.base64,
+    source: meta.source,
+    createdAt: now,
+    updatedAt: now,
+    lastAccessedAt: now,
+  };
+
+  const { createdAt, ...updatableFields } = doc;
+  await collection.updateOne(
+    { judgmentId: download.judgmentId },
+    {
+      $set: updatableFields,
+      $setOnInsert: { createdAt },
+    },
+    { upsert: true }
+  );
 }
 
 function toCaptchaChallenge(
@@ -668,36 +758,50 @@ function buildJudgmentFilename(judgmentId: string, date?: string): string {
   return `order-judgment-${safeFileToken(judgmentId)}${datePart}.pdf`;
 }
 
-export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
-  if (!viewUrl) throw new Error('Missing judgment view URL');
-
+function getJudgmentRequestContext(viewUrl: string) {
   const parsed = new URL(viewUrl);
   const judgmentId = parsed.searchParams.get('judgmentID')?.trim() || '';
   if (!judgmentId) throw new Error('Judgment ID not found in view URL');
 
   const pathParts = parsed.pathname.split('/').filter(Boolean);
   const appRoot = pathParts.length > 1 ? `/${pathParts[0]}` : '';
-  const baseAppUrl = `${parsed.origin}${appRoot}`;
-  const formActionUrl = `${parsed.origin}${parsed.pathname}`;
-  const referer = viewUrl;
+  if (!appRoot) throw new Error('Unsupported eLegalix judgment URL');
+
+  return {
+    parsed,
+    judgmentId,
+    baseAppUrl: `${parsed.origin}${appRoot}`,
+    formActionUrl: `${parsed.origin}${parsed.pathname}`,
+    startPageUrl: `${parsed.origin}${appRoot}/StartWebSearch.do`,
+  };
+}
+
+async function downloadOrderJudgmentDirect(
+  viewUrl: string,
+  date?: string
+): Promise<OrderJudgmentDownload> {
+  const { parsed, judgmentId, baseAppUrl, formActionUrl, startPageUrl } =
+    getJudgmentRequestContext(viewUrl);
   const cookieJar = new Map<string, string>();
 
-  const initRes = await fetch(viewUrl, {
+  const initRes = await fetch(startPageUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
     cache: 'no-store',
   });
   updateCookieJar(cookieJar, initRes);
   if (!initRes.ok) {
-    throw new Error(`Failed to open eLegalix page: ${initRes.status}`);
+    throw new Error(`Failed to start eLegalix session: ${initRes.status}`);
   }
 
   const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const captchaRes = await fetch(`${baseAppUrl}/getData?action=generateCaptcha`, {
+    const captchaRes = await fetch(`${baseAppUrl}/getData?action=generateCaptcha&_t=${Date.now()}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0',
+        Referer: startPageUrl,
         Cookie: toCookieHeader(cookieJar),
       },
       cache: 'no-store',
@@ -724,13 +828,18 @@ export async function downloadOrderJudgment(viewUrl: string, date?: string): Pro
         'User-Agent': 'Mozilla/5.0',
         'Content-Type': 'application/x-www-form-urlencoded',
         Origin: parsed.origin,
-        Referer: referer,
+        Referer: startPageUrl,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,application/pdf,*/*;q=0.8',
         Cookie: toCookieHeader(cookieJar),
       },
       body: form.toString(),
       cache: 'no-store',
     });
     updateCookieJar(cookieJar, fileRes);
+
+    if (fileRes.status === 403) {
+      throw new Error('eLegalix rejected the PDF download request with 403');
+    }
 
     const contentType = (fileRes.headers.get('content-type') || '').toLowerCase();
     if (!fileRes.ok || !contentType.includes('pdf')) {
@@ -752,6 +861,89 @@ export async function downloadOrderJudgment(viewUrl: string, date?: string): Pro
   }
 
   throw new Error('Failed to download judgment after multiple captcha attempts');
+}
+
+function shouldTryJudgmentProxy(error: unknown): boolean {
+  return error instanceof Error && /403|forbidden/i.test(error.message);
+}
+
+async function downloadOrderJudgmentViaProxy(
+  viewUrl: string,
+  date?: string
+): Promise<OrderJudgmentDownload | null> {
+  const proxyUrl = String(process.env.ORDERS_JUDGMENT_PROXY_URL || '').trim();
+  if (!proxyUrl) return null;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  const proxyToken = String(process.env.ORDERS_JUDGMENT_PROXY_TOKEN || '').trim();
+  if (proxyToken) {
+    headers.Authorization = `Bearer ${proxyToken}`;
+  }
+
+  const response = await fetch(proxyUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ viewUrl, date }),
+    cache: 'no-store',
+  });
+
+  let payload: unknown = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (
+    !response.ok ||
+    !payload ||
+    typeof payload !== 'object' ||
+    !('success' in payload) ||
+    !payload.success ||
+    !('result' in payload) ||
+    !payload.result
+  ) {
+    const errorMessage =
+      payload &&
+      typeof payload === 'object' &&
+      'error' in payload &&
+      typeof payload.error === 'string'
+        ? payload.error
+        : `Judgment proxy request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  return payload.result as OrderJudgmentDownload;
+}
+
+export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
+  if (!viewUrl) throw new Error('Missing judgment view URL');
+
+  const { judgmentId } = getJudgmentRequestContext(viewUrl);
+  const cached = await getCachedOrderJudgment(judgmentId);
+  if (cached) return cached;
+
+  try {
+    const direct = await downloadOrderJudgmentDirect(viewUrl, date);
+    await cacheOrderJudgment(direct, { viewUrl, date, source: 'direct' });
+    return direct;
+  } catch (error) {
+    if (!shouldTryJudgmentProxy(error)) {
+      throw error;
+    }
+  }
+
+  const proxied = await downloadOrderJudgmentViaProxy(viewUrl, date);
+  if (!proxied) {
+    throw new Error(
+      'eLegalix rejected the server download request (403). Configure ORDERS_JUDGMENT_PROXY_URL or serve this judgment from cache.'
+    );
+  }
+
+  await cacheOrderJudgment(proxied, { viewUrl, date, source: 'proxy' });
+  return proxied;
 }
 
 function isAllahabadCaptchaMismatch(html: string): boolean {
