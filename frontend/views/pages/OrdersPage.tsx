@@ -68,6 +68,7 @@ export default function OrdersPage() {
 
   const [loading, setLoading] = useState(false);
   const [judgmentLoadingId, setJudgmentLoadingId] = useState<string | null>(null);
+  const [allJudgmentsLoading, setAllJudgmentsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrdersResult | null>(null);
   const [showSearchForm, setShowSearchForm] = useState(false);
@@ -276,25 +277,58 @@ export default function OrdersPage() {
     );
   };
 
+  const fetchJudgmentPdf = async (viewUrl: string, date: string) => {
+    const res = await fetch('/api/orders/judgment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ viewUrl, date }),
+    });
+    const data = await res.json();
+    if (!data.success || !data.result) {
+      throw new Error(data.error || 'Failed to download order/judgment');
+    }
+
+    return data.result as { filename: string; base64: string; mimeType?: string };
+  };
+
   const downloadJudgment = async (viewUrl: string, date: string, judgmentId: string) => {
     try {
       setJudgmentLoadingId(judgmentId);
       setError(null);
-      const res = await fetch('/api/orders/judgment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ viewUrl, date }),
-      });
-      const data = await res.json();
-      if (!data.success || !data.result) {
-        throw new Error(data.error || 'Failed to download order/judgment');
-      }
-
-      downloadBase64(data.result.filename, data.result.base64, data.result.mimeType || 'application/pdf');
+      const pdf = await fetchJudgmentPdf(viewUrl, date);
+      downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to download order/judgment');
     } finally {
       setJudgmentLoadingId(null);
+    }
+  };
+
+  const downloadAllJudgments = async () => {
+    if (!result?.orderJudgments?.length) return;
+
+    try {
+      setAllJudgmentsLoading(true);
+      setError(null);
+      const failedDates: string[] = [];
+
+      for (const entry of result.orderJudgments) {
+        try {
+          const pdf = await fetchJudgmentPdf(entry.viewUrl, entry.date);
+          downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
+          await new Promise((resolve) => setTimeout(resolve, 200));
+        } catch {
+          failedDates.push(entry.date || `#${entry.srNo}`);
+        }
+      }
+
+      if (failedDates.length > 0) {
+        throw new Error(`Some downloads failed: ${failedDates.join(', ')}`);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download all order/judgment PDFs');
+    } finally {
+      setAllJudgmentsLoading(false);
     }
   };
 
@@ -512,9 +546,18 @@ export default function OrdersPage() {
 
             {result.orderJudgments && result.orderJudgments.length > 0 && (
               <div className="mt-5">
-                <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-3">
-                  Order/Judgment Documents
-                </h3>
+                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="text-sm sm:text-base font-semibold text-slate-200">
+                    Order/Judgment Documents
+                  </h3>
+                  <button
+                    onClick={downloadAllJudgments}
+                    disabled={allJudgmentsLoading || judgmentLoadingId !== null}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40 w-full sm:w-auto"
+                  >
+                    {allJudgmentsLoading ? 'Downloading All...' : 'Download All PDFs'}
+                  </button>
+                </div>
                 <div className="space-y-2.5">
                   {result.orderJudgments.map((entry) => (
                     <div
@@ -529,7 +572,7 @@ export default function OrdersPage() {
                       </div>
                       <button
                         onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
-                        disabled={judgmentLoadingId === entry.judgmentId}
+                        disabled={judgmentLoadingId === entry.judgmentId || allJudgmentsLoading}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
                       >
                         {judgmentLoadingId === entry.judgmentId ? 'Downloading...' : 'Download Order/Judgment'}
