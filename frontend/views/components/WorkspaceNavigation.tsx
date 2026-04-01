@@ -4,13 +4,20 @@ import Link from 'next/link';
 import { ReactNode, useState } from 'react';
 
 type NavKey =
-  | 'dashboard'
   | 'web-diary'
   | 'cause-list'
   | 'status'
   | 'orders'
   | 'my-cases'
   | 'track-cases';
+
+type WorkspaceNavigationProps = {
+  alertsCount?: number;
+  current?: NavKey;
+  onAlertsClick?: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+};
 
 type NavItem = {
   key: NavKey;
@@ -31,21 +38,6 @@ const mobileMenuIconClass =
   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border bg-slate-950/80';
 
 const navItems: NavItem[] = [
-  {
-    key: 'dashboard',
-    href: '/',
-    label: 'Dashboard',
-    title: 'Open dashboard',
-    borderClass: 'border-slate-500/20',
-    textClass: 'text-slate-100',
-    iconClass: 'border-slate-500/20 bg-slate-500/10 text-slate-200',
-    icon: (
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12l8-7 8 7" />
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 10v10h12V10" />
-      </svg>
-    ),
-  },
   {
     key: 'web-diary',
     href: '/web-diary',
@@ -134,8 +126,26 @@ const navItems: NavItem[] = [
   },
 ];
 
-export default function WorkspaceNavigation({ current }: { current?: NavKey }) {
+export default function WorkspaceNavigation({
+  alertsCount = 0,
+  current,
+  onAlertsClick,
+  onRefresh,
+  refreshing = false,
+}: WorkspaceNavigationProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const hasAlertsAction = typeof onAlertsClick === 'function';
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh();
+      return;
+    }
+    window.location.reload();
+  };
+  const handleAlerts = () => {
+    if (!onAlertsClick) return;
+    onAlertsClick();
+  };
 
   return (
     <>
@@ -186,6 +196,10 @@ export default function WorkspaceNavigation({ current }: { current?: NavKey }) {
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/10 bg-emerald-400/5 px-3 py-1 text-[11px] font-medium text-emerald-200/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+            Live
+          </div>
           <div className="grid grid-cols-1 gap-2.5">
             {navItems.map((item) => {
               const active = item.key === current;
@@ -205,6 +219,45 @@ export default function WorkspaceNavigation({ current }: { current?: NavKey }) {
                 </Link>
               );
             })}
+
+            <button
+              onClick={() => {
+                setMobileNavOpen(false);
+                handleRefresh();
+              }}
+              disabled={refreshing}
+              className={`${mobileMenuItemClass} border-slate-600/40 disabled:opacity-40`}
+            >
+              <span className={`${mobileMenuIconClass} border-slate-600/40 bg-slate-800/40 text-slate-200`}>
+                <svg className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </span>
+              <span className="text-base font-semibold text-slate-100">
+                {refreshing ? 'Loading...' : 'Refresh'}
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileNavOpen(false);
+                handleAlerts();
+              }}
+              disabled={!hasAlertsAction}
+              className={`${mobileMenuItemClass} border-sky-400/20 disabled:opacity-40`}
+            >
+              <span className={`${mobileMenuIconClass} border-sky-400/20 bg-sky-500/10 text-sky-200`}>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+              </span>
+              <span className="text-base font-semibold text-slate-100">Alerts</span>
+              {alertsCount > 0 && (
+                <span className="ml-auto flex h-7 min-w-7 items-center justify-center rounded-full bg-red-500 px-2 text-xs font-bold text-white shadow-lg shadow-red-500/30">
+                  {alertsCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
       </aside>
@@ -227,6 +280,33 @@ export default function WorkspaceNavigation({ current }: { current?: NavKey }) {
             </Link>
           );
         })}
+
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}
+        >
+          <svg className={`h-4 w-4 text-slate-200 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {refreshing ? 'Loading...' : 'Refresh'}
+        </button>
+
+        <button
+          onClick={handleAlerts}
+          disabled={!hasAlertsAction}
+          className={`${desktopNavItemClass} border-sky-400/20 text-sky-100 hover:border-sky-300/40 disabled:opacity-40`}
+        >
+          <svg className="h-4 w-4 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          Alerts
+          {alertsCount > 0 && (
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white shadow-lg shadow-red-500/30">
+              {alertsCount}
+            </span>
+          )}
+        </button>
       </div>
     </>
   );

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { TrackedOrderCase } from '@/types/court';
+import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 
 const cinzel = Cinzel({
@@ -73,6 +74,9 @@ export default function TrackCasesPage() {
   const [error, setError] = useState('');
   const [hasAccount, setHasAccount] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [caseTypeOptions, setCaseTypeOptions] = useState<CaseTypeOption[]>([]);
   const [caseTypeLoading, setCaseTypeLoading] = useState(false);
   const [orderCaseForm, setOrderCaseForm] = useState<OrderCaseForm>({
@@ -92,6 +96,7 @@ export default function TrackCasesPage() {
         const storedUserEmail = localStorage.getItem('userEmail');
 
         setHasAccount(Boolean(storedUserId));
+        setUserId(storedUserId);
 
         if (storedCaseIds) {
           try {
@@ -156,10 +161,57 @@ export default function TrackCasesPage() {
   }, []);
 
   const totalTracked = caseIds.length + trackedOrderCases.length;
+  const trackedOrderTrackingKeys = useMemo(
+    () => trackedOrderCases.map((trackedCase) => trackedCase.trackingKey),
+    [trackedOrderCases]
+  );
   const accountCaption = useMemo(() => {
     if (!hasAccount) return 'Saved on this device only';
     return accountEmail ? `Synced as ${accountEmail}` : 'Synced across devices';
   }, [accountEmail, hasAccount]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadUnreadCount = async () => {
+      if (caseIds.length === 0 && trackedOrderTrackingKeys.length === 0 && !userId) {
+        if (mounted) setUnreadCount(0);
+        return;
+      }
+
+      try {
+        const params = new URLSearchParams();
+        params.append('limit', '100');
+        if (caseIds.length > 0) {
+          params.append('caseIds', caseIds.join(','));
+        }
+        if (trackedOrderTrackingKeys.length > 0) {
+          params.append('orderTrackingKeys', trackedOrderTrackingKeys.join(','));
+        }
+        if (userId) {
+          params.append('userId', userId);
+        }
+
+        const response = await fetch(`/api/notifications?${params.toString()}`);
+        const data = await response.json();
+        if (mounted && data.success) {
+          setUnreadCount(
+            (data.notifications || []).filter(
+              (notification: { read: boolean }) => !notification.read
+            ).length
+          );
+        }
+      } catch {
+        if (mounted) setUnreadCount(0);
+      }
+    };
+
+    loadUnreadCount();
+
+    return () => {
+      mounted = false;
+    };
+  }, [caseIds, trackedOrderTrackingKeys, userId]);
 
   const persistTracking = async (
     nextCaseIds: string[],
@@ -267,9 +319,25 @@ export default function TrackCasesPage() {
 
   return (
     <div className={`min-h-screen ${manrope.className}`}>
+      <NotificationsPanel
+        isOpen={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        trackedCaseIds={caseIds}
+        trackedOrderTrackingKeys={trackedOrderTrackingKeys}
+        userId={userId}
+      />
+
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
-        <div className="mb-6 flex justify-end">
-          <WorkspaceNavigation current="track-cases" />
+        <div className="mb-6 flex justify-end lg:relative lg:overflow-hidden lg:rounded-[32px] lg:border lg:border-white/10 lg:bg-[#0b1224]/90 lg:p-5 lg:shadow-[0_28px_70px_rgba(2,6,23,0.35)]">
+          <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.10),transparent_30%)]" />
+          <div className="pointer-events-none absolute inset-x-6 top-0 hidden lg:block h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+          <div className="relative">
+            <WorkspaceNavigation
+              current="track-cases"
+              alertsCount={unreadCount}
+              onAlertsClick={() => setNotificationsOpen(true)}
+            />
+          </div>
         </div>
 
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

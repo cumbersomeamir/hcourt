@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { CourtCase, Notification } from '@/types/court';
+import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 import {
   buildSavedCaseProfiles,
@@ -67,6 +68,10 @@ export default function MyCasesPage() {
   const [hasAccount, setHasAccount] = useState(false);
   const [accountEmail, setAccountEmail] = useState('');
   const [scheduleUpdatedAt, setScheduleUpdatedAt] = useState<string>('');
+  const [trackedCaseIds, setTrackedCaseIds] = useState<string[]>([]);
+  const [trackedOrderTrackingKeys, setTrackedOrderTrackingKeys] = useState<string[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -83,6 +88,11 @@ export default function MyCasesPage() {
 
         setHasAccount(trackedState.hasAccount);
         setAccountEmail(trackedState.accountEmail);
+        setTrackedCaseIds(trackedState.caseIds);
+        setTrackedOrderTrackingKeys(
+          trackedState.trackedOrderCases.map((trackedCase) => trackedCase.trackingKey)
+        );
+        setUserId(trackedState.userId);
 
         const nextProfiles = buildSavedCaseProfiles(
           trackedState.caseIds,
@@ -167,9 +177,25 @@ export default function MyCasesPage() {
 
   return (
     <div className={`min-h-screen ${manrope.className}`}>
+      <NotificationsPanel
+        isOpen={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        trackedCaseIds={trackedCaseIds}
+        trackedOrderTrackingKeys={trackedOrderTrackingKeys}
+        userId={userId}
+      />
+
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
-        <div className="mb-6 flex justify-end">
-          <WorkspaceNavigation current="my-cases" />
+        <div className="mb-6 flex justify-end lg:relative lg:overflow-hidden lg:rounded-[32px] lg:border lg:border-white/10 lg:bg-[#0b1224]/90 lg:p-5 lg:shadow-[0_28px_70px_rgba(2,6,23,0.35)]">
+          <div className="pointer-events-none absolute inset-0 hidden lg:block bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.10),transparent_30%)]" />
+          <div className="pointer-events-none absolute inset-x-6 top-0 hidden lg:block h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+          <div className="relative">
+            <WorkspaceNavigation
+              current="my-cases"
+              alertsCount={unreadCount}
+              onAlertsClick={() => setNotificationsOpen(true)}
+            />
+          </div>
         </div>
 
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
