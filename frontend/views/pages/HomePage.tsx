@@ -93,8 +93,6 @@ export default function Home() {
   }, [trackedCaseIds, derivedTrackedCaseIdsFromOrders]);
   const hasTrackedScheduleCases = effectiveTrackedCaseIds.length > 0;
   const shouldApplyScheduleFilter = scheduleFilterEnabled && hasTrackedScheduleCases;
-  const metricCardClass =
-    'rounded-2xl border border-slate-700/40 bg-slate-950/30 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]';
   const quickActionBaseClass =
     'group relative flex min-h-[62px] items-center gap-3 overflow-hidden rounded-2xl border bg-slate-950/40 px-3.5 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-all duration-200 hover:bg-slate-900/70';
   const quickActionIconBaseClass =
@@ -313,33 +311,21 @@ export default function Home() {
                   Lucknow Bench &mdash; Online Court Activity Digital Display Board
                 </p>
                 {dbStats && (
-                  <div className="mt-5 grid grid-cols-2 gap-2.5 min-[560px]:grid-cols-3 max-w-3xl">
-                    <div className={metricCardClass}>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block h-2 w-2 rounded-full bg-cyan-400"></span>
-                        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                          Schedules
-                        </span>
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-slate-100">{dbStats.schedules}</p>
+                  <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-400">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-cyan-400"></span>
+                      <span className="uppercase tracking-[0.18em] text-slate-500">Schedules</span>
+                      <span className="font-semibold text-slate-100">{dbStats.schedules}</span>
                     </div>
-                    <div className={metricCardClass}>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
-                        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                          Changes
-                        </span>
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-slate-100">{dbStats.changes}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-amber-400"></span>
+                      <span className="uppercase tracking-[0.18em] text-slate-500">Changes</span>
+                      <span className="font-semibold text-slate-100">{dbStats.changes}</span>
                     </div>
-                    <div className={metricCardClass}>
-                      <div className="flex items-center gap-2">
-                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
-                        <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-500">
-                          Notifications
-                        </span>
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-slate-100">{dbStats.notifications}</p>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-block h-2 w-2 rounded-full bg-emerald-400"></span>
+                      <span className="uppercase tracking-[0.18em] text-slate-500">Notifications</span>
+                      <span className="font-semibold text-slate-100">{dbStats.notifications}</span>
                     </div>
                   </div>
                 )}
