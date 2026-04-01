@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { CourtCase, Notification } from '@/types/court';
+import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 import {
   buildSavedCaseProfiles,
   encodeCaseProfileSlug,
@@ -167,6 +168,10 @@ export default function MyCasesPage() {
   return (
     <div className={`min-h-screen ${manrope.className}`}>
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
+        <div className="mb-6 flex justify-end">
+          <WorkspaceNavigation current="my-cases" />
+        </div>
+
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link

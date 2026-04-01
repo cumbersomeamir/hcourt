@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { TrackedOrderCase } from '@/types/court';
+import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -267,6 +268,10 @@ export default function TrackCasesPage() {
   return (
     <div className={`min-h-screen ${manrope.className}`}>
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
+        <div className="mb-6 flex justify-end">
+          <WorkspaceNavigation current="track-cases" />
+        </div>
+
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link
