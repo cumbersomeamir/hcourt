@@ -353,6 +353,16 @@ export default function Home() {
                 </svg>
                 Status
               </a>
+              <a
+                href="/orders"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/15 border border-rose-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-rose-300 hover:bg-rose-500/25 hover:border-rose-400/40"
+                title="View Orders"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+                </svg>
+                Orders
+              </a>
               <button
                 onClick={() => setCaseIdModalOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/15 border border-emerald-400/20 px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 hover:border-emerald-400/40"
