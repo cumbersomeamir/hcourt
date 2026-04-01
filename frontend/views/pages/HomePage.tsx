@@ -394,8 +394,8 @@ export default function Home() {
                     </span>
                     <span className="min-w-0 text-sm font-semibold text-slate-100">Orders</span>
                   </a>
-                  <button
-                    onClick={() => setCaseIdModalOpen(true)}
+                  <a
+                    href="/track-cases"
                     className={`${quickActionBaseClass} border-emerald-400/20 hover:border-emerald-300/40`}
                     title="Manage tracked cases"
                   >
@@ -410,7 +410,7 @@ export default function Home() {
                         ? `Tracked (${trackedCaseIds.length + trackedOrderCases.length})`
                         : 'Track Cases'}
                     </span>
-                  </button>
+                  </a>
                   <button
                     onClick={() => fetchSchedule(true)}
                     disabled={loading}
