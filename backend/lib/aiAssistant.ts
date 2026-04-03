@@ -22,7 +22,6 @@ import {
   upsertCaseRegistry,
 } from '@/lib/aiStore';
 import { runGpt5Nano } from '@/lib/gpt5Nano';
-import { buildJudgmentViewerHref, loadLatestJudgmentDocument } from '@/lib/judgmentDocument';
 import { GET as getWebDiary } from '@/controllers/webDiaryController';
 
 export type AiClientState = {
@@ -1322,6 +1321,7 @@ async function runTool(
     const latestOrder = result.orderJudgments[0] || null;
     let latestOrderDocument: Record<string, unknown> | null = null;
     if (responseMode === 'latest_order' && latestOrder) {
+      const { buildJudgmentViewerHref, loadLatestJudgmentDocument } = await import('@/lib/judgmentDocument');
       const latestDocument = await loadLatestJudgmentDocument({
         caseLabel: `${result.caseInfo.caseType} ${caseNo}/${caseYear}`,
         latestOrder,
