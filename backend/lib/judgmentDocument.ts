@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer';
+import { PDFParse } from 'pdf-parse';
 import { downloadOrderJudgment, OrderJudgmentDownload, OrderJudgmentEntry } from '@/models/ordersModel';
 import { runGpt5Nano } from '@/lib/gpt5Nano';
 
@@ -51,70 +52,27 @@ function normalizeLineText(value: string) {
     .trim();
 }
 
-function mergeFragments(fragments: Array<{ text: string; x: number }>) {
-  let output = '';
-  let previousX: number | null = null;
-
-  for (const fragment of fragments) {
-    const text = normalizeLineText(fragment.text);
-    if (!text) continue;
-
-    if (!output) {
-      output = text;
-      previousX = fragment.x;
-      continue;
-    }
-
-    const needsSpace =
-      !output.endsWith('-') &&
-      !/^[,.;:)\]]/.test(text) &&
-      previousX !== null &&
-      Math.abs(fragment.x - previousX) > 1;
-
-    output += needsSpace ? ` ${text}` : text;
-    previousX = fragment.x;
-  }
-
-  return normalizeLineText(output);
-}
-
 export async function extractJudgmentLinesFromBase64(base64: string): Promise<JudgmentLine[]> {
-  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const data = Uint8Array.from(Buffer.from(base64, 'base64'));
-  const loadingTask = pdfjs.getDocument({
-    data,
-    useSystemFonts: true,
-    isEvalSupported: false,
+  const parser = new PDFParse({
+    data: Buffer.from(base64, 'base64'),
   });
-  const pdf = await loadingTask.promise;
+  const textResult = await parser.getText({
+    pageJoiner: '',
+    itemJoiner: '',
+    lineEnforce: true,
+    cellSeparator: ' ',
+  } as Record<string, unknown>);
+  await parser.destroy();
+
   const lines: JudgmentLine[] = [];
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const textContent = await page.getTextContent();
-    const grouped = new Map<number, Array<{ text: string; x: number }>>();
-
-    for (const item of textContent.items as Array<{ str?: string; transform?: number[] }>) {
-      const text = normalizeLineText(item?.str || '');
-      const transform = Array.isArray(item?.transform) ? item.transform : [];
-      const x = typeof transform[4] === 'number' ? transform[4] : 0;
-      const y = typeof transform[5] === 'number' ? transform[5] : 0;
-      if (!text) continue;
-
-      const matchedKey =
-        Array.from(grouped.keys()).find((key) => Math.abs(key - y) <= 2.5) ?? Math.round(y * 10) / 10;
-      const bucket = grouped.get(matchedKey) || [];
-      bucket.push({ text, x });
-      grouped.set(matchedKey, bucket);
-    }
-
-    const sortedLineGroups = Array.from(grouped.entries()).sort((left, right) => right[0] - left[0]);
+  for (const page of textResult.pages || []) {
     let lineNumber = 1;
-    for (const [, fragments] of sortedLineGroups) {
-      const text = mergeFragments(fragments.sort((left, right) => left.x - right.x));
+    for (const rawLine of String(page.text || '').split(/\r?\n/)) {
+      const text = normalizeLineText(rawLine);
       if (!text) continue;
       lines.push({
-        page: pageNumber,
+        page: page.num,
         line: lineNumber,
         text,
       });
