@@ -215,6 +215,23 @@ function getToolArg(args: Record<string, unknown> | undefined, ...keys: string[]
   return undefined;
 }
 
+function isTrackedCasesLookup(message: string) {
+  const lowerMessage = message.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!/\b(track|tracked|tracking)\b/.test(lowerMessage)) return false;
+
+  return [
+    /\bwhich cases\b.*\b(track|tracked|tracking)\b/,
+    /\bwhat cases\b.*\b(track|tracked|tracking)\b/,
+    /\bshow\b.*\b(track|tracked|tracking)\b/,
+    /\blist\b.*\b(track|tracked|tracking)\b/,
+    /\btracked cases\b/,
+    /\b(cases of mine|my cases)\b.*\btracked\b/,
+    /\b(getting|being)\s+tracked\b/,
+    /\b(am i|i am|i'm)\b.*\b(track|tracking)\b/,
+    /\bwhat am i tracking\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timeoutId: NodeJS.Timeout | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -260,6 +277,10 @@ async function resolveCaseTypeValue(
 async function buildPlanner(message: string, history: ChatTurn[], clientState: NormalizedClientState, lawyerProfile: ReturnType<typeof serializeLawyerProfile>) {
   const fallbackPlanner = () => {
     const lowerMessage = message.toLowerCase();
+    if (isTrackedCasesLookup(message)) {
+      return { tools: [{ name: 'get_my_cases', arguments: {} }] };
+    }
+
     if (lowerMessage.includes('track')) {
       const caseId = extractCaseId(message);
       const caseParts = extractCaseNumberParts(message);
@@ -325,7 +346,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             role: 'system',
             content:
-              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments, use get_case_status. If it is about saving or tracking a case, use track_case.',
+              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments, use get_case_status. If it is about saving or tracking a new case, use track_case.',
           },
           {
             role: 'user',
@@ -368,6 +389,10 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
     .filter((tool): tool is PlannerToolCall => Boolean(tool))
     .slice(0, 3);
 
+  if (isTrackedCasesLookup(message)) {
+    return { tools: [{ name: 'get_my_cases', arguments: {} }] };
+  }
+
   if (sanitizedTools.length > 0) {
     return { tools: sanitizedTools };
   }
@@ -409,10 +434,19 @@ async function runTool(
       });
     }
 
+    const trackedCaseSummary =
+      effectiveCaseIds.length > 0 ? effectiveCaseIds.join(', ') : 'none';
+    const trackedOrderSummary =
+      trackedOrderCases.length > 0
+        ? trackedOrderCases
+            .map((trackedCase) => `${trackedCase.caseTypeLabel} ${trackedCase.caseNo}/${trackedCase.caseYear}`)
+            .join(', ')
+        : 'none';
+
     return {
       tool: tool.name,
       ok: true,
-      summary: `Loaded ${effectiveCaseIds.length} saved cases and ${trackedOrderCases.length} order trackers.`,
+      summary: `Saved case IDs: ${trackedCaseSummary}. Order trackers: ${trackedOrderSummary}.`,
       data: {
         trackedCaseIds: effectiveCaseIds,
         trackedOrderCases,

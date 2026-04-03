@@ -22,10 +22,17 @@ function normalizeStringList(value: unknown): string[] {
   );
 }
 
+function generateProfileKey() {
+  const cryptoKey = globalThis.crypto?.randomUUID?.();
+  if (cryptoKey) return cryptoKey;
+
+  return `lp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export function getOrCreateLawyerProfileKey() {
   const existing = localStorage.getItem(PROFILE_KEY_STORAGE);
   if (existing) return existing;
-  const nextKey = crypto.randomUUID();
+  const nextKey = generateProfileKey();
   localStorage.setItem(PROFILE_KEY_STORAGE, nextKey);
   return nextKey;
 }

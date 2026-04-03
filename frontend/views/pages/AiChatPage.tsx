@@ -358,19 +358,6 @@ export default function AiChatPage() {
           <aside className="space-y-5">
             <section className="rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 p-6">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                Available Questions
-              </p>
-              <div className="mt-4 space-y-3 text-sm text-slate-300">
-                <p>Case status and latest order/judgment counts.</p>
-                <p>Cause list assignment checks using your lawyer profile aliases.</p>
-                <p>Courtroom movement using live board plus stored court history.</p>
-                <p>Tracking actions using case IDs or case type / no / year.</p>
-                <p>Web diary notices for a given date.</p>
-              </div>
-            </section>
-
-            <section className="rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 p-6">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
                 Current Profile
               </p>
               <h2 className="mt-3 text-xl font-semibold text-slate-100">
