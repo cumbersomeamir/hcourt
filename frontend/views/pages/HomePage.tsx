@@ -286,42 +286,38 @@ export default function Home() {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileNavOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 7h16M4 12h16M4 17h16'} />
         </svg>
       </button>
-      <div
-        className={`fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-200 lg:hidden ${
-          !caseIdModalOpen && mobileNavOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
-        }`}
-        onClick={() => setMobileNavOpen(false)}
-        aria-hidden={!mobileNavOpen}
-      />
-      <aside
-        className={`fixed inset-y-0 right-0 z-50 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl transition-transform duration-300 ease-out lg:hidden ${
-          !caseIdModalOpen && mobileNavOpen
-            ? 'pointer-events-auto translate-x-0'
-            : 'pointer-events-none translate-x-full'
-        }`}
-        aria-hidden={!mobileNavOpen}
-      >
-        <div className="flex items-center justify-between border-b border-slate-800/80 px-5 py-4">
-          <div>
-            <p className="text-[10px] tracking-[0.24em] uppercase text-slate-500">Navigation</p>
-            <p className="mt-1 text-sm text-slate-400">Court services and monitoring tools</p>
-          </div>
-          <button
+      {!caseIdModalOpen && mobileNavOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-200 lg:hidden"
             onClick={() => setMobileNavOpen(false)}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/50 text-slate-100"
-            aria-label="Close navigation menu"
+            aria-hidden={false}
+          />
+          <aside
+            className="fixed inset-y-0 right-0 z-50 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl lg:hidden"
+            aria-hidden={false}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/10 bg-emerald-400/5 px-3 py-1 text-[11px] font-medium text-emerald-200/80">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
-            Live
-          </div>
-          <div className="grid grid-cols-1 gap-2.5">
+            <div className="flex items-center justify-between border-b border-slate-800/80 px-5 py-4">
+              <div>
+                <p className="text-[10px] tracking-[0.24em] uppercase text-slate-500">Navigation</p>
+                <p className="mt-1 text-sm text-slate-400">Court services and monitoring tools</p>
+              </div>
+              <button
+                onClick={() => setMobileNavOpen(false)}
+                className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/50 text-slate-100"
+                aria-label="Close navigation menu"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/10 bg-emerald-400/5 px-3 py-1 text-[11px] font-medium text-emerald-200/80">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                Live
+              </div>
+              <div className="grid grid-cols-1 gap-2.5">
             <a href="/web-diary" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-violet-400/20`} title="View Web Diary">
               <span className={`${mobileMenuIconClass} border-violet-400/20 bg-violet-500/10 text-violet-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -415,9 +411,11 @@ export default function Home() {
                 </span>
               )}
             </button>
-          </div>
-        </div>
-      </aside>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
       <div className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
         {/* Header Card */}
         <div className="glass-card-lg relative mb-6 overflow-hidden">
