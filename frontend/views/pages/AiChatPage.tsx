@@ -268,7 +268,7 @@ export default function AiChatPage() {
               <p className="mt-2 text-sm text-amber-100/70">
                 {lawyerProfile
                   ? `${lawyerProfile.aliases.length + lawyerProfile.chamberAliases.length} aliases ready`
-                  : 'Configure this in /admin for “assigned to me” checks.'}
+                  : 'Configure this in /admin/data-map for “assigned to me” checks.'}
               </p>
             </div>
           </div>
@@ -370,10 +370,10 @@ export default function AiChatPage() {
                       ...lawyerProfile.aliases,
                       ...lawyerProfile.chamberAliases,
                     ].join(', ') || 'none'}`
-                  : 'Go to /admin and add your counsel name, aliases, and chamber names.'}
+                  : 'Go to /admin/data-map and add your counsel name, aliases, and chamber names.'}
               </p>
               <Link
-                href="/admin"
+                href="/admin/data-map#lawyer-profile"
                 className="mt-5 inline-flex items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-500/10 px-5 py-3 text-sm font-semibold text-amber-100 transition-colors hover:bg-amber-500/18"
               >
                 Edit Lawyer Profile

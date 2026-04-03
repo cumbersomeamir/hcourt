@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
+import AdminSectionLinks from '@/views/components/AdminSectionLinks';
 import { loadTrackedState } from '@/lib/caseProfiles';
 import { loadLawyerProfile, saveLawyerProfile } from '@/lib/lawyerProfile';
 import { AdminOverview, LawyerProfile } from '@/types/assistant';
@@ -258,7 +259,12 @@ export default function AdminPage() {
           </div>
         ) : (
           <div className="space-y-8">
-            <section className="rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.35)] sm:p-8">
+            <AdminSectionLinks current="data-map" />
+
+            <section
+              id="lawyer-profile"
+              className="rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.35)] sm:p-8"
+            >
               <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">

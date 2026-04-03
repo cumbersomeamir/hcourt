@@ -1,3 +1,3 @@
-import AdminPage from '@/views/pages/AdminPage';
+import AdminIndexPage from '@/views/pages/AdminIndexPage';
 
-export default AdminPage;
+export default AdminIndexPage;
