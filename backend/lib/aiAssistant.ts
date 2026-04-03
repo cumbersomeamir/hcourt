@@ -232,6 +232,22 @@ function isTrackedCasesLookup(message: string) {
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
+function isTrackedCasesStatusLookup(message: string) {
+  const lowerMessage = message.toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!/\bstatus\b/.test(lowerMessage)) return false;
+
+  return [
+    /\bwhat('?s| is)? the status of my cases?\b/,
+    /\bstatus of my cases?\b/,
+    /\bstatus of tracked cases?\b/,
+    /\bstatus of saved cases?\b/,
+    /\bshow( me)? the status of my cases?\b/,
+    /\bmy cases?\b.*\bstatus\b/,
+    /\btracked cases?\b.*\bstatus\b/,
+    /\bsaved cases?\b.*\bstatus\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timeoutId: NodeJS.Timeout | null = null;
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -317,6 +333,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             name: 'get_case_status',
             arguments: {
+              ...(isTrackedCasesStatusLookup(message) ? { useTrackedCases: true } : {}),
               city: normalizeBench(message),
               ...(extractCaseNumberParts(message) || {}),
               caseId: extractCaseId(message),
@@ -346,7 +363,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             role: 'system',
             content:
-              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments, use get_case_status. If it is about saving or tracking a new case, use track_case.',
+              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request asks for the status of saved, tracked, or "my" cases, use get_case_status with {"useTrackedCases":true}. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments for a specific case, use get_case_status. If it is about saving or tracking a new case, use track_case.',
           },
           {
             role: 'user',
@@ -397,6 +414,159 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
     return { tools: sanitizedTools };
   }
   return fallbackPlanner();
+}
+
+async function loadTrackedStatuses(
+  db: Awaited<ReturnType<typeof getDb>>,
+  clientState: NormalizedClientState
+): Promise<ExecutedToolResult> {
+  const derivedCaseIds = clientState.trackedOrderCases
+    .map((trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase))
+    .filter((caseId): caseId is string => Boolean(caseId));
+  const effectiveCaseIds = Array.from(
+    new Set([...clientState.trackedCaseIds, ...derivedCaseIds])
+  );
+
+  if (effectiveCaseIds.length === 0 && clientState.trackedOrderCases.length === 0) {
+    return {
+      tool: 'get_case_status',
+      ok: false,
+      summary: 'No tracked cases are available in your current session.',
+    };
+  }
+
+  const liveBoardCases: Array<{
+    caseId: string;
+    visible: boolean;
+    courtNo?: string | null;
+    serialNo?: string | null;
+    progress?: string | null;
+    title?: string | null;
+  }> = [];
+  const orderCases: Array<{
+    trackingKey: string;
+    city: string;
+    caseLabel: string;
+    status: string | null;
+    title: string | null;
+    latestOrderDate: string | null;
+    orderJudgmentsCount: number;
+  }> = [];
+  const errors: string[] = [];
+
+  if (effectiveCaseIds.length > 0) {
+    try {
+      const latestResult = await syncSchedule({
+        db,
+        force: false,
+        source: 'ai_chat',
+      });
+      const schedule = latestResult.schedule;
+      const scheduleCourts = schedule?.courts || [];
+
+      for (const caseId of effectiveCaseIds) {
+        const matchedCourt =
+          scheduleCourts.find(
+            (court) => String(court.caseDetails?.caseNumber || '').toUpperCase() === caseId
+          ) || null;
+
+        if (matchedCourt) {
+          await upsertCaseRegistry(db, {
+            caseKey: caseId,
+            canonicalCaseId: caseId,
+            title: matchedCourt.caseDetails?.title || null,
+            explicitCaseIds: [caseId],
+          });
+          await saveScheduleSummary(db, {
+            caseKey: caseId,
+            canonicalCaseId: caseId,
+            title: matchedCourt.caseDetails?.title || null,
+            boardDate: schedule!.date,
+            lastUpdated: new Date(schedule!.lastUpdated),
+            court: matchedCourt,
+          });
+        }
+
+        liveBoardCases.push({
+          caseId,
+          visible: Boolean(matchedCourt),
+          courtNo: matchedCourt?.courtNo || null,
+          serialNo: matchedCourt?.serialNo || null,
+          progress: matchedCourt?.progress || null,
+          title: matchedCourt?.caseDetails?.title || null,
+        });
+      }
+    } catch (error) {
+      errors.push(
+        error instanceof Error ? error.message : 'Failed to load live board status for tracked cases.'
+      );
+    }
+  }
+
+  const trackedOrderCasesToCheck = clientState.trackedOrderCases.slice(0, 5);
+  for (const trackedCase of trackedOrderCasesToCheck) {
+    try {
+      const result = await withTimeout(
+        fetchOrders({
+          city: trackedCase.city,
+          caseType: trackedCase.caseType,
+          caseNo: trackedCase.caseNo,
+          caseYear: trackedCase.caseYear,
+        }),
+        20000,
+        `Tracked case status for ${trackedCase.trackingKey}`
+      );
+
+      const derivedCaseId = deriveCaseIdFromTrackedOrderCase(trackedCase);
+      await upsertCaseRegistry(db, {
+        caseKey: derivedCaseId || trackedCase.trackingKey,
+        canonicalCaseId: derivedCaseId,
+        title: result.caseInfo.petitionerVsRespondent || null,
+        explicitCaseIds: derivedCaseId ? [derivedCaseId] : [],
+        orderTrackers: [trackedCase],
+      });
+      await saveStatusSnapshot(db, {
+        caseKey: derivedCaseId || trackedCase.trackingKey,
+        canonicalCaseId: derivedCaseId,
+        city: trackedCase.city,
+        caseType: trackedCase.caseType,
+        caseNo: trackedCase.caseNo,
+        caseYear: trackedCase.caseYear,
+        result,
+      });
+
+      orderCases.push({
+        trackingKey: trackedCase.trackingKey,
+        city: trackedCase.city,
+        caseLabel: `${result.caseInfo.caseType} ${trackedCase.caseNo}/${trackedCase.caseYear}`,
+        status: result.caseInfo.status || null,
+        title: result.caseInfo.petitionerVsRespondent || null,
+        latestOrderDate: result.orderJudgments[0]?.date || null,
+        orderJudgmentsCount: result.orderJudgments.length,
+      });
+    } catch (error) {
+      errors.push(
+        error instanceof Error
+          ? error.message
+          : `Failed to load tracked order status for ${trackedCase.trackingKey}.`
+      );
+    }
+  }
+
+  const skippedOrderCases = Math.max(clientState.trackedOrderCases.length - trackedOrderCasesToCheck.length, 0);
+  const visibleCount = liveBoardCases.filter((entry) => entry.visible).length;
+
+  return {
+    tool: 'get_case_status',
+    ok: liveBoardCases.length > 0 || orderCases.length > 0,
+    summary: `Tracked live-board cases: ${liveBoardCases.length} checked, ${visibleCount} visible now. Tracked order-status cases: ${orderCases.length} loaded.${skippedOrderCases > 0 ? ` ${skippedOrderCases} additional tracked order cases were skipped in this response.` : ''}`,
+    data: {
+      liveBoardCases,
+      orderCases,
+      errors,
+      skippedOrderCases,
+    },
+  };
 }
 
 async function runTool(
@@ -559,6 +729,9 @@ async function runTool(
   }
 
   if (tool.name === 'get_case_status') {
+    const useTrackedCases =
+      Boolean(getToolArg(tool.arguments, 'useTrackedCases', 'use_tracked_cases')) ||
+      isTrackedCasesStatusLookup(message);
     const city = normalizeBench(
       String(getToolArg(tool.arguments, 'city', 'bench') || message)
     );
@@ -581,6 +754,10 @@ async function runTool(
           ''
       ).trim()
     );
+
+    if (useTrackedCases && !caseNo && !caseYear && !caseTypeCandidate && !caseId) {
+      return loadTrackedStatuses(db, clientState);
+    }
 
     if (!caseNo || !caseYear || !caseTypeCandidate) {
       return {
