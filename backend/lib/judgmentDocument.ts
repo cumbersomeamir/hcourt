@@ -1,5 +1,4 @@
 import { Buffer } from 'node:buffer';
-import { PDFParse } from 'pdf-parse';
 import { downloadOrderJudgment, OrderJudgmentDownload, OrderJudgmentEntry } from '@/models/ordersModel';
 import { runGpt5Nano } from '@/lib/gpt5Nano';
 
@@ -53,6 +52,7 @@ function normalizeLineText(value: string) {
 }
 
 export async function extractJudgmentLinesFromBase64(base64: string): Promise<JudgmentLine[]> {
+  const { PDFParse } = await import('pdf-parse');
   const parser = new PDFParse({
     data: Buffer.from(base64, 'base64'),
   });
