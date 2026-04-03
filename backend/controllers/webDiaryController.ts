@@ -196,6 +196,11 @@ export async function GET(request: Request) {
               return NextResponse.json({
                 success: true,
                 data: calendarData,
+                meta: {
+                  partial: true,
+                  timedOut: true,
+                  warning: 'Diary source timed out before notices could be loaded.',
+                },
               });
             }
             throw fetchError; // Re-throw other errors

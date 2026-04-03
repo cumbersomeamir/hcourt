@@ -73,6 +73,8 @@ type NormalizedClientState = {
   trackedOrderCases: TrackedOrderCase[];
 };
 
+const DISPLAY_TIME_ZONE = 'Asia/Kolkata';
+
 const ALLOWED_TOOLS = new Set([
   'get_my_cases',
   'get_case_status',
@@ -157,6 +159,34 @@ function formatWebDiaryDate(input: string | null | undefined): string | null {
   return `${parsed.day}/${parsed.month}/${parsed.year}`;
 }
 
+function formatDisplayDate(input: string | null | undefined) {
+  const parsed = parseDateParts(input);
+  if (!parsed) return String(input || '').trim() || null;
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: DISPLAY_TIME_ZONE,
+  }).format(new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day)));
+}
+
+function formatDisplayTimestamp(input: Date | string | null | undefined) {
+  if (!input) return null;
+  const value = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(value.getTime())) return null;
+
+  return new Intl.DateTimeFormat('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: DISPLAY_TIME_ZONE,
+  }).format(value);
+}
+
 function extractCaseId(message: string): string | null {
   const match = message.match(/\b[A-Z][A-Z0-9]*\/\d+\/\d{4}\b/i);
   return match ? match[0].toUpperCase() : null;
@@ -198,12 +228,38 @@ function extractJsonObject(raw: string): Record<string, unknown> | null {
 }
 
 function cleanCaseTypeQuery(value: string) {
-  return String(value || '')
-    .replace(
-      /^(what is the status of|what is status of|status of|show status of|check status of|track|track this case|details of|case status of)\s+/i,
-      ''
-    )
+  let nextValue = String(value || '').trim();
+
+  const leadingPatterns = [
+    /^(what(?:'s| is)? the status of)\s+/i,
+    /^(what(?:'s| is)? status of)\s+/i,
+    /^(status of)\s+/i,
+    /^(show(?: me)?(?: the)? status of)\s+/i,
+    /^(check(?: the)? status of)\s+/i,
+    /^(give me(?: the)? status of)\s+/i,
+    /^(case status of)\s+/i,
+    /^(details of)\s+/i,
+    /^(what(?:'s| is)? the latest order in)\s+/i,
+    /^(what(?:'s| is)? the latest order for)\s+/i,
+    /^(latest order in)\s+/i,
+    /^(latest order for)\s+/i,
+    /^(how many orders are there in)\s+/i,
+    /^(how many orders in)\s+/i,
+    /^(orders in)\s+/i,
+    /^(how many judgments are there in)\s+/i,
+    /^(how many judgments in)\s+/i,
+    /^(judgments in)\s+/i,
+    /^(track this case)\s+/i,
+    /^(track)\s+/i,
+  ];
+
+  for (const pattern of leadingPatterns) {
+    nextValue = nextValue.replace(pattern, '').trim();
+  }
+
+  return nextValue
     .replace(/\s+in\s+(lucknow|allahabad)\s+bench.*$/i, '')
+    .replace(/[?.!,;:]+$/g, '')
     .trim();
 }
 
@@ -215,8 +271,36 @@ function getToolArg(args: Record<string, unknown> | undefined, ...keys: string[]
   return undefined;
 }
 
+function normalizeIntentText(message: string) {
+  return String(message || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function extractBenchMention(message: string): 'lucknow' | 'allahabad' | null {
+  const normalized = normalizeIntentText(message);
+  if (normalized.includes('allahabad')) return 'allahabad';
+  if (normalized.includes('lucknow')) return 'lucknow';
+  return null;
+}
+
+function extractReferencedDate(message: string) {
+  const match = String(message || '').match(/\b\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}\b/);
+  return match?.[0] || '';
+}
+
+function getTimeZoneDateKey(input: Date | string, timeZone = DISPLAY_TIME_ZONE) {
+  const value = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(value.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    timeZone,
+  }).format(value);
+}
+
 function isTrackedCasesLookup(message: string) {
-  const lowerMessage = message.toLowerCase().replace(/\s+/g, ' ').trim();
+  const lowerMessage = normalizeIntentText(message);
+  if (isTrackedCasesStatusLookup(message) || isAlertsLookup(message)) return false;
   if (!/\b(track|tracked|tracking)\b/.test(lowerMessage)) return false;
 
   return [
@@ -233,7 +317,7 @@ function isTrackedCasesLookup(message: string) {
 }
 
 function isTrackedCasesStatusLookup(message: string) {
-  const lowerMessage = message.toLowerCase().replace(/\s+/g, ' ').trim();
+  const lowerMessage = normalizeIntentText(message);
   if (!/\bstatus\b/.test(lowerMessage)) return false;
 
   return [
@@ -245,6 +329,68 @@ function isTrackedCasesStatusLookup(message: string) {
     /\bmy cases?\b.*\bstatus\b/,
     /\btracked cases?\b.*\bstatus\b/,
     /\bsaved cases?\b.*\bstatus\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
+function isAlertsLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+
+  if (/\balert(s)?\b/.test(lowerMessage)) return true;
+
+  return [
+    /\bany updates?\b/,
+    /\bshow updates?\b/,
+    /\bnew order\b/,
+    /\bnew judgment\b/,
+    /\bcourtroom change\b/,
+    /\bchange alerts?\b/,
+    /\bupdates? in my tracked cases\b/,
+    /\bupdates? for my tracked cases\b/,
+    /\bupdates? in my cases\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
+function isTrackAction(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  if (!/\btrack\b/.test(lowerMessage)) return false;
+  if (isTrackedCasesLookup(message) || isTrackedCasesStatusLookup(message) || isAlertsLookup(message)) {
+    return false;
+  }
+
+  return [
+    /^track\b/,
+    /\btrack this case\b/,
+    /\btrack .* for me\b/,
+    /\bstart tracking\b/,
+    /\badd .*tracking\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
+function isCauseListAssignmentLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  if (!lowerMessage.includes('cause list')) return false;
+
+  return [
+    /\bassigned to me\b/,
+    /\bany case assigned to me\b/,
+    /\bfor me\b/,
+    /\bmy aliases\b/,
+    /\bmy lawyer profile\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
+function isWebDiaryLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return /\bweb diary\b/.test(lowerMessage) || /\bdiary notices?\b/.test(lowerMessage);
+}
+
+function isCourtroomTransferLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return [
+    /\btransfer\b.*\bcourt/,
+    /\bcourtroom\b.*\btransfer\b/,
+    /\bmove(d|ment)?\b.*\bcourt/,
+    /\bwhere is\b.*\blive board\b/,
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
@@ -292,12 +438,27 @@ async function resolveCaseTypeValue(
 
 async function buildPlanner(message: string, history: ChatTurn[], clientState: NormalizedClientState, lawyerProfile: ReturnType<typeof serializeLawyerProfile>) {
   const fallbackPlanner = () => {
-    const lowerMessage = message.toLowerCase();
+    const lowerMessage = normalizeIntentText(message);
     if (isTrackedCasesLookup(message)) {
       return { tools: [{ name: 'get_my_cases', arguments: {} }] };
     }
 
-    if (lowerMessage.includes('track')) {
+    if (isTrackedCasesStatusLookup(message)) {
+      return {
+        tools: [
+          {
+            name: 'get_case_status',
+            arguments: { useTrackedCases: true },
+          },
+        ],
+      };
+    }
+
+    if (isAlertsLookup(message)) {
+      return { tools: [{ name: 'get_alerts', arguments: {} }] };
+    }
+
+    if (isTrackAction(message)) {
       const caseId = extractCaseId(message);
       const caseParts = extractCaseNumberParts(message);
       return {
@@ -306,6 +467,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
             name: 'track_case',
             arguments: {
               caseId,
+              city: extractBenchMention(message) || undefined,
               ...(caseParts || {}),
             },
           },
@@ -313,13 +475,21 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
       };
     }
 
-    if (lowerMessage.includes('cause list') && lowerMessage.includes('assigned')) {
+    if (isCauseListAssignmentLookup(message)) {
       return { tools: [{ name: 'check_cause_list_assignments', arguments: {} }] };
     }
 
-    if (lowerMessage.includes('transfer') && lowerMessage.includes('court')) {
+    if (isCourtroomTransferLookup(message)) {
       return {
-        tools: [{ name: 'check_courtroom_transfer', arguments: extractCourtroomArgs(message) }],
+        tools: [
+          {
+            name: 'check_courtroom_transfer',
+            arguments: {
+              ...extractCourtroomArgs(message),
+              caseId: extractCaseId(message) || undefined,
+            },
+          },
+        ],
       };
     }
 
@@ -343,7 +513,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
       };
     }
 
-    if (lowerMessage.includes('web diary')) {
+    if (isWebDiaryLookup(message)) {
       return { tools: [{ name: 'get_web_diary', arguments: {} }] };
     }
 
@@ -363,7 +533,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             role: 'system',
             content:
-              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request asks for the status of saved, tracked, or "my" cases, use get_case_status with {"useTrackedCases":true}. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments for a specific case, use get_case_status. If it is about saving or tracking a new case, use track_case.',
+              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request asks for the status of saved, tracked, or "my" cases, use get_case_status with {"useTrackedCases":true}. If the request asks for alerts or updates on tracked/my/saved cases, use get_alerts. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer or movement in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments for a specific case, use get_case_status. If it is about saving or tracking a new case, use track_case. Never treat "which cases are tracked", "show tracked cases", or "updates in my tracked cases" as track_case.',
           },
           {
             role: 'user',
@@ -410,22 +580,173 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
     return { tools: [{ name: 'get_my_cases', arguments: {} }] };
   }
 
+  if (isTrackedCasesStatusLookup(message)) {
+    return { tools: [{ name: 'get_case_status', arguments: { useTrackedCases: true } }] };
+  }
+
+  if (isAlertsLookup(message)) {
+    return { tools: [{ name: 'get_alerts', arguments: {} }] };
+  }
+
+  if (isCauseListAssignmentLookup(message)) {
+    return { tools: [{ name: 'check_cause_list_assignments', arguments: {} }] };
+  }
+
+  if (isCourtroomTransferLookup(message)) {
+    return {
+      tools: [
+        {
+          name: 'check_courtroom_transfer',
+          arguments: {
+            ...extractCourtroomArgs(message),
+            caseId: extractCaseId(message) || undefined,
+          },
+        },
+      ],
+    };
+  }
+
+  if (isWebDiaryLookup(message)) {
+    return { tools: [{ name: 'get_web_diary', arguments: {} }] };
+  }
+
+  if (isTrackAction(message)) {
+    return {
+      tools: [
+        {
+          name: 'track_case',
+          arguments: {
+            caseId: extractCaseId(message) || undefined,
+            city: extractBenchMention(message) || undefined,
+            ...(extractCaseNumberParts(message) || {}),
+          },
+        },
+      ],
+    };
+  }
+
   if (sanitizedTools.length > 0) {
     return { tools: sanitizedTools };
   }
   return fallbackPlanner();
 }
 
+function formatTrackedOrderLabel(trackedCase: TrackedOrderCase) {
+  return `${trackedCase.caseTypeLabel || trackedCase.caseType} ${trackedCase.caseNo}/${trackedCase.caseYear}`;
+}
+
+function getEffectiveTrackedCaseIds(clientState: NormalizedClientState) {
+  return Array.from(
+    new Set([
+      ...clientState.trackedCaseIds,
+      ...clientState.trackedOrderCases
+        .map((trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase))
+        .filter((caseId): caseId is string => Boolean(caseId)),
+    ])
+  );
+}
+
+async function loadRelevantNotifications(
+  db: Awaited<ReturnType<typeof getDb>>,
+  clientState: NormalizedClientState,
+  limit = 100
+) {
+  const notificationsCollection = db.collection<Notification>('notifications');
+  const changesCollection = db.collection('changes');
+  const trackedOrderKeys = new Set(
+    clientState.trackedOrderCases.map((trackedCase) => trackedCase.trackingKey)
+  );
+  const trackedCaseIds = new Set(getEffectiveTrackedCaseIds(clientState));
+
+  let notifications = await notificationsCollection
+    .find({})
+    .sort({ timestamp: -1 })
+    .limit(limit * 4)
+    .toArray();
+
+  const hasCaseFilter = trackedCaseIds.size > 0;
+  const hasOrderFilter = trackedOrderKeys.size > 0;
+  if (!hasCaseFilter && !hasOrderFilter) {
+    return notifications;
+  }
+
+  const changeRecordMap = new Map<string, Notification['metadata'] & { oldCaseNumber?: string | null; newCaseNumber?: string | null }>();
+  if (hasCaseFilter) {
+    const { ObjectId } = await import('mongodb');
+    const changeRecordObjectIds = notifications
+      .map((notification) => String(notification.changeRecordId || '').trim())
+      .filter(Boolean)
+      .map((id) => {
+        try {
+          return new ObjectId(id);
+        } catch {
+          return null;
+        }
+      })
+      .filter((id): id is InstanceType<typeof ObjectId> => id !== null);
+
+    if (changeRecordObjectIds.length > 0) {
+      const changeRecords = await changesCollection
+        .find({ _id: { $in: changeRecordObjectIds } })
+        .toArray();
+
+      for (const changeRecord of changeRecords) {
+        changeRecordMap.set(String(changeRecord._id), {
+          oldCaseNumber: String(changeRecord.oldValue?.caseDetails?.caseNumber || '').toUpperCase() || null,
+          newCaseNumber: String(changeRecord.newValue?.caseDetails?.caseNumber || '').toUpperCase() || null,
+        });
+      }
+    }
+  }
+
+  notifications = notifications.filter((notification) => {
+    if (notification.type === 'order_update') {
+      const trackingKey = String(notification.orderTrackingKey || '').trim();
+      return Boolean(trackingKey && trackedOrderKeys.has(trackingKey));
+    }
+
+    const changeRecord = changeRecordMap.get(String(notification.changeRecordId || '').trim());
+    if (!changeRecord) return false;
+
+    return Boolean(
+      (changeRecord.oldCaseNumber && trackedCaseIds.has(changeRecord.oldCaseNumber)) ||
+        (changeRecord.newCaseNumber && trackedCaseIds.has(changeRecord.newCaseNumber))
+    );
+  });
+
+  return notifications.slice(0, limit);
+}
+
+async function findTrackedOrderCaseByCaseId(
+  db: Awaited<ReturnType<typeof getDb>>,
+  clientState: NormalizedClientState,
+  caseId: string
+) {
+  const normalizedCaseId = String(caseId || '').trim().toUpperCase();
+  if (!normalizedCaseId) return null;
+
+  const trackedMatch = clientState.trackedOrderCases.find(
+    (trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase) === normalizedCaseId
+  );
+  if (trackedMatch) return trackedMatch;
+
+  const registry = await db.collection('case_registry').findOne({
+    $or: [
+      { caseKey: normalizedCaseId },
+      { canonicalCaseId: normalizedCaseId },
+      { explicitCaseIds: normalizedCaseId },
+    ],
+  });
+
+  const registryTrackers = normalizeTrackedOrderCases(registry?.orderTrackers);
+  return registryTrackers[0] || null;
+}
+
 async function loadTrackedStatuses(
   db: Awaited<ReturnType<typeof getDb>>,
   clientState: NormalizedClientState
 ): Promise<ExecutedToolResult> {
-  const derivedCaseIds = clientState.trackedOrderCases
-    .map((trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase))
-    .filter((caseId): caseId is string => Boolean(caseId));
-  const effectiveCaseIds = Array.from(
-    new Set([...clientState.trackedCaseIds, ...derivedCaseIds])
-  );
+  const effectiveCaseIds = getEffectiveTrackedCaseIds(clientState);
 
   if (effectiveCaseIds.length === 0 && clientState.trackedOrderCases.length === 0) {
     return {
@@ -435,24 +756,57 @@ async function loadTrackedStatuses(
     };
   }
 
-  const liveBoardCases: Array<{
-    caseId: string;
-    visible: boolean;
-    courtNo?: string | null;
-    serialNo?: string | null;
-    progress?: string | null;
-    title?: string | null;
-  }> = [];
-  const orderCases: Array<{
-    trackingKey: string;
-    city: string;
-    caseLabel: string;
-    status: string | null;
-    title: string | null;
-    latestOrderDate: string | null;
-    orderJudgmentsCount: number;
-  }> = [];
+  const caseEntries = new Map<
+    string,
+    {
+      caseKey: string;
+      caseId: string | null;
+      referenceLabel: string;
+      trackingModes: string[];
+      trackingKey?: string;
+      liveBoard?: {
+        visible: boolean;
+        courtNo: string | null;
+        serialNo: string | null;
+        progress: string | null;
+        title: string | null;
+      };
+      orderStatus?: {
+        trackingKey: string;
+        city: string;
+        caseLabel: string;
+        status: string | null;
+        title: string | null;
+        latestOrderDate: string | null;
+        orderJudgmentsCount: number;
+      };
+    }
+  >();
   const errors: string[] = [];
+
+  for (const caseId of clientState.trackedCaseIds) {
+    caseEntries.set(caseId, {
+      caseKey: caseId,
+      caseId,
+      referenceLabel: caseId,
+      trackingModes: ['schedule'],
+    });
+  }
+
+  for (const trackedCase of clientState.trackedOrderCases) {
+    const derivedCaseId = deriveCaseIdFromTrackedOrderCase(trackedCase);
+    const caseKey = derivedCaseId || trackedCase.trackingKey;
+    const existing = caseEntries.get(caseKey);
+    caseEntries.set(caseKey, {
+      caseKey,
+      caseId: derivedCaseId || existing?.caseId || null,
+      referenceLabel: derivedCaseId || formatTrackedOrderLabel(trackedCase),
+      trackingModes: Array.from(new Set([...(existing?.trackingModes || []), 'order-status'])),
+      trackingKey: trackedCase.trackingKey,
+      liveBoard: existing?.liveBoard,
+      orderStatus: existing?.orderStatus,
+    });
+  }
 
   if (effectiveCaseIds.length > 0) {
     try {
@@ -469,6 +823,7 @@ async function loadTrackedStatuses(
           scheduleCourts.find(
             (court) => String(court.caseDetails?.caseNumber || '').toUpperCase() === caseId
           ) || null;
+        const existing = caseEntries.get(caseId);
 
         if (matchedCourt) {
           await upsertCaseRegistry(db, {
@@ -487,13 +842,20 @@ async function loadTrackedStatuses(
           });
         }
 
-        liveBoardCases.push({
+        caseEntries.set(caseId, {
+          caseKey: caseId,
           caseId,
-          visible: Boolean(matchedCourt),
-          courtNo: matchedCourt?.courtNo || null,
-          serialNo: matchedCourt?.serialNo || null,
-          progress: matchedCourt?.progress || null,
-          title: matchedCourt?.caseDetails?.title || null,
+          referenceLabel: existing?.referenceLabel || caseId,
+          trackingModes: Array.from(new Set([...(existing?.trackingModes || []), 'schedule'])),
+          trackingKey: existing?.trackingKey,
+          orderStatus: existing?.orderStatus,
+          liveBoard: {
+            visible: Boolean(matchedCourt),
+            courtNo: matchedCourt?.courtNo || null,
+            serialNo: matchedCourt?.serialNo || null,
+            progress: matchedCourt?.progress || null,
+            title: matchedCourt?.caseDetails?.title || null,
+          },
         });
       }
     } catch (error) {
@@ -535,14 +897,24 @@ async function loadTrackedStatuses(
         result,
       });
 
-      orderCases.push({
+      const caseKey = derivedCaseId || trackedCase.trackingKey;
+      const existing = caseEntries.get(caseKey);
+      caseEntries.set(caseKey, {
+        caseKey,
+        caseId: derivedCaseId || existing?.caseId || null,
+        referenceLabel: derivedCaseId || existing?.referenceLabel || formatTrackedOrderLabel(trackedCase),
+        trackingModes: Array.from(new Set([...(existing?.trackingModes || []), 'order-status'])),
         trackingKey: trackedCase.trackingKey,
-        city: trackedCase.city,
-        caseLabel: `${result.caseInfo.caseType} ${trackedCase.caseNo}/${trackedCase.caseYear}`,
-        status: result.caseInfo.status || null,
-        title: result.caseInfo.petitionerVsRespondent || null,
-        latestOrderDate: result.orderJudgments[0]?.date || null,
-        orderJudgmentsCount: result.orderJudgments.length,
+        liveBoard: existing?.liveBoard,
+        orderStatus: {
+          trackingKey: trackedCase.trackingKey,
+          city: trackedCase.city,
+          caseLabel: `${result.caseInfo.caseType} ${trackedCase.caseNo}/${trackedCase.caseYear}`,
+          status: result.caseInfo.status || null,
+          title: result.caseInfo.petitionerVsRespondent || null,
+          latestOrderDate: result.orderJudgments[0]?.date || null,
+          orderJudgmentsCount: result.orderJudgments.length,
+        },
       });
     } catch (error) {
       errors.push(
@@ -554,15 +926,16 @@ async function loadTrackedStatuses(
   }
 
   const skippedOrderCases = Math.max(clientState.trackedOrderCases.length - trackedOrderCasesToCheck.length, 0);
-  const visibleCount = liveBoardCases.filter((entry) => entry.visible).length;
+  const cases = Array.from(caseEntries.values());
+  const visibleCount = cases.filter((entry) => entry.liveBoard?.visible).length;
+  const orderLoadedCount = cases.filter((entry) => entry.orderStatus).length;
 
   return {
     tool: 'get_case_status',
-    ok: liveBoardCases.length > 0 || orderCases.length > 0,
-    summary: `Tracked live-board cases: ${liveBoardCases.length} checked, ${visibleCount} visible now. Tracked order-status cases: ${orderCases.length} loaded.${skippedOrderCases > 0 ? ` ${skippedOrderCases} additional tracked order cases were skipped in this response.` : ''}`,
+    ok: cases.length > 0,
+    summary: `Loaded detailed status for ${cases.length} tracked case${cases.length === 1 ? '' : 's'}. ${visibleCount} visible on the live board. ${orderLoadedCount} order-status record${orderLoadedCount === 1 ? '' : 's'} loaded.${skippedOrderCases > 0 ? ` ${skippedOrderCases} additional tracked order cases were skipped in this response.` : ''}`,
     data: {
-      liveBoardCases,
-      orderCases,
+      cases,
       errors,
       skippedOrderCases,
     },
@@ -580,10 +953,7 @@ async function runTool(
   const trackedOrderCases = [...clientState.trackedOrderCases];
 
   if (tool.name === 'get_my_cases') {
-    const derivedCaseIds = trackedOrderCases
-      .map((trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase))
-      .filter((caseId): caseId is string => Boolean(caseId));
-    const effectiveCaseIds = Array.from(new Set([...trackedCaseIds, ...derivedCaseIds]));
+    const effectiveCaseIds = getEffectiveTrackedCaseIds(clientState);
 
     for (const caseId of effectiveCaseIds) {
       await upsertCaseRegistry(db, {
@@ -604,22 +974,32 @@ async function runTool(
       });
     }
 
-    const trackedCaseSummary =
-      effectiveCaseIds.length > 0 ? effectiveCaseIds.join(', ') : 'none';
-    const trackedOrderSummary =
-      trackedOrderCases.length > 0
-        ? trackedOrderCases
-            .map((trackedCase) => `${trackedCase.caseTypeLabel} ${trackedCase.caseNo}/${trackedCase.caseYear}`)
-            .join(', ')
-        : 'none';
+    const cases = effectiveCaseIds.map((caseId) => {
+      const matchedTracker = trackedOrderCases.find(
+        (trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase) === caseId
+      );
+      return {
+        caseId,
+        scheduleTracked: trackedCaseIds.includes(caseId),
+        orderTracked: Boolean(matchedTracker),
+        orderTrackerLabel: matchedTracker ? formatTrackedOrderLabel(matchedTracker) : null,
+        city: matchedTracker?.city || null,
+      };
+    });
 
     return {
       tool: tool.name,
       ok: true,
-      summary: `Saved case IDs: ${trackedCaseSummary}. Order trackers: ${trackedOrderSummary}.`,
+      summary: `Tracking ${cases.length} case reference${cases.length === 1 ? '' : 's'}: ${cases.map((entry) => entry.caseId).join(', ') || 'none'}.`,
       data: {
+        cases,
         trackedCaseIds: effectiveCaseIds,
-        trackedOrderCases,
+        trackedOrderCases: trackedOrderCases.map((trackedCase) => ({
+          trackingKey: trackedCase.trackingKey,
+          city: trackedCase.city,
+          label: formatTrackedOrderLabel(trackedCase),
+          caseId: deriveCaseIdFromTrackedOrderCase(trackedCase),
+        })),
       },
     };
   }
@@ -732,7 +1112,7 @@ async function runTool(
     const useTrackedCases =
       Boolean(getToolArg(tool.arguments, 'useTrackedCases', 'use_tracked_cases')) ||
       isTrackedCasesStatusLookup(message);
-    const city = normalizeBench(
+    let city = normalizeBench(
       String(getToolArg(tool.arguments, 'city', 'bench') || message)
     );
     const caseId = String(
@@ -741,13 +1121,13 @@ async function runTool(
       .trim()
       .toUpperCase();
     const fallbackParts = extractCaseNumberParts(message);
-    const caseNo = String(
+    let caseNo = String(
       getToolArg(tool.arguments, 'caseNo', 'case_no') || fallbackParts?.caseNo || ''
     ).trim();
-    const caseYear = String(
+    let caseYear = String(
       getToolArg(tool.arguments, 'caseYear', 'case_year') || fallbackParts?.caseYear || ''
     ).trim();
-    const caseTypeCandidate = cleanCaseTypeQuery(
+    let caseTypeCandidate = cleanCaseTypeQuery(
       String(
         getToolArg(tool.arguments, 'caseType', 'case_type', 'caseTypeQuery', 'case_type_query') ||
           fallbackParts?.caseTypeQuery ||
@@ -759,11 +1139,97 @@ async function runTool(
       return loadTrackedStatuses(db, clientState);
     }
 
+    if (caseId && (!caseNo || !caseYear || !caseTypeCandidate)) {
+      const matchedTrackedCase = await findTrackedOrderCaseByCaseId(db, clientState, caseId);
+      if (matchedTrackedCase) {
+        city = matchedTrackedCase.city;
+        caseNo = matchedTrackedCase.caseNo;
+        caseYear = matchedTrackedCase.caseYear;
+        caseTypeCandidate = matchedTrackedCase.caseTypeLabel || matchedTrackedCase.caseType;
+      }
+    }
+
+    if (caseId && (!caseNo || !caseYear || !caseTypeCandidate)) {
+      const latestResult = await syncSchedule({
+        db,
+        force: false,
+        source: 'ai_chat',
+      });
+      const schedule = latestResult.schedule;
+      const matchedCourt =
+        schedule?.courts?.find(
+          (court) => String(court.caseDetails?.caseNumber || '').toUpperCase() === caseId
+        ) || null;
+
+      if (matchedCourt && schedule) {
+        await upsertCaseRegistry(db, {
+          caseKey: caseId,
+          canonicalCaseId: caseId,
+          title: matchedCourt.caseDetails?.title || null,
+          explicitCaseIds: [caseId],
+        });
+        await saveScheduleSummary(db, {
+          caseKey: caseId,
+          canonicalCaseId: caseId,
+          title: matchedCourt.caseDetails?.title || null,
+          boardDate: schedule.date,
+          lastUpdated: new Date(schedule.lastUpdated),
+          court: matchedCourt,
+        });
+
+        return {
+          tool: tool.name,
+          ok: true,
+          summary: `Live board status loaded for ${caseId}. Court ${matchedCourt.courtNo}, serial ${matchedCourt.serialNo || 'not shown'}, progress ${matchedCourt.progress || 'not shown'}.`,
+          data: {
+            caseId,
+            city: null,
+            caseInfo: null,
+            liveBoard: {
+              visible: true,
+              boardDate: schedule.date,
+              lastUpdated: new Date(schedule.lastUpdated).toISOString(),
+              courtNo: matchedCourt.courtNo,
+              serialNo: matchedCourt.serialNo || null,
+              progress: matchedCourt.progress || null,
+              title: matchedCourt.caseDetails?.title || null,
+            },
+            latestOrder: null,
+            orderJudgmentsCount: 0,
+          },
+        };
+      }
+
+      return {
+        tool: tool.name,
+        ok: true,
+        summary: `${caseId} is not visible on the latest live board snapshot, and no order-status tracker is saved for it.`,
+        data: {
+          caseId,
+          city: null,
+          caseInfo: null,
+          liveBoard: {
+            visible: false,
+            boardDate: schedule?.date || null,
+            lastUpdated: schedule ? new Date(schedule.lastUpdated).toISOString() : null,
+            courtNo: null,
+            serialNo: null,
+            progress: null,
+            title: null,
+          },
+          latestOrder: null,
+          orderJudgmentsCount: 0,
+        },
+      };
+    }
+
     if (!caseNo || !caseYear || !caseTypeCandidate) {
       return {
         tool: tool.name,
         ok: false,
-        summary: 'Case status needs case type, case number, and case year.',
+        summary: caseId
+          ? `I could not resolve order-status details for ${caseId}. Save order tracking for this case, or ask using case type, case number, and case year.`
+          : 'Case status needs case type, case number, and case year.',
       };
     }
 
@@ -823,8 +1289,10 @@ async function runTool(
       ok: true,
       summary: `Status loaded for ${result.caseInfo.caseType} ${caseNo}/${caseYear}. Current status: ${result.caseInfo.status || 'not shown'}. Orders found: ${result.orderJudgments.length}.`,
       data: {
+        caseId: caseId || deriveCaseIdFromTrackedOrderCase(trackedOrderCase!),
         city,
         caseInfo: result.caseInfo,
+        liveBoard: null,
         details: {
           keyValues: result.details.keyValues.slice(0, 12),
           listingHistoryCount: result.details.listingHistory.length,
@@ -865,10 +1333,7 @@ async function runTool(
 
     const rawDate =
       inputDate ||
-      (() => {
-        const match = message.match(/\b\d{1,4}[\/-]\d{1,2}[\/-]\d{1,4}\b/);
-        return match?.[0] || '';
-      })();
+      extractReferencedDate(message);
 
     if (!rawDate) {
       return {
@@ -949,14 +1414,15 @@ async function runTool(
     await Promise.all(tasks);
 
     const matches = benchResults.filter((entry) => entry.totalRows > 0);
+    const totalMatchedRows = matches.reduce((sum, entry) => sum + entry.totalRows, 0);
     return {
       tool: tool.name,
       ok: benchResults.length > 0,
       summary:
         matches.length > 0
-          ? `Found cause list matches for ${matches.length} alias/bench searches.`
+          ? `Cause list for ${rawDate}: ${totalMatchedRows} matching row${totalMatchedRows === 1 ? '' : 's'} found across ${matches.length} successful search${matches.length === 1 ? '' : 'es'}.`
           : benchResults.length > 0
-            ? 'No cause list matches found for the configured lawyer aliases on that date.'
+            ? `No cause list matches found for ${rawDate}.`
             : failures[0] || 'Cause list lookups did not complete.',
       data: {
         date: rawDate,
@@ -968,12 +1434,7 @@ async function runTool(
   }
 
   if (tool.name === 'get_web_diary') {
-    const rawDate =
-      String(tool.arguments?.date || '').trim() ||
-      (() => {
-        const match = message.match(/\b\d{1,4}[\/-]\d{1,2}[\/-]\d{1,4}\b/);
-        return match?.[0] || '';
-      })();
+    const rawDate = String(tool.arguments?.date || '').trim() || extractReferencedDate(message);
 
     const formatted = formatWebDiaryDate(rawDate || new Date().toLocaleDateString('en-GB'));
     if (!formatted) {
@@ -1008,6 +1469,11 @@ async function runTool(
           allLinks?: Array<{ type: string; link: string }>;
         }>;
       };
+      meta?: {
+        partial?: boolean;
+        timedOut?: boolean;
+        warning?: string;
+      };
       error?: string;
     };
 
@@ -1027,17 +1493,21 @@ async function runTool(
 
     return {
       tool: tool.name,
-      ok: true,
-      summary: `Loaded ${notifications.length} web diary notifications for ${formatted}.`,
+      ok: !payload.meta?.timedOut,
+      summary: payload.meta?.timedOut
+        ? payload.meta.warning || `Web diary source timed out for ${formatted}.`
+        : `Loaded ${notifications.length} web diary notification${notifications.length === 1 ? '' : 's'} for ${formatted}.`,
       data: {
         date: formatted,
+        partial: Boolean(payload.meta?.partial),
+        warning: payload.meta?.warning || null,
         notifications: notifications.slice(0, 8),
       },
     };
   }
 
   if (tool.name === 'check_courtroom_transfer') {
-    const courtNoArg = String(
+    let courtNoArg = String(
       getToolArg(tool.arguments, 'courtNo', 'court_no') || extractCourtroomArgs(message).courtNo || ''
     ).trim();
     const serialNoArg = String(
@@ -1049,11 +1519,11 @@ async function runTool(
       .trim()
       .toUpperCase();
 
-    if (!courtNoArg) {
+    if (!courtNoArg && !caseIdArg) {
       return {
         tool: tool.name,
         ok: false,
-        summary: 'Courtroom transfer checks need a courtroom number.',
+        summary: 'Courtroom transfer checks need a courtroom number or case ID.',
       };
     }
 
@@ -1071,16 +1541,28 @@ async function runTool(
       };
     }
 
-    const matchedCourt =
+    let matchedCourt =
       (schedule.courts || []).find(
         (court) => normalizeCourtNo(court.courtNo) === normalizeCourtNo(courtNoArg)
       ) || null;
+
+    if (!matchedCourt && caseIdArg) {
+      matchedCourt =
+        (schedule.courts || []).find(
+          (court) => String(court.caseDetails?.caseNumber || '').toUpperCase() === caseIdArg
+        ) || null;
+      if (matchedCourt) {
+        courtNoArg = matchedCourt.courtNo;
+      }
+    }
 
     if (!matchedCourt) {
       return {
         tool: tool.name,
         ok: false,
-        summary: `Courtroom ${courtNoArg} was not found on the latest live board snapshot.`,
+        summary: caseIdArg
+          ? `${caseIdArg} is not visible on the latest live board snapshot, so courtroom movement cannot be confirmed right now.`
+          : `Courtroom ${courtNoArg} was not found on the latest live board snapshot.`,
       };
     }
 
@@ -1164,34 +1646,113 @@ async function runTool(
   }
 
   if (tool.name === 'get_alerts') {
-    const notificationsCollection = db.collection<Notification>('notifications');
-    const trackedOrderKeys = new Set(trackedOrderCases.map((trackedCase) => trackedCase.trackingKey));
-    const effectiveCaseIds = new Set(trackedCaseIds);
-    const notifications = await notificationsCollection
-      .find({})
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .toArray();
+    const effectiveCaseIds = getEffectiveTrackedCaseIds(clientState);
+    const trackedOrderByKey = new Map(
+      trackedOrderCases.map((trackedCase) => [trackedCase.trackingKey, trackedCase] as const)
+    );
+    const requestedDate = extractReferencedDate(message);
+    const requestedDateParts = requestedDate ? parseDateParts(requestedDate) : null;
+    const requestedDateKey = requestedDateParts
+      ? getTimeZoneDateKey(
+          new Date(
+            Date.UTC(
+              requestedDateParts.year,
+              requestedDateParts.month - 1,
+              requestedDateParts.day
+            )
+          )
+        )
+      : null;
+    const todayOnly = /\btoday\b/.test(normalizeIntentText(message)) && !requestedDateKey;
+    const todayDateKey = getTimeZoneDateKey(new Date());
 
-    const filtered = notifications.filter((notification) => {
+    let filtered = await loadRelevantNotifications(db, clientState, 100);
+    if (requestedDateKey) {
+      filtered = filtered.filter(
+        (notification) => getTimeZoneDateKey(notification.timestamp) === requestedDateKey
+      );
+    } else if (todayOnly && todayDateKey) {
+      filtered = filtered.filter(
+        (notification) => getTimeZoneDateKey(notification.timestamp) === todayDateKey
+      );
+    }
+
+    const { ObjectId } = await import('mongodb');
+    const changeRecordObjectIds = filtered
+      .map((notification) => String(notification.changeRecordId || '').trim())
+      .filter(Boolean)
+      .map((id) => {
+        try {
+          return new ObjectId(id);
+        } catch {
+          return null;
+        }
+      })
+      .filter((id): id is InstanceType<typeof ObjectId> => id !== null);
+    const changeRecordMap = new Map<
+      string,
+      { oldCaseNumber: string | null; newCaseNumber: string | null }
+    >();
+
+    if (changeRecordObjectIds.length > 0) {
+      const changeRecords = await db
+        .collection('changes')
+        .find({ _id: { $in: changeRecordObjectIds } })
+        .toArray();
+
+      for (const changeRecord of changeRecords) {
+        changeRecordMap.set(String(changeRecord._id), {
+          oldCaseNumber: String(changeRecord.oldValue?.caseDetails?.caseNumber || '').toUpperCase() || null,
+          newCaseNumber: String(changeRecord.newValue?.caseDetails?.caseNumber || '').toUpperCase() || null,
+        });
+      }
+    }
+
+    const notifications = filtered.slice(0, 12).map((notification) => {
+      let caseReference: string | null = null;
+
       if (notification.type === 'order_update') {
         const trackingKey = String(notification.orderTrackingKey || '').trim();
-        return trackingKey ? trackedOrderKeys.has(trackingKey) : false;
+        const trackedCase = trackedOrderByKey.get(trackingKey);
+        caseReference =
+          trackedCase?.caseTypeLabel && trackedCase.caseNo && trackedCase.caseYear
+            ? `${trackedCase.caseTypeLabel} ${trackedCase.caseNo}/${trackedCase.caseYear}`
+            : trackingKey || null;
+      } else {
+        const changeRecord = changeRecordMap.get(String(notification.changeRecordId || '').trim());
+        caseReference =
+          changeRecord?.newCaseNumber ||
+          changeRecord?.oldCaseNumber ||
+          effectiveCaseIds.find((caseId) =>
+            `${notification.title} ${notification.message}`.toUpperCase().includes(caseId)
+          ) ||
+          null;
       }
 
-      const message = `${notification.title} ${notification.message}`.toUpperCase();
-      return Array.from(effectiveCaseIds).some((caseId) => message.includes(caseId));
+      return {
+        caseReference,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        timestamp:
+          typeof notification.timestamp === 'string'
+            ? notification.timestamp
+            : notification.timestamp.toISOString(),
+      };
     });
 
-    for (const notification of filtered.slice(0, 10)) {
-      const caseIdMatch = Array.from(effectiveCaseIds).find((caseId) =>
-        `${notification.title} ${notification.message}`.toUpperCase().includes(caseId)
+    for (const entry of notifications.slice(0, 10)) {
+      const matchedNotification = filtered.find(
+        (notification) =>
+          notification.title === entry.title &&
+          notification.message === entry.message &&
+          String(notification.timestamp) === String(entry.timestamp)
       );
-      if (caseIdMatch) {
+      if (entry.caseReference && matchedNotification) {
         await saveNotificationSummary(db, {
-          caseKey: caseIdMatch,
-          canonicalCaseId: caseIdMatch,
-          notification,
+          caseKey: entry.caseReference,
+          canonicalCaseId: entry.caseReference,
+          notification: matchedNotification,
         });
       }
     }
@@ -1199,18 +1760,14 @@ async function runTool(
     return {
       tool: tool.name,
       ok: true,
-      summary: `Loaded ${filtered.length} relevant alerts from the latest notification set.`,
+      summary:
+        requestedDateKey || todayOnly
+          ? `${notifications.length} relevant alert${notifications.length === 1 ? '' : 's'} found for ${requestedDateKey ? formatDisplayDate(requestedDate) : 'today'}.`
+          : `Loaded ${notifications.length} relevant alert${notifications.length === 1 ? '' : 's'} for your tracked cases.`,
       data: {
-        count: filtered.length,
-        notifications: filtered.slice(0, 12).map((notification) => ({
-          title: notification.title,
-          message: notification.message,
-          type: notification.type,
-          timestamp:
-            typeof notification.timestamp === 'string'
-              ? notification.timestamp
-              : notification.timestamp.toISOString(),
-        })),
+        count: notifications.length,
+        dateScope: requestedDateKey ? formatDisplayDate(requestedDate) : todayOnly ? 'today' : null,
+        notifications,
       },
     };
   }
@@ -1222,7 +1779,272 @@ async function runTool(
   };
 }
 
+function summarizePreviewRow(row: Record<string, string | number | null> | undefined) {
+  if (!row) return null;
+  const parts = Object.entries(row)
+    .filter(([, value]) => value !== null && String(value).trim())
+    .slice(0, 4)
+    .map(([key, value]) => `${key}: ${value}`);
+  return parts.length > 0 ? parts.join(' | ') : null;
+}
+
+function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]) {
+  const sections: string[] = [];
+
+  for (const result of results) {
+    if (!result.ok && result.summary) {
+      sections.push(result.summary);
+      continue;
+    }
+
+    if (result.tool === 'get_my_cases') {
+      const cases = Array.isArray((result.data as { cases?: unknown[] } | undefined)?.cases)
+        ? ((result.data as { cases?: Array<Record<string, unknown>> }).cases || [])
+        : [];
+
+      if (cases.length === 0) {
+        sections.push('No cases are currently being tracked in this session.');
+        continue;
+      }
+
+      sections.push(
+        [
+          `You are tracking ${cases.length} case reference${cases.length === 1 ? '' : 's'}.`,
+          ...cases.map((entry) => {
+            const modes = [
+              entry.scheduleTracked ? 'schedule' : null,
+              entry.orderTracked ? 'orders/status' : null,
+            ].filter(Boolean);
+            const modeLabel = modes.length > 0 ? ` via ${modes.join(' + ')}` : '';
+            const orderLabel =
+              entry.orderTrackerLabel && entry.orderTrackerLabel !== entry.caseId
+                ? ` (${entry.orderTrackerLabel})`
+                : '';
+            return `- ${entry.caseId}${orderLabel}${modeLabel}`;
+          }),
+        ].join('\n')
+      );
+      continue;
+    }
+
+    if (result.tool === 'get_case_status') {
+      const trackedCases = Array.isArray((result.data as { cases?: unknown[] } | undefined)?.cases)
+        ? ((result.data as { cases?: Array<Record<string, unknown>> }).cases || [])
+        : [];
+
+      if (trackedCases.length > 0) {
+        const lines = trackedCases.map((entry) => {
+          const parts: string[] = [];
+          const label = String(entry.caseId || entry.referenceLabel || entry.caseKey || 'Tracked case');
+          const liveBoard = entry.liveBoard as Record<string, unknown> | undefined;
+          const orderStatus = entry.orderStatus as Record<string, unknown> | undefined;
+
+          if (liveBoard?.visible) {
+            parts.push(
+              `live board: Court ${liveBoard.courtNo || 'not shown'}, serial ${liveBoard.serialNo || 'not shown'}, progress ${liveBoard.progress || 'not shown'}`
+            );
+          } else if (liveBoard) {
+            parts.push('live board: not visible right now');
+          }
+
+          if (orderStatus) {
+            parts.push(
+              `orders/status: ${orderStatus.status || 'status not shown'}, ${orderStatus.orderJudgmentsCount || 0} order${Number(orderStatus.orderJudgmentsCount || 0) === 1 ? '' : 's'}${orderStatus.latestOrderDate ? `, latest ${formatDisplayDate(String(orderStatus.latestOrderDate))}` : ''}`
+            );
+          } else {
+            parts.push('orders/status: no order tracker saved');
+          }
+
+          return `- ${label}: ${parts.join('. ')}.`;
+        });
+
+        const errors = Array.isArray((result.data as { errors?: unknown[] } | undefined)?.errors)
+          ? ((result.data as { errors?: string[] }).errors || []).filter(Boolean)
+          : [];
+
+        sections.push(
+          ['Tracked case status:', ...lines, ...(errors.length > 0 ? [`Source issues: ${errors.join(' | ')}`] : [])].join(
+            '\n'
+          )
+        );
+        continue;
+      }
+
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const caseInfo = (data.caseInfo as Record<string, unknown> | null) || null;
+      const liveBoard = (data.liveBoard as Record<string, unknown> | null) || null;
+      const title = String(caseInfo?.petitionerVsRespondent || liveBoard?.title || '').trim();
+      const label = caseInfo
+        ? `${caseInfo.caseType} ${caseInfo.caseNo}/${caseInfo.caseYear}`
+        : String(data.caseId || 'Case');
+      const parts: string[] = [];
+
+      if (title) {
+        parts.push(title);
+      }
+      if (caseInfo) {
+        parts.push(`status ${caseInfo.status || 'not shown'}`);
+        parts.push(
+          `${data.orderJudgmentsCount || 0} order${Number(data.orderJudgmentsCount || 0) === 1 ? '' : 's'}`
+        );
+        const latestOrder = (data.latestOrder as Record<string, unknown> | null) || null;
+        if (latestOrder?.date) {
+          parts.push(`latest order ${formatDisplayDate(String(latestOrder.date))}`);
+        }
+      }
+      if (liveBoard?.visible) {
+        parts.push(
+          `live board: Court ${liveBoard.courtNo || 'not shown'}, serial ${liveBoard.serialNo || 'not shown'}, progress ${liveBoard.progress || 'not shown'}`
+        );
+      } else if (liveBoard) {
+        parts.push('live board: not visible right now');
+      }
+
+      sections.push(`${label}: ${parts.join('. ')}.`);
+      continue;
+    }
+
+    if (result.tool === 'track_case') {
+      sections.push(result.summary);
+      continue;
+    }
+
+    if (result.tool === 'get_alerts') {
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const notifications = Array.isArray(data.notifications)
+        ? (data.notifications as Array<Record<string, unknown>>)
+        : [];
+      const scope = String(data.dateScope || '').trim();
+
+      if (notifications.length === 0) {
+        sections.push(
+          scope ? `No relevant alerts were found for ${scope}.` : 'No relevant alerts were found for your tracked cases.'
+        );
+        continue;
+      }
+
+      sections.push(
+        [
+          scope
+            ? `Relevant alerts for ${scope}:`
+            : 'Relevant alerts for your tracked cases:',
+          ...notifications.slice(0, 6).map((entry) => {
+            const prefix = entry.caseReference ? `${entry.caseReference}: ` : '';
+            const when = formatDisplayTimestamp(String(entry.timestamp || ''));
+            return `- ${prefix}${entry.title}. ${entry.message}${when ? ` (${when})` : ''}`;
+          }),
+        ].join('\n')
+      );
+      continue;
+    }
+
+    if (result.tool === 'check_cause_list_assignments') {
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const matches = Array.isArray(data.matches)
+        ? (data.matches as Array<Record<string, unknown>>)
+        : [];
+      const date = formatDisplayDate(String(data.date || '')) || String(data.date || '').trim();
+      const failures = Array.isArray(data.failures)
+        ? (data.failures as string[]).filter(Boolean)
+        : [];
+
+      if (matches.length === 0) {
+        sections.push(
+          failures.length > 0
+            ? `${result.summary} Source issues: ${failures.join(' | ')}`
+            : result.summary
+        );
+        continue;
+      }
+
+      sections.push(
+        [
+          `Cause list matches for ${date}:`,
+          ...matches.slice(0, 5).map((entry) => {
+            const previewRows = Array.isArray(entry.previewRows)
+              ? (entry.previewRows as Array<Record<string, string | number | null>>)
+              : [];
+            const topRow = summarizePreviewRow(previewRows[0]);
+            return `- ${String(entry.bench || '').toUpperCase()} / ${entry.counselName}: ${entry.totalRows} row${Number(entry.totalRows || 0) === 1 ? '' : 's'}${topRow ? `. Top row: ${topRow}` : ''}`;
+          }),
+          ...(failures.length > 0 ? [`Source issues: ${failures.join(' | ')}`] : []),
+        ].join('\n')
+      );
+      continue;
+    }
+
+    if (result.tool === 'get_web_diary') {
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const notifications = Array.isArray(data.notifications)
+        ? (data.notifications as Array<Record<string, unknown>>)
+        : [];
+      const date = formatDisplayDate(String(data.date || '')) || String(data.date || '').trim();
+
+      if (data.partial) {
+        sections.push(`Web diary for ${date} is incomplete. ${data.warning || 'The source timed out.'}`);
+        continue;
+      }
+
+      if (notifications.length === 0) {
+        sections.push(`No web diary notices were found for ${date}.`);
+        continue;
+      }
+
+      sections.push(
+        [
+          `Web diary for ${date}:`,
+          ...notifications.slice(0, 5).map((entry) => `- ${entry.title}`),
+        ].join('\n')
+      );
+      continue;
+    }
+
+    if (result.tool === 'check_courtroom_transfer') {
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const current = (data.current as Record<string, unknown> | null) || null;
+      const recentHistory = Array.isArray(data.recentHistory)
+        ? (data.recentHistory as Array<Record<string, unknown>>)
+        : [];
+      const intro = data.transferDetected
+        ? `Transfer is likely in courtroom ${current?.courtNo || 'not shown'}.`
+        : `No transfer evidence found for courtroom ${current?.courtNo || 'not shown'}.`;
+
+      sections.push(
+        [
+          intro,
+          current
+            ? `Current board entry: serial ${current.serialNo || 'not shown'}, case ${current.caseNumber || 'not shown'}, progress ${current.progress || 'not shown'}.`
+            : null,
+          recentHistory.length > 0
+            ? `Recent history: ${recentHistory
+                .slice(0, 3)
+                .map(
+                  (entry) =>
+                    `${formatDisplayTimestamp(String(entry.timestamp || '')) || 'Earlier'} - serial ${entry.serialNo || 'not shown'}, case ${entry.caseNumber || 'not shown'}`
+                )
+                .join(' | ')}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join('\n')
+      );
+      continue;
+    }
+
+    if (result.summary) {
+      sections.push(result.summary);
+    }
+  }
+
+  return sections.filter(Boolean).join('\n\n');
+}
+
 async function writeFinalAnswer(message: string, results: ExecutedToolResult[]) {
+  const deterministicAnswer = buildDeterministicAnswer(message, results);
+  if (deterministicAnswer) {
+    return deterministicAnswer;
+  }
+
   try {
     return await withTimeout(
       runGpt5Nano({
