@@ -153,6 +153,12 @@ export default function AdminChatFunctionsPage() {
                       </div>
                     </summary>
                     <p className="mt-4 text-sm text-slate-400">{item.detail}</p>
+                    <div className="mt-4 rounded-2xl border border-cyan-400/15 bg-cyan-500/8 p-4">
+                      <p className="text-[11px] uppercase tracking-[0.22em] text-cyan-200/80">
+                        Sample Response
+                      </p>
+                      <p className="mt-2 text-sm text-cyan-50">{item.sampleResponse}</p>
+                    </div>
                   </details>
                 ))}
               </div>
