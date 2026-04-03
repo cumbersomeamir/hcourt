@@ -194,8 +194,8 @@ export default function WorkspaceNavigation({
       />
 
       <aside
-        className={`fixed right-0 top-0 z-50 flex h-full w-[min(24rem,calc(100vw-1rem))] flex-col border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl transition-transform duration-300 ease-out lg:hidden ${
-          mobileNavOpen ? 'translate-x-0' : 'translate-x-full'
+        className={`fixed inset-y-0 right-0 z-50 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl transition-transform duration-300 ease-out lg:hidden ${
+          mobileNavOpen ? 'pointer-events-auto translate-x-0' : 'pointer-events-none translate-x-full'
         }`}
         aria-hidden={!mobileNavOpen}
       >
