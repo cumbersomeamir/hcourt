@@ -3,7 +3,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../'),
-  serverExternalPackages: ['playwright', 'cheerio', 'exceljs', 'mongodb'],
+  serverExternalPackages: ['playwright', 'cheerio', 'exceljs', 'mongodb', 'pdf-parse'],
   webpack: (config, { isServer }) => {
     if (isServer) {
       config.resolve.fallback = {
