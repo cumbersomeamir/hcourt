@@ -227,6 +227,7 @@ export default function AiChatPage() {
               </Link>
             </div>
             <WorkspaceNavigation
+              current="ai-chat"
               alertsCount={notificationsCount}
               onAlertsClick={() => setNotificationsOpen(true)}
             />

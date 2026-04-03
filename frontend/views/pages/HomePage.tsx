@@ -342,6 +342,19 @@ export default function Home() {
               </span>
               <span className="text-base font-semibold text-slate-100">Status</span>
             </a>
+            <Link href="/ai-chat" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-blue-400/20`} title="Open AI Chat">
+              <span className={`${mobileMenuIconClass} border-blue-400/20 bg-blue-500/10 text-blue-200`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 10h8M8 14h5M7 4h10a3 3 0 013 3v6a3 3 0 01-3 3h-4l-4 4v-4H7a3 3 0 01-3-3V7a3 3 0 013-3z"
+                  />
+                </svg>
+              </span>
+              <span className="text-base font-semibold text-slate-100">AI Chat</span>
+            </Link>
             <Link href="/my-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-cyan-400/20`} title="View saved cases">
               <span className={`${mobileMenuIconClass} border-cyan-400/20 bg-cyan-500/10 text-cyan-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -427,6 +440,17 @@ export default function Home() {
                   </svg>
                   Status
                 </a>
+                <Link href="/ai-chat" className={`${desktopNavItemClass} border-blue-400/20 text-blue-100 hover:border-blue-300/40`} title="Open AI Chat">
+                  <svg className="w-4 h-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M8 10h8M8 14h5M7 4h10a3 3 0 013 3v6a3 3 0 01-3 3h-4l-4 4v-4H7a3 3 0 01-3-3V7a3 3 0 013-3z"
+                    />
+                  </svg>
+                  AI Chat
+                </Link>
                 <Link href="/my-cases" className={`${desktopNavItemClass} border-cyan-400/20 text-cyan-100 hover:border-cyan-300/40`} title="View saved cases">
                   <svg className="w-4 h-4 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />

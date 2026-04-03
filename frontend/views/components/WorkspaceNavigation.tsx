@@ -8,6 +8,7 @@ type NavKey =
   | 'cause-list'
   | 'status'
   | 'orders'
+  | 'ai-chat'
   | 'my-cases'
   | 'track-cases';
 
@@ -91,6 +92,25 @@ const navItems: NavItem[] = [
     icon: (
       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'ai-chat',
+    href: '/ai-chat',
+    label: 'AI Chat',
+    title: 'Open AI Chat',
+    borderClass: 'border-blue-400/20',
+    textClass: 'text-blue-100',
+    iconClass: 'border-blue-400/20 bg-blue-500/10 text-blue-200',
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth={2}
+          d="M8 10h8M8 14h5M7 4h10a3 3 0 013 3v6a3 3 0 01-3 3h-4l-4 4v-4H7a3 3 0 01-3-3V7a3 3 0 013-3z"
+        />
       </svg>
     ),
   },
