@@ -100,22 +100,106 @@ function sanitizeCitation(raw: unknown): JudgmentCitation | null {
   };
 }
 
+function scoreJudgmentLine(text: string) {
+  const normalized = normalizeLineText(text).toLowerCase();
+  if (!normalized) return 0;
+
+  const scoredPatterns: Array<[RegExp, number]> = [
+    [/\badjourn(?:ed|ment)?\b/, 12],
+    [/\bnext\b.*\b(date|listing|hearing)\b/, 10],
+    [/\bshall be taken up\b/, 10],
+    [/\bconnected writ\b/, 9],
+    [/\bshown in the cause list\b/, 9],
+    [/\bcounter affidavit\b/, 8],
+    [/\brejoinder\b/, 8],
+    [/\binterim\b/, 8],
+    [/\bnotice\b/, 7],
+    [/\blist(?:ed|ing)?\b/, 6],
+    [/\bdisposed of\b/, 10],
+    [/\ballowed\b/, 8],
+    [/\bdismissed\b/, 8],
+    [/\brejected\b/, 8],
+    [/\bgranted\b/, 7],
+    [/\bwithin\b.*\bweeks?\b/, 6],
+  ];
+
+  return scoredPatterns.reduce((score, [pattern, value]) => {
+    return pattern.test(normalized) ? score + value : score;
+  }, 0);
+}
+
+function buildFallbackCitations(lines: JudgmentLine[]): JudgmentCitation[] {
+  const scoredLines = lines
+    .map((line, index) => ({
+      line,
+      index,
+      score: scoreJudgmentLine(line.text),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.index - right.index);
+
+  if (scoredLines.length === 0) {
+    const firstLines = lines.slice(0, 2);
+    return firstLines.map((line) => ({
+      page: line.page,
+      lineStart: line.line,
+      lineEnd: line.line,
+      quote: line.text,
+    }));
+  }
+
+  const citations: JudgmentCitation[] = [];
+  const usedPages = new Set<string>();
+
+  for (const entry of scoredLines) {
+    const startIndex = entry.index;
+    const startLine = lines[startIndex];
+    const block: JudgmentLine[] = [startLine];
+
+    for (let cursor = startIndex + 1; cursor < lines.length; cursor += 1) {
+      const current = lines[cursor];
+      const previous = block[block.length - 1];
+      if (current.page !== previous.page || current.line !== previous.line + 1) break;
+      block.push(current);
+      const textLength = block.reduce((total, line) => total + line.text.length, 0);
+      if (textLength >= 280 || block.length >= 5) break;
+    }
+
+    const quote = normalizeLineText(block.map((line) => line.text).join(' '));
+    if (!quote) continue;
+
+    const blockKey = `${startLine.page}:${startLine.line}`;
+    if (usedPages.has(blockKey)) continue;
+    usedPages.add(blockKey);
+
+    citations.push({
+      page: startLine.page,
+      lineStart: startLine.line,
+      lineEnd: block[block.length - 1].line,
+      quote,
+    });
+
+    if (citations.length >= 2) break;
+  }
+
+  return citations.sort((left, right) => left.page - right.page || left.lineStart - right.lineStart);
+}
+
 function buildFallbackSummary(lines: JudgmentLine[]) {
   if (lines.length === 0) {
     return 'The latest order PDF was loaded, but no readable text was extracted.';
   }
-  return 'The latest order PDF was loaded, but a concise summary could not be generated automatically.';
-}
 
-function buildFallbackCitations(lines: JudgmentLine[]): JudgmentCitation[] {
-  const firstLines = lines.slice(0, 2);
-  if (firstLines.length === 0) return [];
-  return firstLines.map((line) => ({
-    page: line.page,
-    lineStart: line.line,
-    lineEnd: line.line,
-    quote: line.text,
-  }));
+  const citations = buildFallbackCitations(lines);
+  if (citations.length === 0) {
+    return 'The latest order PDF was loaded, but a concise summary could not be generated automatically.';
+  }
+
+  return citations
+    .map((citation) => citation.quote)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export async function summarizeJudgmentDocument(input: {
@@ -164,9 +248,10 @@ export async function summarizeJudgmentDocument(input: {
     }
   } catch {}
 
+  const fallbackCitations = buildFallbackCitations(input.lines);
   return {
     summary: buildFallbackSummary(input.lines),
-    citations: buildFallbackCitations(input.lines),
+    citations: fallbackCitations,
   };
 }
 
