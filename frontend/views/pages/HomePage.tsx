@@ -274,18 +274,18 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <button
-        onClick={() => setMobileNavOpen((open) => !open)}
-        className={`fixed right-4 top-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/80 text-slate-100 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-xl transition-opacity lg:hidden ${
-          caseIdModalOpen ? 'pointer-events-none opacity-0' : 'pointer-events-auto opacity-100'
-        }`}
-        aria-label="Toggle navigation menu"
-        aria-expanded={mobileNavOpen}
-      >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileNavOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 7h16M4 12h16M4 17h16'} />
-        </svg>
-      </button>
+      {!caseIdModalOpen && (
+        <button
+          onClick={() => setMobileNavOpen((open) => !open)}
+          className="fixed right-4 top-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/80 text-slate-100 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:hidden"
+          aria-label="Toggle navigation menu"
+          aria-expanded={mobileNavOpen}
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={mobileNavOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 7h16M4 12h16M4 17h16'} />
+          </svg>
+        </button>
+      )}
       {!caseIdModalOpen && mobileNavOpen && (
         <>
           <div
