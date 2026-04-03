@@ -47,6 +47,21 @@ export type AiToolResult = {
   data?: unknown;
 };
 
+export type LatestOrderDocumentLink = {
+  judgmentId: string;
+  filename: string;
+  date: string | null;
+  viewUrl: string;
+  viewerHref: string;
+  summary: string;
+  citations: Array<{
+    page: number;
+    lineStart: number;
+    lineEnd: number;
+    quote: string;
+  }>;
+};
+
 export type AiChatResponse = {
   requestId: string;
   answer: string;

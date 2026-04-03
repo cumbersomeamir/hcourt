@@ -22,6 +22,7 @@ import {
   upsertCaseRegistry,
 } from '@/lib/aiStore';
 import { runGpt5Nano } from '@/lib/gpt5Nano';
+import { buildJudgmentViewerHref, loadLatestJudgmentDocument } from '@/lib/judgmentDocument';
 import { GET as getWebDiary } from '@/controllers/webDiaryController';
 
 export type AiClientState = {
@@ -332,6 +333,23 @@ function isTrackedCasesStatusLookup(message: string) {
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
+function isLatestOrderLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return /\blatest (order|judgment)\b/.test(lowerMessage);
+}
+
+function isOrderCountLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return [
+    /\bhow many orders?\b/,
+    /\bhow many judgments?\b/,
+    /\borders? count\b/,
+    /\bjudgments? count\b/,
+    /\bnumber of orders?\b/,
+    /\bnumber of judgments?\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
 function isAlertsLookup(message: string) {
   const lowerMessage = normalizeIntentText(message);
 
@@ -348,6 +366,13 @@ function isAlertsLookup(message: string) {
     /\bupdates? for my tracked cases\b/,
     /\bupdates? in my cases\b/,
   ].some((pattern) => pattern.test(lowerMessage));
+}
+
+function getCaseStatusResponseMode(message: string, useTrackedCases: boolean) {
+  if (useTrackedCases) return 'tracked_overview' as const;
+  if (isLatestOrderLookup(message)) return 'latest_order' as const;
+  if (isOrderCountLookup(message)) return 'order_count' as const;
+  return 'status' as const;
 }
 
 function isTrackAction(message: string) {
@@ -1112,6 +1137,7 @@ async function runTool(
     const useTrackedCases =
       Boolean(getToolArg(tool.arguments, 'useTrackedCases', 'use_tracked_cases')) ||
       isTrackedCasesStatusLookup(message);
+    const responseMode = getCaseStatusResponseMode(message, useTrackedCases);
     let city = normalizeBench(
       String(getToolArg(tool.arguments, 'city', 'bench') || message)
     );
@@ -1136,7 +1162,14 @@ async function runTool(
     );
 
     if (useTrackedCases && !caseNo && !caseYear && !caseTypeCandidate && !caseId) {
-      return loadTrackedStatuses(db, clientState);
+      const trackedResult = await loadTrackedStatuses(db, clientState);
+      return {
+        ...trackedResult,
+        data: {
+          ...((trackedResult.data as Record<string, unknown> | undefined) || {}),
+          responseMode,
+        },
+      };
     }
 
     if (caseId && (!caseNo || !caseYear || !caseTypeCandidate)) {
@@ -1182,6 +1215,7 @@ async function runTool(
           ok: true,
           summary: `Live board status loaded for ${caseId}. Court ${matchedCourt.courtNo}, serial ${matchedCourt.serialNo || 'not shown'}, progress ${matchedCourt.progress || 'not shown'}.`,
           data: {
+            responseMode,
             caseId,
             city: null,
             caseInfo: null,
@@ -1205,6 +1239,7 @@ async function runTool(
         ok: true,
         summary: `${caseId} is not visible on the latest live board snapshot, and no order-status tracker is saved for it.`,
         data: {
+          responseMode,
           caseId,
           city: null,
           caseInfo: null,
@@ -1284,11 +1319,40 @@ async function runTool(
       result,
     });
 
+    const latestOrder = result.orderJudgments[0] || null;
+    let latestOrderDocument: Record<string, unknown> | null = null;
+    if (responseMode === 'latest_order' && latestOrder) {
+      const latestDocument = await loadLatestJudgmentDocument({
+        caseLabel: `${result.caseInfo.caseType} ${caseNo}/${caseYear}`,
+        latestOrder,
+      });
+      latestOrderDocument = {
+        judgmentId: latestDocument.download.judgmentId,
+        filename: latestDocument.download.filename,
+        date: latestDocument.entry.date || null,
+        viewUrl: latestDocument.entry.viewUrl,
+        viewerHref: buildJudgmentViewerHref({
+          viewUrl: latestDocument.entry.viewUrl,
+          date: latestDocument.entry.date || null,
+          page: latestDocument.citations[0]?.page || 1,
+          title: `${result.caseInfo.caseType} ${caseNo}/${caseYear}`,
+        }),
+        summary: latestDocument.summary,
+        citations: latestDocument.citations,
+      };
+    }
+
     return {
       tool: tool.name,
       ok: true,
-      summary: `Status loaded for ${result.caseInfo.caseType} ${caseNo}/${caseYear}. Current status: ${result.caseInfo.status || 'not shown'}. Orders found: ${result.orderJudgments.length}.`,
+      summary:
+        responseMode === 'latest_order'
+          ? 'Latest order document loaded.'
+          : responseMode === 'order_count'
+            ? 'Order count loaded.'
+            : 'Case status loaded.',
       data: {
+        responseMode,
         caseId: caseId || deriveCaseIdFromTrackedOrderCase(trackedOrderCase!),
         city,
         caseInfo: result.caseInfo,
@@ -1298,7 +1362,8 @@ async function runTool(
           listingHistoryCount: result.details.listingHistory.length,
           iaDetailsCount: result.details.iaDetails.length,
         },
-        latestOrder: result.orderJudgments[0] || null,
+        latestOrder,
+        latestOrderDocument,
         orderJudgmentsCount: result.orderJudgments.length,
       },
     };
@@ -1788,6 +1853,76 @@ function summarizePreviewRow(row: Record<string, string | number | null> | undef
   return parts.length > 0 ? parts.join(' | ') : null;
 }
 
+function formatCitationSummary(citations: Array<Record<string, unknown>>) {
+  const parts = citations
+    .slice(0, 3)
+    .map((citation) => {
+      const page = Number(citation.page || 0);
+      const lineStart = Number(citation.lineStart || 0);
+      const lineEnd = Number(citation.lineEnd || 0);
+      const quote = String(citation.quote || '').trim().slice(0, 140);
+      if (!page || !lineStart || !lineEnd) return null;
+      const lineLabel = lineStart === lineEnd ? `l${lineStart}` : `l${lineStart}-${lineEnd}`;
+      return `p${page} ${lineLabel}${quote ? ` ("${quote}")` : ''}`;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  return parts.length > 0 ? `Source: ${parts.join('; ')}.` : null;
+}
+
+function formatSpecificCaseStatusAnswer(data: Record<string, unknown>) {
+  const responseMode = String(data.responseMode || 'status');
+  const caseInfo = (data.caseInfo as Record<string, unknown> | null) || null;
+  const liveBoard = (data.liveBoard as Record<string, unknown> | null) || null;
+  const latestOrder = (data.latestOrder as Record<string, unknown> | null) || null;
+  const latestOrderDocument = (data.latestOrderDocument as Record<string, unknown> | null) || null;
+  const orderCount = Number(data.orderJudgmentsCount || 0);
+  const status = String(caseInfo?.status || '').trim();
+  const latestOrderDate = String(latestOrder?.date || latestOrderDocument?.date || '').trim();
+
+  if (responseMode === 'order_count') {
+    return `${orderCount} order${orderCount === 1 ? '' : 's'} are available for this case.`;
+  }
+
+  if (responseMode === 'latest_order') {
+    if (!latestOrderDate) {
+      return 'No order/judgment document is available for this case yet.';
+    }
+
+    const summary = String(latestOrderDocument?.summary || '').trim();
+    const citations = Array.isArray(latestOrderDocument?.citations)
+      ? (latestOrderDocument!.citations as Array<Record<string, unknown>>)
+      : [];
+    const parts = [
+      `Latest order dated ${formatDisplayDate(latestOrderDate)}: ${summary || 'The latest order PDF was loaded.'}`,
+      formatCitationSummary(citations),
+      latestOrderDocument?.viewerHref ? 'Open the latest order PDF below.' : null,
+    ].filter(Boolean);
+
+    return parts.join('\n');
+  }
+
+  if (caseInfo) {
+    const parts = [
+      status ? `Current status: ${status}.` : 'Current status is not shown in the source response.',
+      orderCount > 0
+        ? `${orderCount} order${orderCount === 1 ? '' : 's'} are available${latestOrderDate ? `, latest dated ${formatDisplayDate(latestOrderDate)}` : ''}.`
+        : 'No order/judgment entries are listed for this case.',
+    ];
+    return parts.join(' ');
+  }
+
+  if (liveBoard?.visible) {
+    return `It is visible on the live board: Court ${liveBoard.courtNo || 'not shown'}, serial ${liveBoard.serialNo || 'not shown'}, progress ${liveBoard.progress || 'not shown'}.`;
+  }
+
+  if (liveBoard) {
+    return 'It is not visible on the latest live board snapshot right now.';
+  }
+
+  return null;
+}
+
 function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]) {
   const sections: string[] = [];
 
@@ -1863,44 +1998,19 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
           : [];
 
         sections.push(
-          ['Tracked case status:', ...lines, ...(errors.length > 0 ? [`Source issues: ${errors.join(' | ')}`] : [])].join(
-            '\n'
-          )
+          [...lines, ...(errors.length > 0 ? [`Source issues: ${errors.join(' | ')}`] : [])].join('\n')
         );
         continue;
       }
 
       const data = (result.data as Record<string, unknown> | undefined) || {};
-      const caseInfo = (data.caseInfo as Record<string, unknown> | null) || null;
-      const liveBoard = (data.liveBoard as Record<string, unknown> | null) || null;
-      const title = String(caseInfo?.petitionerVsRespondent || liveBoard?.title || '').trim();
-      const label = caseInfo
-        ? `${caseInfo.caseType} ${caseInfo.caseNo}/${caseInfo.caseYear}`
-        : String(data.caseId || 'Case');
-      const parts: string[] = [];
-
-      if (title) {
-        parts.push(title);
-      }
-      if (caseInfo) {
-        parts.push(`status ${caseInfo.status || 'not shown'}`);
-        parts.push(
-          `${data.orderJudgmentsCount || 0} order${Number(data.orderJudgmentsCount || 0) === 1 ? '' : 's'}`
-        );
-        const latestOrder = (data.latestOrder as Record<string, unknown> | null) || null;
-        if (latestOrder?.date) {
-          parts.push(`latest order ${formatDisplayDate(String(latestOrder.date))}`);
-        }
-      }
-      if (liveBoard?.visible) {
-        parts.push(
-          `live board: Court ${liveBoard.courtNo || 'not shown'}, serial ${liveBoard.serialNo || 'not shown'}, progress ${liveBoard.progress || 'not shown'}`
-        );
-      } else if (liveBoard) {
-        parts.push('live board: not visible right now');
+      const response = formatSpecificCaseStatusAnswer(data);
+      if (response) {
+        sections.push(response);
+        continue;
       }
 
-      sections.push(`${label}: ${parts.join('. ')}.`);
+      sections.push(result.summary);
       continue;
     }
 

@@ -7,7 +7,7 @@ import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 import { loadTrackedState } from '@/lib/caseProfiles';
 import { applyTrackedMutation, loadLawyerProfile } from '@/lib/lawyerProfile';
-import { AiChatResponse, LawyerProfile } from '@/types/assistant';
+import { AiChatResponse, AiToolResult, LatestOrderDocumentLink, LawyerProfile } from '@/types/assistant';
 import { TrackedOrderCase } from '@/types/court';
 
 const cinzel = Cinzel({
@@ -33,6 +33,28 @@ const starterPrompts = [
   'Is there any transfer in courtroom 9, my case is on serial number 12?',
   'Track WRIC/11985/2025 for me.',
 ];
+
+function getLatestOrderDocument(tool: AiToolResult): LatestOrderDocumentLink | null {
+  const data = tool.data as { latestOrderDocument?: unknown } | undefined;
+  const document = data?.latestOrderDocument as Record<string, unknown> | undefined;
+  if (!document) return null;
+
+  const viewerHref = String(document.viewerHref || '').trim();
+  const judgmentId = String(document.judgmentId || '').trim();
+  if (!viewerHref || !judgmentId) return null;
+
+  return {
+    judgmentId,
+    filename: String(document.filename || '').trim(),
+    date: String(document.date || '').trim() || null,
+    viewUrl: String(document.viewUrl || '').trim(),
+    viewerHref,
+    summary: String(document.summary || '').trim(),
+    citations: Array.isArray(document.citations)
+      ? (document.citations as LatestOrderDocumentLink['citations'])
+      : [],
+  };
+}
 
 export default function AiChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -314,13 +336,30 @@ export default function AiChatPage() {
                   {message.tools && message.tools.length > 0 && (
                     <div className="mt-4 space-y-2">
                       {message.tools.map((tool) => (
-                        <div
-                          key={`${message.id}-${tool.tool}`}
-                          className="rounded-2xl border border-slate-700/60 bg-slate-900/35 px-4 py-3 text-sm text-slate-300"
-                        >
-                          <span className="font-semibold text-slate-100">{tool.tool}</span>
-                          <span className="ml-2 text-slate-400">{tool.summary}</span>
-                        </div>
+                        (() => {
+                          const latestOrderDocument = getLatestOrderDocument(tool);
+                          return (
+                            <div
+                              key={`${message.id}-${tool.tool}`}
+                              className="rounded-2xl border border-slate-700/60 bg-slate-900/35 px-4 py-3 text-sm text-slate-300"
+                            >
+                              <span className="font-semibold text-slate-100">{tool.tool}</span>
+                              <span className="ml-2 text-slate-400">{tool.summary}</span>
+                              {latestOrderDocument && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  <Link
+                                    href={latestOrderDocument.viewerHref}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/12 px-4 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                                  >
+                                    Open Latest Order PDF
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()
                       ))}
                     </div>
                   )}
