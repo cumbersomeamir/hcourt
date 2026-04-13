@@ -107,7 +107,7 @@ const homeTiles: HomeTile[] = [
     title: 'Cause List',
     label: 'Lists',
     description: 'Inspect cause lists, court options, counsel search, and downloadable list views.',
-    className: 'col-span-2 min-h-[170px] sm:col-span-1 sm:min-h-[180px]',
+    className: 'min-h-[170px] sm:min-h-[180px]',
     surfaceClassName:
       'border-orange-300/18 bg-[linear-gradient(150deg,rgba(26,17,13,0.95),rgba(74,36,12,0.85)_54%,rgba(251,146,60,0.38))] shadow-[0_22px_55px_rgba(120,53,15,0.24)]',
     glowClassName:
@@ -149,7 +149,7 @@ const homeTiles: HomeTile[] = [
     title: 'My Cases',
     label: 'Workspace',
     description: 'Review saved case profiles, live board matches, and recent activity.',
-    className: 'col-span-2 min-h-[178px] sm:col-span-1 sm:min-h-[180px]',
+    className: 'min-h-[178px] sm:min-h-[180px]',
     surfaceClassName:
       'border-sky-300/18 bg-[linear-gradient(150deg,rgba(10,20,34,0.95),rgba(11,54,78,0.86)_50%,rgba(45,212,191,0.32))] shadow-[0_24px_58px_rgba(8,47,73,0.24)]',
     glowClassName:
