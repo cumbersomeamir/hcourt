@@ -92,10 +92,11 @@ export default function Home() {
       .filter(Boolean);
     return Array.from(new Set(normalized));
   }, [trackedCaseIds, derivedTrackedCaseIdsFromOrders]);
+  const totalTrackedItems = trackedCaseIds.length + trackedOrderCases.length;
   const hasTrackedScheduleCases = effectiveTrackedCaseIds.length > 0;
   const shouldApplyScheduleFilter = scheduleFilterEnabled && hasTrackedScheduleCases;
   const desktopNavItemClass =
-    'group relative inline-flex h-11 items-center gap-2 rounded-full border bg-slate-950/35 px-4 text-sm font-semibold text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors duration-200 hover:bg-slate-900/70';
+    'group relative inline-flex h-11 items-center gap-2 rounded-full border bg-slate-950/50 px-4 text-sm font-semibold text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-slate-900/85';
   const mobileMenuItemClass =
     'relative flex min-h-14 items-center gap-3 rounded-2xl border bg-slate-950/40 px-4 py-3 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors duration-200 hover:bg-slate-900/70';
   const mobileMenuIconClass =
@@ -417,13 +418,46 @@ export default function Home() {
         </>
       )}
       <div className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
-        {/* Header Card */}
-        <div className="glass-card-lg relative mb-6 overflow-hidden">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.10),transparent_30%)]" />
-          <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
-          <div className="relative p-5 sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div className="hidden lg:flex flex-wrap items-center justify-end gap-2.5 ml-auto">
+        <header className="mb-6 hidden lg:block">
+          <div className="relative overflow-hidden rounded-[1.75rem] border border-slate-700/50 bg-slate-950/60 shadow-[0_24px_70px_rgba(2,6,23,0.42)] backdrop-blur-2xl">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.96),rgba(15,23,42,0.74)_48%,rgba(8,145,178,0.12))]" />
+            <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-sky-200/30 to-transparent" />
+            <div className="relative px-6 py-5">
+              <div className="flex items-start justify-between gap-6">
+                <div className="min-w-0 flex-1">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200/85">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
+                    Court View
+                  </div>
+                  <div className="mt-4 flex items-center gap-4">
+                    <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-2xl border border-sky-400/20 bg-sky-500/10 text-sky-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M5 21V9m14 12V9M9 21v-6m6 6v-6M4 9l8-6 8 6M8 9h8" />
+                      </svg>
+                    </div>
+                    <div className="min-w-0">
+                      <h1 className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-50">
+                        High Court of Judicature at Allahabad
+                      </h1>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Lucknow Bench &mdash; Online Court Activity Digital Display Board
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-200">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse-dot" />
+                    Live updates
+                  </div>
+                  <div className="rounded-2xl border border-slate-700/50 bg-slate-900/55 px-4 py-3 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tracked Matters</p>
+                    <p className="mt-1 text-lg font-semibold text-slate-50">{totalTrackedItems}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-slate-800/70 pt-5">
                 <a href="/web-diary" className={`${desktopNavItemClass} border-violet-400/20 text-violet-100 hover:border-violet-300/40`} title="View Web Diary">
                   <svg className="w-4 h-4 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -465,9 +499,7 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                   </svg>
-                  {trackedCaseIds.length + trackedOrderCases.length > 0
-                    ? `Tracked (${trackedCaseIds.length + trackedOrderCases.length})`
-                    : 'Track Cases'}
+                  {totalTrackedItems > 0 ? `Tracked (${totalTrackedItems})` : 'Track Cases'}
                 </a>
                 <button onClick={() => fetchSchedule(true)} disabled={loading} className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}>
                   <svg className={`w-4 h-4 text-slate-200 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -488,17 +520,42 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </div>
+        </header>
 
-            <div className="mt-6 min-w-0">
-              <p className="text-[11px] sm:text-xs tracking-[0.32em] uppercase text-amber-300/85 font-medium">
+        <div className="glass-card-lg relative mb-6 overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(245,158,11,0.12),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(34,211,238,0.10),transparent_30%)]" />
+          <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/12 to-transparent" />
+          <div className="relative p-5 sm:p-8">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-end">
+              <div className="min-w-0">
+                <p className="text-[11px] sm:text-xs tracking-[0.32em] uppercase text-amber-300/85 font-medium">
                 Court View
-              </p>
-              <h1 className="mt-3 max-w-3xl text-3xl sm:text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-slate-50">
-                High Court of Judicature at Allahabad
-              </h1>
-              <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400">
-                Lucknow Bench &mdash; Online Court Activity Digital Display Board
-              </p>
+                </p>
+                <h1 className="mt-3 max-w-3xl text-3xl sm:text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-slate-50">
+                  High Court of Judicature at Allahabad
+                </h1>
+                <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400">
+                  Lucknow Bench &mdash; Online Court Activity Digital Display Board
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Display Mode</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-100">
+                    {shouldApplyScheduleFilter ? 'Tracked cases only' : 'All courts visible'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tracked Matters</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-100">{totalTrackedItems}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Unread Alerts</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-100">{unreadCount}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -641,4 +698,3 @@ export default function Home() {
     </div>
   );
 }
-// Fix: Ensure courts display correctly
