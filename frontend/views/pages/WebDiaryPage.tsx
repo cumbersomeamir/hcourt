@@ -96,7 +96,7 @@ export default function WebDiaryPage() {
         <div className="mb-5 sm:mb-6">
           <div className="flex items-center gap-4 mb-3 sm:mb-4">
             <Link
-              href="/"
+              href="/court-view"
               className="text-cyan-400 hover:text-cyan-300 text-sm font-medium flex items-center gap-1.5 group"
             >
               <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
