@@ -162,47 +162,7 @@ export default function AppHomePage() {
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-4 sm:px-6 sm:py-6">
-        <section className="relative mb-4 overflow-hidden rounded-[2rem] border border-slate-700/50 bg-slate-950/60 shadow-[0_30px_90px_rgba(2,6,23,0.42)] backdrop-blur-2xl">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(15,23,42,0.94),rgba(15,23,42,0.78)_48%,rgba(14,116,144,0.14))]" />
-          <div className="relative px-5 py-6 sm:px-7 sm:py-7">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-              <div className="max-w-3xl">
-                <div className="inline-flex items-center gap-2 rounded-full border border-amber-300/15 bg-amber-300/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-200/85">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" />
-                  HCourt Home
-                </div>
-                <h1 className="mt-4 text-3xl font-semibold leading-tight tracking-[-0.04em] text-slate-50 sm:text-5xl">
-                  One screen for every court workflow.
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm text-slate-300 sm:text-base">
-                  Jump straight into live court view, daily diary work, cause lists, orders,
-                  AI assistance, tracked cases, and admin tools from a single full-screen hub.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:min-w-[420px]">
-                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/45 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Core</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">Court View</p>
-                </div>
-                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/45 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Research</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">Orders + AI</p>
-                </div>
-                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/45 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tracking</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">Cases + Alerts</p>
-                </div>
-                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/45 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Admin</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">Data Map</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid flex-1 auto-rows-[minmax(168px,1fr)] grid-cols-2 gap-3 pb-4 sm:gap-4 sm:pb-6 lg:grid-cols-4">
+        <section className="grid flex-1 auto-rows-[minmax(168px,1fr)] grid-cols-2 gap-3 py-1 sm:gap-4 sm:py-2 lg:grid-cols-4">
           {homeTiles.map((tile) => (
             <Link
               key={tile.href}
