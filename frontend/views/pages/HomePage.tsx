@@ -319,6 +319,15 @@ export default function Home() {
                 Live
               </div>
               <div className="grid grid-cols-1 gap-2.5">
+            <Link href="/" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-slate-400/20`} title="Go to Home">
+              <span className={`${mobileMenuIconClass} border-slate-400/20 bg-slate-500/10 text-slate-100`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 11l9-8 9 8M5 10v10h14V10M9 20v-6h6v6" />
+                </svg>
+              </span>
+              <span className="text-base font-semibold text-slate-100">Home</span>
+            </Link>
+
             <a href="/web-diary" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-violet-400/20`} title="View Web Diary">
               <span className={`${mobileMenuIconClass} border-violet-400/20 bg-violet-500/10 text-violet-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -23,7 +23,7 @@ const homeTiles: HomeTile[] = [
     title: 'Court View',
     label: 'Live Board',
     description: 'Open the live Lucknow bench board with search, tracked filters, alerts, and refresh controls.',
-    className: 'col-span-2 min-h-[220px] sm:min-h-[240px] lg:row-span-2 lg:min-h-[340px]',
+    className: 'sm:col-span-2 sm:min-h-[240px] lg:row-span-2 lg:min-h-[340px]',
     surfaceClassName:
       'border-amber-300/20 bg-[linear-gradient(145deg,rgba(15,23,42,0.94),rgba(10,20,46,0.9)_52%,rgba(22,78,99,0.72))] shadow-[0_28px_70px_rgba(15,23,42,0.34)]',
     glowClassName:
@@ -44,7 +44,7 @@ const homeTiles: HomeTile[] = [
     title: 'AI Chat',
     label: 'Assistant',
     description: 'Ask for tracked-case summaries, courtroom changes, alerts, and guided actions in one place.',
-    className: 'col-span-2 min-h-[205px] sm:min-h-[220px]',
+    className: 'sm:col-span-2 sm:min-h-[220px]',
     surfaceClassName:
       'border-cyan-300/18 bg-[linear-gradient(145deg,rgba(8,17,40,0.95),rgba(16,30,68,0.88)_48%,rgba(8,145,178,0.55))] shadow-[0_28px_70px_rgba(8,47,73,0.26)]',
     glowClassName:
@@ -65,7 +65,7 @@ const homeTiles: HomeTile[] = [
     title: 'Orders & Judgments',
     label: 'Orders',
     description: 'Fetch case orders, judgments, PDFs, and spreadsheet exports.',
-    className: 'min-h-[190px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-rose-300/18 bg-[linear-gradient(150deg,rgba(20,13,30,0.94),rgba(55,20,39,0.84)_55%,rgba(234,88,12,0.42))] shadow-[0_24px_60px_rgba(67,20,7,0.24)]',
     glowClassName:
@@ -86,7 +86,7 @@ const homeTiles: HomeTile[] = [
     title: 'Web Diary',
     label: 'Diary',
     description: 'Browse date-based notifications and daily diary documents.',
-    className: 'min-h-[170px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-violet-300/18 bg-[linear-gradient(145deg,rgba(17,12,37,0.95),rgba(41,19,72,0.86)_55%,rgba(192,132,252,0.4))] shadow-[0_22px_55px_rgba(46,16,101,0.25)]',
     glowClassName:
@@ -107,7 +107,7 @@ const homeTiles: HomeTile[] = [
     title: 'Cause List',
     label: 'Lists',
     description: 'Inspect cause lists, court options, counsel search, and downloadable list views.',
-    className: 'min-h-[170px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-orange-300/18 bg-[linear-gradient(150deg,rgba(26,17,13,0.95),rgba(74,36,12,0.85)_54%,rgba(251,146,60,0.38))] shadow-[0_22px_55px_rgba(120,53,15,0.24)]',
     glowClassName:
@@ -128,7 +128,7 @@ const homeTiles: HomeTile[] = [
     title: 'Status',
     label: 'Board Status',
     description: 'Open the courtroom status board and live progress stream.',
-    className: 'min-h-[185px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-indigo-300/18 bg-[linear-gradient(145deg,rgba(11,16,40,0.96),rgba(24,31,88,0.85)_55%,rgba(79,70,229,0.42))] shadow-[0_24px_58px_rgba(30,27,75,0.24)]',
     glowClassName:
@@ -149,7 +149,7 @@ const homeTiles: HomeTile[] = [
     title: 'My Cases',
     label: 'Workspace',
     description: 'Review saved case profiles, live board matches, and recent activity.',
-    className: 'min-h-[178px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-sky-300/18 bg-[linear-gradient(150deg,rgba(10,20,34,0.95),rgba(11,54,78,0.86)_50%,rgba(45,212,191,0.32))] shadow-[0_24px_58px_rgba(8,47,73,0.24)]',
     glowClassName:
@@ -171,7 +171,7 @@ const homeTiles: HomeTile[] = [
     title: 'Track Cases',
     label: 'Tracking',
     description: 'Manage case IDs, order watchers, and saved tracking preferences.',
-    className: 'min-h-[192px] sm:min-h-[180px]',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
       'border-emerald-300/18 bg-[linear-gradient(145deg,rgba(8,23,24,0.95),rgba(12,71,65,0.84)_55%,rgba(16,185,129,0.36))] shadow-[0_24px_58px_rgba(6,78,59,0.24)]',
     glowClassName:
@@ -193,7 +193,7 @@ const homeTiles: HomeTile[] = [
     title: 'Admin Data Map',
     label: 'Admin',
     description: 'Open the admin workspace for collection mapping, controls, and AI support views.',
-    className: 'col-span-2 min-h-[178px] lg:col-span-1',
+    className: 'sm:col-span-2 sm:min-h-[180px] lg:col-span-1',
     surfaceClassName:
       'border-slate-400/18 bg-[linear-gradient(145deg,rgba(15,23,42,0.95),rgba(30,41,59,0.88)_52%,rgba(71,85,105,0.42))] shadow-[0_22px_55px_rgba(15,23,42,0.24)]',
     glowClassName:
@@ -220,13 +220,13 @@ export default function AppHomePage() {
         <div className="absolute bottom-[-12%] left-[22%] h-[420px] w-[420px] rounded-full bg-emerald-500/8 blur-[150px]" />
       </div>
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-4 sm:px-6 sm:py-6">
-        <section className="grid flex-1 auto-rows-[minmax(168px,1fr)] grid-cols-2 gap-3 py-1 sm:gap-4 sm:py-2 lg:grid-cols-4">
+      <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-3 sm:px-6 sm:py-6">
+        <section className="grid flex-1 auto-rows-[minmax(92px,1fr)] grid-cols-[repeat(2,minmax(0,1fr))] gap-2 py-1 sm:auto-rows-[minmax(168px,1fr)] sm:gap-4 sm:py-2 lg:grid-cols-4">
           {homeTiles.map((tile) => (
             <Link
               key={tile.href}
               href={tile.href}
-              className={`group relative overflow-hidden rounded-[1.7rem] border p-5 shadow-[0_20px_55px_rgba(2,6,23,0.28)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-1 hover:border-slate-200/20 ${tile.className} ${tile.surfaceClassName}`}
+              className={`group relative min-w-0 overflow-hidden rounded-2xl border p-3 shadow-[0_20px_55px_rgba(2,6,23,0.28)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-1 hover:border-slate-200/20 sm:rounded-[1.7rem] sm:p-5 ${tile.className} ${tile.surfaceClassName}`}
             >
               <div className={`pointer-events-none absolute inset-0 opacity-100 transition-opacity duration-200 group-hover:opacity-90 ${tile.glowClassName}`} />
               <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_20%,transparent_75%,rgba(15,23,42,0.14))]" />
@@ -235,26 +235,26 @@ export default function AppHomePage() {
               <div className={`pointer-events-none absolute bottom-0 left-10 h-20 w-20 rounded-full blur-2xl ${tile.orbClassName}`} />
               <div className="relative flex h-full flex-col">
                 <div className="flex items-start">
-                  <div className={`flex h-12 w-12 items-center justify-center rounded-2xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${tile.iconClassName}`}>
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] [&>svg]:h-5 [&>svg]:w-5 sm:h-12 sm:w-12 sm:rounded-2xl sm:[&>svg]:h-7 sm:[&>svg]:w-7 ${tile.iconClassName}`}>
                     {tile.icon}
                   </div>
                 </div>
 
-                <div className="mt-6">
-                  <p className={`text-[11px] uppercase tracking-[0.26em] ${tile.labelClassName}`}>
+                <div className="mt-3 sm:mt-6">
+                  <p className={`text-[9px] uppercase tracking-[0.18em] sm:text-[11px] sm:tracking-[0.26em] ${tile.labelClassName}`}>
                     {tile.label}
                   </p>
-                  <h2 className={`mt-2 text-xl font-semibold tracking-[-0.03em] sm:text-2xl ${tile.titleClassName}`}>
+                  <h2 className={`mt-1 text-wrap text-sm font-semibold leading-tight sm:mt-2 sm:text-2xl ${tile.titleClassName}`}>
                     {tile.title}
                   </h2>
-                  <p className="mt-3 max-w-[32ch] text-sm leading-6 text-slate-100/78">
+                  <p className="mt-3 hidden max-w-[32ch] text-sm leading-6 text-slate-100/78 sm:block">
                     {tile.description}
                   </p>
                 </div>
 
-                <div className="mt-auto flex items-center justify-end pt-6 text-sm font-semibold text-slate-100">
-                  <span className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-transform duration-200 group-hover:translate-x-1 ${tile.ctaClassName}`}>
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="mt-auto flex items-center justify-end pt-2 text-sm font-semibold text-slate-100 sm:pt-6">
+                  <span className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition-transform duration-200 group-hover:translate-x-1 sm:h-10 sm:w-10 ${tile.ctaClassName}`}>
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </span>
