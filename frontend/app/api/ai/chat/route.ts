@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { access } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -24,16 +25,40 @@ async function findBackendEnvFile(backendDir: string) {
   return null;
 }
 
+async function loadEnvFile(envFile: string | null) {
+  if (!envFile) return {};
+
+  const env: Record<string, string> = {};
+  const content = await readFile(envFile, 'utf8');
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || !line.includes('=')) continue;
+
+    const equalsIndex = line.indexOf('=');
+    const key = line.slice(0, equalsIndex).trim();
+    let value = line.slice(equalsIndex + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (key) env[key] = value;
+  }
+
+  return env;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
     const backendDir = path.resolve(process.cwd(), '../backend');
     const scriptPath = path.join(backendDir, 'scripts/run-ai-chat-cli.ts');
     const envFile = await findBackendEnvFile(backendDir);
+    const backendEnv = await loadEnvFile(envFile);
     const encodedPayload = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 
     const args = [
-      ...(envFile ? [`--env-file=${envFile}`] : []),
       '--import',
       'tsx',
       scriptPath,
@@ -42,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     const { stdout, stderr } = await execFileAsync(process.execPath, args, {
       cwd: backendDir,
-      env: process.env,
+      env: { ...process.env, ...backendEnv },
       maxBuffer: 10 * 1024 * 1024,
       timeout: 120000,
     });

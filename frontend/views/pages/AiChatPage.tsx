@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
@@ -137,11 +137,6 @@ export default function AiChatPage() {
     };
   }, []);
 
-  const trackedSummary = useMemo(
-    () => trackedCaseIds.length + trackedOrderCases.length,
-    [trackedCaseIds.length, trackedOrderCases.length]
-  );
-
   const sendMessage = async (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed || sending) return;
@@ -258,41 +253,12 @@ export default function AiChatPage() {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
-        <div className="mb-8 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <div className="mb-8">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-cyan-300/75">AI Chat</p>
             <h1 className={`mt-3 text-3xl font-semibold text-slate-100 sm:text-4xl ${cinzel.className}`}>
               Court Assistant
             </h1>
-            <p className="mt-3 max-w-3xl text-sm text-slate-300 sm:text-base">
-              GPT-5 Nano handles the natural-language request, triggers the right court tools,
-              then writes the final concise answer from the retrieved facts.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <div className="rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-5">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/70">
-                Tracking Context
-              </p>
-              <p className="mt-3 text-3xl font-semibold text-cyan-100">{trackedSummary}</p>
-              <p className="mt-2 text-sm text-cyan-100/70">
-                Saved case references available to the assistant.
-              </p>
-            </div>
-            <div className="rounded-3xl border border-amber-400/20 bg-amber-500/10 p-5">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-amber-200/70">
-                Lawyer Profile
-              </p>
-              <p className="mt-3 text-2xl font-semibold text-amber-100">
-                {lawyerProfile?.counselName || 'Not configured'}
-              </p>
-              <p className="mt-2 text-sm text-amber-100/70">
-                {lawyerProfile
-                  ? `${lawyerProfile.aliases.length + lawyerProfile.chamberAliases.length} aliases ready`
-                  : 'Configure this in /admin/data-map for “assigned to me” checks.'}
-              </p>
-            </div>
           </div>
         </div>
 
@@ -381,9 +347,7 @@ export default function AiChatPage() {
                 placeholder="Ask about status, cause list assignments, courtroom transfer, alerts, web diary, or ask the assistant to track a case."
               />
               <div className="mt-3 flex items-center justify-between gap-3">
-                <p className="text-xs text-slate-500">
-                  Planner model: GPT-5 Nano. Final answer model: GPT-5 Nano.
-                </p>
+                <span />
                 <button
                   onClick={() => void sendMessage(input)}
                   disabled={sending || !input.trim()}
