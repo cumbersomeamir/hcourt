@@ -92,7 +92,10 @@ export async function POST(request: NextRequest) {
       console.error('AI chat stderr:', stderr);
     }
 
-    return NextResponse.json(JSON.parse(stdout));
+    return NextResponse.json({
+      success: true,
+      result: JSON.parse(stdout),
+    });
   } catch (error) {
     console.error('Frontend AI chat route failed:', error);
     return NextResponse.json(
