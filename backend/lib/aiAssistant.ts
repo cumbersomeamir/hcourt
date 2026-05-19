@@ -35,6 +35,7 @@ export type AiClientState = {
 type ChatTurn = {
   role: 'user' | 'assistant';
   content: string;
+  toolResults?: ExecutedToolResult[];
 };
 
 type PlannerToolCall = {
@@ -349,6 +350,16 @@ function isOrderCountLookup(message: string) {
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
+function isOrderListLookup(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return [
+    /\bshow( me)?\b.*\borders?\b/,
+    /\blist\b.*\borders?\b/,
+    /\bshow( me)?\b.*\bjudgments?\b/,
+    /\blist\b.*\bjudgments?\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
 function isAlertsLookup(message: string) {
   const lowerMessage = normalizeIntentText(message);
 
@@ -370,6 +381,7 @@ function isAlertsLookup(message: string) {
 function getCaseStatusResponseMode(message: string, useTrackedCases: boolean) {
   if (useTrackedCases) return 'tracked_overview' as const;
   if (isLatestOrderLookup(message)) return 'latest_order' as const;
+  if (isOrderListLookup(message)) return 'order_list' as const;
   if (isOrderCountLookup(message)) return 'order_count' as const;
   return 'status' as const;
 }
@@ -460,7 +472,42 @@ async function resolveCaseTypeValue(
   return scored[0]?.option || null;
 }
 
+function pickCaseContext(data: Record<string, unknown>) {
+  const city = String(data.city || '').trim();
+  const caseNo = String(data.caseNo || '').trim();
+  const caseYear = String(data.caseYear || '').trim();
+  const caseType = String(data.caseType || '').trim();
+  const caseTypeQuery = String(data.caseTypeLabel || data.caseTypeQuery || caseType).trim();
+  const caseId = String(data.caseId || '').trim().toUpperCase();
+
+  if (!caseNo || !caseYear || !caseTypeQuery) return null;
+
+  return {
+    city: city || 'lucknow',
+    caseType: caseType || caseTypeQuery,
+    caseTypeQuery,
+    caseNo,
+    caseYear,
+    caseId: caseId || undefined,
+  };
+}
+
+function findLatestCaseContext(history: ChatTurn[]) {
+  for (const turn of history.slice().reverse()) {
+    const toolResults = Array.isArray(turn.toolResults) ? turn.toolResults.slice().reverse() : [];
+    for (const result of toolResults) {
+      if (result.tool !== 'get_case_status' || !result.ok) continue;
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const context = pickCaseContext(data);
+      if (context) return context;
+    }
+  }
+
+  return null;
+}
+
 async function buildPlanner(message: string, history: ChatTurn[], clientState: NormalizedClientState, lawyerProfile: ReturnType<typeof serializeLawyerProfile>) {
+  const latestCaseContext = findLatestCaseContext(history);
   const fallbackPlanner = () => {
     const lowerMessage = normalizeIntentText(message);
     if (isTrackedCasesLookup(message)) {
@@ -522,15 +569,16 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
       lowerMessage.includes('judgment') ||
       lowerMessage.includes('order')
     ) {
+      const extractedParts = extractCaseNumberParts(message);
       return {
         tools: [
           {
             name: 'get_case_status',
             arguments: {
               ...(isTrackedCasesStatusLookup(message) ? { useTrackedCases: true } : {}),
-              city: normalizeBench(message),
-              ...(extractCaseNumberParts(message) || {}),
-              caseId: extractCaseId(message),
+              city: extractBenchMention(message) || latestCaseContext?.city || normalizeBench(message),
+              ...(extractedParts || latestCaseContext || {}),
+              caseId: extractCaseId(message) || latestCaseContext?.caseId,
             },
           },
         ],
@@ -546,7 +594,25 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
 
   const historyText = history
     .slice(-6)
-    .map((turn) => `${turn.role.toUpperCase()}: ${turn.content}`)
+    .map((turn) => {
+      const toolText = Array.isArray(turn.toolResults)
+        ? turn.toolResults
+            .map((result) => {
+              const data = (result.data as Record<string, unknown> | undefined) || {};
+              const caseContext = pickCaseContext(data);
+              return [
+                `${result.tool}: ${result.summary}`,
+                caseContext
+                  ? `case context: ${JSON.stringify(caseContext)}`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' | ');
+            })
+            .join('\n')
+        : '';
+      return [`${turn.role.toUpperCase()}: ${turn.content}`, toolText].filter(Boolean).join('\n');
+    })
     .join('\n');
 
   let plannerResponse = '';
@@ -598,6 +664,23 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
       } as PlannerToolCall;
     })
     .filter((tool): tool is PlannerToolCall => Boolean(tool))
+    .map((tool) => {
+      if (tool.name !== 'get_case_status' || !latestCaseContext) return tool;
+      const hasCaseArgs = Boolean(
+        getToolArg(tool.arguments, 'caseNo', 'case_no') &&
+          getToolArg(tool.arguments, 'caseYear', 'case_year') &&
+          getToolArg(tool.arguments, 'caseType', 'case_type', 'caseTypeQuery', 'case_type_query')
+      );
+      if (hasCaseArgs || extractCaseNumberParts(message) || extractCaseId(message)) return tool;
+      return {
+        ...tool,
+        arguments: {
+          ...latestCaseContext,
+          ...tool.arguments,
+          caseId: latestCaseContext.caseId,
+        },
+      };
+    })
     .slice(0, 3);
 
   if (isTrackedCasesLookup(message)) {
@@ -1355,6 +1438,10 @@ async function runTool(
         responseMode,
         caseId: caseId || deriveCaseIdFromTrackedOrderCase(trackedOrderCase!),
         city,
+        caseType: resolvedCaseType.value,
+        caseTypeLabel: resolvedCaseType.label,
+        caseNo,
+        caseYear,
         caseInfo: result.caseInfo,
         liveBoard: null,
         details: {
@@ -1364,6 +1451,12 @@ async function runTool(
         },
         latestOrder,
         latestOrderDocument,
+        orderJudgments: result.orderJudgments.map((order) => ({
+          srNo: order.srNo,
+          date: order.date || null,
+          viewUrl: order.viewUrl || null,
+          judgmentId: order.judgmentId || null,
+        })),
         orderJudgmentsCount: result.orderJudgments.length,
       },
     };
@@ -1882,6 +1975,24 @@ function formatSpecificCaseStatusAnswer(data: Record<string, unknown>) {
 
   if (responseMode === 'order_count') {
     return `${orderCount} order${orderCount === 1 ? '' : 's'} are available for this case.`;
+  }
+
+  if (responseMode === 'order_list') {
+    const orders = Array.isArray(data.orderJudgments)
+      ? (data.orderJudgments as Array<Record<string, unknown>>)
+      : [];
+    if (orders.length === 0) {
+      return 'No order/judgment entries are listed for this case.';
+    }
+
+    return [
+      `${orders.length} order${orders.length === 1 ? '' : 's'} are available:`,
+      ...orders.map((order, index) => {
+        const date = formatDisplayDate(String(order.date || '').trim()) || 'date not shown';
+        const title = String(order.title || order.description || order.text || '').trim();
+        return `${index + 1}. ${date}${title ? ` - ${title}` : ''}`;
+      }),
+    ].join('\n');
   }
 
   if (responseMode === 'latest_order') {

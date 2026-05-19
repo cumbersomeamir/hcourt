@@ -199,6 +199,7 @@ export default function AiChatPage() {
         .map((message) => ({
           role: message.role,
           content: message.content,
+          toolResults: message.tools,
         }));
 
       const response = await fetch('/api/ai/chat', {
