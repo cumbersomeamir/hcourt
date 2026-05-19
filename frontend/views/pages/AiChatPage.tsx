@@ -22,7 +22,7 @@ const manrope = Manrope({
 
 type ChatMessage = {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'pending';
   content: string;
   tools?: AiChatResponse['toolResults'];
 };
@@ -32,6 +32,13 @@ const starterPrompts = [
   'Check the cause list of date 02/04/2026 and let me know if any case is assigned to me.',
   'Is there any transfer in courtroom 9, my case is on serial number 12?',
   'Track WRIC/11985/2025 for me.',
+];
+
+const pendingMessages = [
+  'Reading your question...',
+  'Choosing the right court lookup...',
+  'Checking live court data...',
+  'This lookup can take a little longer when the court site is slow...',
 ];
 
 function getLatestOrderDocument(tool: AiToolResult): LatestOrderDocumentLink | null {
@@ -77,6 +84,8 @@ export default function AiChatPage() {
   const [lawyerProfile, setLawyerProfile] = useState<LawyerProfile | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsCount, setNotificationsCount] = useState(0);
+  const [pendingStartedAt, setPendingStartedAt] = useState<number | null>(null);
+  const [pendingStep, setPendingStep] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -137,11 +146,35 @@ export default function AiChatPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!sending || !pendingStartedAt) {
+      setPendingStep(0);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - pendingStartedAt) / 1000);
+      if (elapsedSeconds >= 18) {
+        setPendingStep(3);
+      } else if (elapsedSeconds >= 8) {
+        setPendingStep(2);
+      } else if (elapsedSeconds >= 3) {
+        setPendingStep(1);
+      } else {
+        setPendingStep(0);
+      }
+    }, 500);
+
+    return () => window.clearInterval(interval);
+  }, [pendingStartedAt, sending]);
+
   const sendMessage = async (prompt: string) => {
     const trimmed = prompt.trim();
     if (!trimmed || sending) return;
 
     setSending(true);
+    setPendingStartedAt(Date.now());
+    setPendingStep(0);
     setError('');
 
     const userMessage: ChatMessage = {
@@ -150,7 +183,13 @@ export default function AiChatPage() {
       content: trimmed,
     };
 
-    setMessages((current) => [...current, userMessage]);
+    const pendingMessage: ChatMessage = {
+      id: `pending-${Date.now()}`,
+      role: 'pending',
+      content: pendingMessages[0],
+    };
+
+    setMessages((current) => [...current, userMessage, pendingMessage]);
     setInput('');
 
     try {
@@ -200,7 +239,7 @@ export default function AiChatPage() {
       }
 
       setMessages((current) => [
-        ...current,
+        ...current.filter((message) => message.role !== 'pending'),
         {
           id: result.requestId,
           role: 'assistant',
@@ -209,9 +248,11 @@ export default function AiChatPage() {
         },
       ]);
     } catch (sendError) {
+      setMessages((current) => current.filter((message) => message.role !== 'pending'));
       setError(sendError instanceof Error ? sendError.message : 'Failed to send message');
     } finally {
       setSending(false);
+      setPendingStartedAt(null);
     }
   };
 
@@ -288,17 +329,28 @@ export default function AiChatPage() {
                 <article
                   key={message.id}
                   className={`rounded-3xl border p-4 sm:p-5 ${
-                    message.role === 'assistant'
+                    message.role === 'assistant' || message.role === 'pending'
                       ? 'border-slate-800/80 bg-slate-950/35'
                       : 'border-cyan-400/20 bg-cyan-500/10'
                   }`}
                 >
                   <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    {message.role === 'assistant' ? 'Assistant' : 'You'}
+                    {message.role === 'user' ? 'You' : 'Assistant'}
                   </p>
-                  <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-100">
-                    {message.content}
-                  </p>
+                  {message.role === 'pending' ? (
+                    <div className="mt-3 flex items-center gap-3 text-sm leading-7 text-slate-100">
+                      <span className="inline-flex gap-1" aria-hidden="true">
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300 [animation-delay:150ms]" />
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300 [animation-delay:300ms]" />
+                      </span>
+                      <span>{pendingMessages[pendingStep]}</span>
+                    </div>
+                  ) : (
+                    <p className="mt-3 whitespace-pre-line text-sm leading-7 text-slate-100">
+                      {message.content}
+                    </p>
+                  )}
                   {message.tools && message.tools.length > 0 && (
                     <div className="mt-4 space-y-2">
                       {message.tools.map((tool) => (
