@@ -62,6 +62,13 @@ export type LatestOrderDocumentLink = {
   }>;
 };
 
+export type OrderDocumentLink = {
+  index: number;
+  date: string | null;
+  viewUrl: string;
+  viewerHref: string;
+};
+
 export type AiChatResponse = {
   requestId: string;
   answer: string;

@@ -2034,6 +2034,60 @@ function formatSpecificCaseStatusAnswer(data: Record<string, unknown>) {
   return null;
 }
 
+function buildOrderDocumentLinks(data: Record<string, unknown>) {
+  const orders = Array.isArray(data.orderJudgments)
+    ? (data.orderJudgments as Array<Record<string, unknown>>)
+    : [];
+  if (orders.length === 0) return [];
+
+  const caseInfo = (data.caseInfo as Record<string, unknown> | null) || null;
+  const caseLabel = [
+    String(caseInfo?.caseType || data.caseTypeLabel || data.caseType || '').trim(),
+    [data.caseNo, data.caseYear].filter(Boolean).join('/'),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return orders
+    .map((order, index) => {
+      const viewUrl = String(order.viewUrl || '').trim();
+      if (!viewUrl) return null;
+      const date = String(order.date || '').trim() || null;
+      const params = new URLSearchParams();
+      params.set('viewUrl', viewUrl);
+      if (date) params.set('date', date);
+      params.set('page', '1');
+      params.set('title', `${caseLabel || 'Order'}${date ? ` - ${formatDisplayDate(date)}` : ` #${index + 1}`}`);
+
+      return {
+        index: Number(order.srNo || index + 1),
+        date,
+        viewUrl,
+        viewerHref: `/orders/judgment-view?${params.toString()}`,
+      };
+    })
+    .filter((order): order is { index: number; date: string | null; viewUrl: string; viewerHref: string } =>
+      Boolean(order)
+    );
+}
+
+function attachDisplayLinks(result: ExecutedToolResult): ExecutedToolResult {
+  if (result.tool !== 'get_case_status' || !result.data || typeof result.data !== 'object') {
+    return result;
+  }
+
+  const data = result.data as Record<string, unknown>;
+  if (String(data.responseMode || '') !== 'order_list') return result;
+
+  return {
+    ...result,
+    data: {
+      ...data,
+      orderDocumentLinks: buildOrderDocumentLinks(data),
+    },
+  };
+}
+
 function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]) {
   const sections: string[] = [];
 
@@ -2335,7 +2389,7 @@ export async function runAiAssistantChat(input: {
   let finalClientMutation: AiAssistantResponse['clientMutation'];
 
   for (const tool of plan.tools || []) {
-    const result = await runTool(tool, message, clientState, lawyerProfile);
+    const result = attachDisplayLinks(await runTool(tool, message, clientState, lawyerProfile));
     toolResults.push(result);
     if (result.clientMutation) {
       finalClientMutation = {

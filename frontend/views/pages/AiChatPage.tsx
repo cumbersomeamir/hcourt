@@ -7,7 +7,7 @@ import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
 import { loadTrackedState } from '@/lib/caseProfiles';
 import { applyTrackedMutation, loadLawyerProfile } from '@/lib/lawyerProfile';
-import { AiChatResponse, AiToolResult, LatestOrderDocumentLink, LawyerProfile } from '@/types/assistant';
+import { AiChatResponse, AiToolResult, LatestOrderDocumentLink, LawyerProfile, OrderDocumentLink } from '@/types/assistant';
 import { TrackedOrderCase } from '@/types/court';
 
 const cinzel = Cinzel({
@@ -61,6 +61,27 @@ function getLatestOrderDocument(tool: AiToolResult): LatestOrderDocumentLink | n
       ? (document.citations as LatestOrderDocumentLink['citations'])
       : [],
   };
+}
+
+function getOrderDocumentLinks(tool: AiToolResult): OrderDocumentLink[] {
+  const data = tool.data as { orderDocumentLinks?: unknown } | undefined;
+  if (!Array.isArray(data?.orderDocumentLinks)) return [];
+
+  return data.orderDocumentLinks
+    .map((entry) => {
+      const order = entry as Record<string, unknown>;
+      const viewerHref = String(order.viewerHref || '').trim();
+      const viewUrl = String(order.viewUrl || '').trim();
+      if (!viewerHref || !viewUrl) return null;
+
+      return {
+        index: Number(order.index || 0),
+        date: String(order.date || '').trim() || null,
+        viewUrl,
+        viewerHref,
+      };
+    })
+    .filter((entry): entry is OrderDocumentLink => Boolean(entry));
 }
 
 export default function AiChatPage() {
@@ -357,6 +378,7 @@ export default function AiChatPage() {
                       {message.tools.map((tool) => (
                         (() => {
                           const latestOrderDocument = getLatestOrderDocument(tool);
+                          const orderDocumentLinks = getOrderDocumentLinks(tool);
                           return (
                             <div
                               key={`${message.id}-${tool.tool}`}
@@ -374,6 +396,21 @@ export default function AiChatPage() {
                                   >
                                     Open Latest Order PDF
                                   </Link>
+                                </div>
+                              )}
+                              {orderDocumentLinks.length > 0 && (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {orderDocumentLinks.map((order, index) => (
+                                    <Link
+                                      key={`${order.viewerHref}-${index}`}
+                                      href={order.viewerHref}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/12 px-3 py-2 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                                    >
+                                      {order.date ? `Order ${index + 1}: ${order.date}` : `Order ${index + 1} PDF`}
+                                    </Link>
+                                  ))}
                                 </div>
                               )}
                             </div>
