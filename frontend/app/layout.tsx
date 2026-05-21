@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Clarity from "@/components/Clarity";
+import ClientErrorReporter from "@/components/ClientErrorReporter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,6 +30,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Clarity />
+        <ClientErrorReporter />
         {children}
       </body>
     </html>

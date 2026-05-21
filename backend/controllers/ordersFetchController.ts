@@ -60,8 +60,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    if (message.startsWith('Record not found for ')) {
+      return NextResponse.json(
+        { success: false, code: 'record_not_found', error: message },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
+      { success: false, error: message },
       { status: 500 }
     );
   }
