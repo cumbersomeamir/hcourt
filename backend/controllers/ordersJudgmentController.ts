@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { downloadOrderJudgment } from '@/models/ordersModel';
+import {
+  downloadOrderJudgment,
+  isOrderJudgmentPendingError,
+} from '@/models/ordersModel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,9 +23,25 @@ export async function POST(req: Request) {
     const result = await downloadOrderJudgment(viewUrl, date || undefined);
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    if (isOrderJudgmentPendingError(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          code: error.code,
+          error: error.message,
+          retryAfterMs: error.retryAfterMs,
+        },
+        { status: 202 }
+      );
+    }
+
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        code: 'document_download_failed',
+        error: 'Could not prepare this court PDF right now. Please retry shortly.',
+      },
+      { status: 502 }
     );
   }
 }

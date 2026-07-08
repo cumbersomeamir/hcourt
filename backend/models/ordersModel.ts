@@ -3,6 +3,7 @@ export {
   fetchCaseTypes,
   fetchOrderJudgmentsForCase,
   fetchOrders,
+  isOrderJudgmentPendingError,
   isOrdersCaptchaRequiredError,
   refreshOrdersCaptchaChallenge,
   submitOrdersCaptchaChallenge,

@@ -28,6 +28,9 @@ type OrdersResult = {
     date: string;
     viewUrl: string;
     judgmentId: string;
+    documentStatus?: 'cached' | 'fetching' | 'not_cached';
+    documentMessage?: string;
+    documentSizeBytes?: number;
   }>;
 };
 
@@ -51,6 +54,10 @@ function downloadBase64(filename: string, base64: string, mime: string) {
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default function OrdersPage() {
@@ -284,18 +291,78 @@ export default function OrdersPage() {
       body: JSON.stringify({ viewUrl, date }),
     });
     const data = await res.json();
+
+    if (res.status === 202 || data.code === 'document_preparing') {
+      return {
+        status: 'preparing' as const,
+        message: data.error || 'This PDF is being prepared. Please retry shortly.',
+        retryAfterMs: Number(data.retryAfterMs || 5000),
+      };
+    }
+
     if (!data.success || !data.result) {
       throw new Error(data.error || 'Failed to download order/judgment');
     }
 
-    return data.result as { filename: string; base64: string; mimeType?: string };
+    return {
+      status: 'ready' as const,
+      pdf: data.result as { filename: string; base64: string; mimeType?: string },
+    };
+  };
+
+  const updateJudgmentDocumentStatus = (
+    judgmentId: string,
+    patch: {
+      documentStatus?: 'cached' | 'fetching' | 'not_cached';
+      documentMessage?: string;
+    }
+  ) => {
+    setResult((current) => {
+      if (!current?.orderJudgments) return current;
+      return {
+        ...current,
+        orderJudgments: current.orderJudgments.map((entry) =>
+          entry.judgmentId === judgmentId ? { ...entry, ...patch } : entry
+        ),
+      };
+    });
+  };
+
+  const fetchJudgmentPdfWithPolling = async (
+    viewUrl: string,
+    date: string,
+    judgmentId: string
+  ) => {
+    const maxAttempts = 6;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const result = await fetchJudgmentPdf(viewUrl, date);
+      if (result.status === 'ready') {
+        updateJudgmentDocumentStatus(judgmentId, {
+          documentStatus: 'cached',
+          documentMessage: 'PDF is cached and ready.',
+        });
+        return result.pdf;
+      }
+
+      updateJudgmentDocumentStatus(judgmentId, {
+        documentStatus: 'fetching',
+        documentMessage: result.message,
+      });
+
+      if (attempt < maxAttempts) {
+        await wait(Math.min(Math.max(result.retryAfterMs, 1500), 7000));
+      }
+    }
+
+    throw new Error('PDF is still being prepared. Please try again shortly.');
   };
 
   const downloadJudgment = async (viewUrl: string, date: string, judgmentId: string) => {
     try {
       setJudgmentLoadingId(judgmentId);
       setError(null);
-      const pdf = await fetchJudgmentPdf(viewUrl, date);
+      const pdf = await fetchJudgmentPdfWithPolling(viewUrl, date, judgmentId);
       downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to download order/judgment');
@@ -314,7 +381,11 @@ export default function OrdersPage() {
 
       for (const entry of result.orderJudgments) {
         try {
-          const pdf = await fetchJudgmentPdf(entry.viewUrl, entry.date);
+          const pdf = await fetchJudgmentPdfWithPolling(
+            entry.viewUrl,
+            entry.date,
+            entry.judgmentId
+          );
           downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
           await new Promise((resolve) => setTimeout(resolve, 200));
         } catch {
@@ -569,13 +640,26 @@ export default function OrdersPage() {
                           {entry.srNo}
                         </span>
                         {entry.date || 'Date unavailable'}
+                        {entry.documentStatus && (
+                          <span className="ml-2 text-[11px] text-slate-500">
+                            {entry.documentStatus === 'cached'
+                              ? 'PDF ready'
+                              : entry.documentStatus === 'fetching'
+                                ? 'Preparing PDF'
+                                : 'PDF not cached'}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
                         disabled={judgmentLoadingId === entry.judgmentId || allJudgmentsLoading}
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
                       >
-                        {judgmentLoadingId === entry.judgmentId ? 'Downloading...' : 'Download Order/Judgment'}
+                        {judgmentLoadingId === entry.judgmentId
+                          ? 'Preparing...'
+                          : entry.documentStatus === 'cached'
+                            ? 'Download Order/Judgment'
+                            : 'Prepare PDF'}
                       </button>
                     </div>
                   ))}

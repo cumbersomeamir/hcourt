@@ -8,7 +8,7 @@ import ExcelJS from 'exceljs';
 import { chromium } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -33,11 +33,16 @@ export type OrdersCaptchaChallenge = {
   prompt: string;
 };
 
+export type OrderJudgmentDocumentStatus = 'cached' | 'fetching' | 'not_cached';
+
 export type OrderJudgmentEntry = {
   srNo: number;
   date: string;
   viewUrl: string;
   judgmentId: string;
+  documentStatus?: OrderJudgmentDocumentStatus;
+  documentMessage?: string;
+  documentSizeBytes?: number;
 };
 
 export type OrderJudgmentDownload = {
@@ -126,6 +131,7 @@ const ORDERS_CAPTCHA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
 let ordersCaptchaIndexesEnsured = false;
 let orderJudgmentCacheIndexesEnsured = false;
+const orderJudgmentPrefetches = new Map<string, Promise<void>>();
 
 class OrdersCaptchaRequiredError extends Error {
   readonly code = 'captcha_required';
@@ -135,6 +141,17 @@ class OrdersCaptchaRequiredError extends Error {
     super(message);
     this.name = 'OrdersCaptchaRequiredError';
     this.challenge = challenge;
+  }
+}
+
+class OrderJudgmentPendingError extends Error {
+  readonly code = 'document_preparing';
+  readonly retryAfterMs: number;
+
+  constructor(message: string, retryAfterMs = 5000) {
+    super(message);
+    this.name = 'OrderJudgmentPendingError';
+    this.retryAfterMs = retryAfterMs;
   }
 }
 
@@ -237,6 +254,25 @@ async function getCachedOrderJudgment(
   };
 }
 
+async function getCachedOrderJudgmentMeta(
+  judgmentId: string
+): Promise<{ judgmentId: string; sizeBytes: number } | null> {
+  const normalizedId = String(judgmentId || '').trim();
+  if (!normalizedId) return null;
+
+  const collection = await getOrderJudgmentCacheCollection();
+  const doc = await collection.findOne(
+    { judgmentId: normalizedId },
+    { projection: { judgmentId: 1, sizeBytes: 1 } }
+  );
+  if (!doc) return null;
+
+  return {
+    judgmentId: doc.judgmentId,
+    sizeBytes: doc.sizeBytes,
+  };
+}
+
 async function cacheOrderJudgment(
   download: OrderJudgmentDownload,
   meta: {
@@ -289,6 +325,12 @@ export function isOrdersCaptchaRequiredError(
   error: unknown
 ): error is OrdersCaptchaRequiredError {
   return error instanceof OrdersCaptchaRequiredError;
+}
+
+export function isOrderJudgmentPendingError(
+  error: unknown
+): error is OrderJudgmentPendingError {
+  return error instanceof OrderJudgmentPendingError;
 }
 
 function normalizeCity(city?: string): OrdersCity {
@@ -918,13 +960,10 @@ async function downloadOrderJudgmentViaProxy(
   return payload.result as OrderJudgmentDownload;
 }
 
-export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
-  if (!viewUrl) throw new Error('Missing judgment view URL');
-
-  const { judgmentId } = getJudgmentRequestContext(viewUrl);
-  const cached = await getCachedOrderJudgment(judgmentId);
-  if (cached) return cached;
-
+async function downloadAndCacheOrderJudgment(
+  viewUrl: string,
+  date?: string
+): Promise<OrderJudgmentDownload> {
   try {
     const direct = await downloadOrderJudgmentDirect(viewUrl, date);
     await cacheOrderJudgment(direct, { viewUrl, date, source: 'direct' });
@@ -938,12 +977,103 @@ export async function downloadOrderJudgment(viewUrl: string, date?: string): Pro
   const proxied = await downloadOrderJudgmentViaProxy(viewUrl, date);
   if (!proxied) {
     throw new Error(
-      'eLegalix rejected the server download request (403). Configure ORDERS_JUDGMENT_PROXY_URL or serve this judgment from cache.'
+      'The court PDF source is rejecting this server request. The document will be retried and served from cache when ready.'
     );
   }
 
   await cacheOrderJudgment(proxied, { viewUrl, date, source: 'proxy' });
   return proxied;
+}
+
+function startOrderJudgmentPrefetch(entry: Pick<OrderJudgmentEntry, 'judgmentId' | 'viewUrl' | 'date'>) {
+  const judgmentId = String(entry.judgmentId || '').trim();
+  if (!judgmentId) return Promise.resolve();
+
+  const existing = orderJudgmentPrefetches.get(judgmentId);
+  if (existing) return existing;
+
+  const task = (async () => {
+    const cached = await getCachedOrderJudgmentMeta(judgmentId);
+    if (cached) return;
+    await downloadAndCacheOrderJudgment(entry.viewUrl, entry.date || undefined);
+  })()
+    .catch((error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[orders] Unable to prepare judgment ${judgmentId}: ${message}`);
+    })
+    .finally(() => {
+      orderJudgmentPrefetches.delete(judgmentId);
+    });
+
+  orderJudgmentPrefetches.set(judgmentId, task);
+  return task;
+}
+
+async function prepareOrderJudgmentEntries(
+  entries: OrderJudgmentEntry[],
+  waitMs = Number(process.env.ORDERS_JUDGMENT_PREFETCH_WAIT_MS || 12000)
+): Promise<OrderJudgmentEntry[]> {
+  if (entries.length === 0) return entries;
+
+  const uniqueEntries = Array.from(
+    new Map(entries.map((entry) => [entry.judgmentId, entry])).values()
+  );
+  const tasks = uniqueEntries.map((entry) => startOrderJudgmentPrefetch(entry));
+
+  if (waitMs > 0) {
+    await Promise.race([
+      Promise.allSettled(tasks),
+      new Promise((resolve) => setTimeout(resolve, waitMs)),
+    ]);
+  }
+
+  return annotateOrderJudgmentEntries(entries);
+}
+
+async function annotateOrderJudgmentEntries(
+  entries: OrderJudgmentEntry[]
+): Promise<OrderJudgmentEntry[]> {
+  return Promise.all(
+    entries.map(async (entry) => {
+      const cached = await getCachedOrderJudgmentMeta(entry.judgmentId);
+      if (cached) {
+        return {
+          ...entry,
+          documentStatus: 'cached' as const,
+          documentMessage: 'PDF is cached and ready.',
+          documentSizeBytes: cached.sizeBytes,
+        };
+      }
+
+      const fetching = orderJudgmentPrefetches.has(entry.judgmentId);
+      return {
+        ...entry,
+        documentStatus: fetching ? 'fetching' as const : 'not_cached' as const,
+        documentMessage: fetching
+          ? 'PDF is being prepared from the court source.'
+          : 'PDF will be prepared when requested.',
+      };
+    })
+  );
+}
+
+export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
+  if (!viewUrl) throw new Error('Missing judgment view URL');
+
+  const { judgmentId } = getJudgmentRequestContext(viewUrl);
+  const cached = await getCachedOrderJudgment(judgmentId);
+  if (cached) return cached;
+
+  try {
+    return await downloadAndCacheOrderJudgment(viewUrl, date);
+  } catch (error) {
+    startOrderJudgmentPrefetch({ judgmentId, viewUrl, date: date || '' });
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[orders] Judgment ${judgmentId} is not ready yet: ${message}`);
+    throw new OrderJudgmentPendingError(
+      'This court PDF is still being prepared. Please retry shortly.'
+    );
+  }
 }
 
 function isAllahabadCaptchaMismatch(html: string): boolean {
@@ -1304,32 +1434,55 @@ async function buildExcel(params: {
   return Buffer.from(buf);
 }
 
-async function buildPdf(detailsHtml: string) {
-  // For Vercel serverless, ensure Chromium is available
-  // Use headless shell if available (lighter for serverless)
-  let browser;
+function getSystemChromiumExecutablePath(): string | null {
+  const configured = String(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '').trim();
+  const candidates = [
+    configured,
+    '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+    '/usr/bin/google-chrome',
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+  ].filter(Boolean);
+
+  return candidates.find((candidate) => existsSync(candidate)) || null;
+}
+
+async function launchChromiumForPdf() {
+  const args = [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--no-first-run',
+    '--no-zygote',
+    '--disable-gpu',
+  ];
+
   try {
-    browser = await chromium.launch({
+    return await chromium.launch({
       headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-      ],
+      args,
     });
   } catch (error) {
-    // Fallback: try with minimal args if the above fails
-    console.error('Failed to launch browser with full args, trying minimal:', error);
-    browser = await chromium.launch({
+    const executablePath = getSystemChromiumExecutablePath();
+    if (!executablePath) {
+      console.error('Failed to launch bundled Chromium and no system Chrome/Chromium was found:', error);
+      throw error;
+    }
+
+    console.warn(`Bundled Chromium unavailable; using system browser at ${executablePath}`);
+    return chromium.launch({
+      executablePath,
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      args,
     });
   }
+}
+
+async function buildPdf(detailsHtml: string) {
+  const browser = await launchChromiumForPdf();
   try {
     const page = await browser.newPage();
     await page.setContent(
@@ -1480,7 +1633,7 @@ export async function submitOrdersCaptchaChallenge(params: {
     cookieJar,
   });
 
-  const [pdfBuf, xlsxBuf] = await Promise.all([
+  const [pdfBuf, xlsxBuf, orderJudgments] = await Promise.all([
     buildPdf(caseData.detailsHtml),
     buildExcel({
       caseTypeLabel: caseData.caseTypeLabel,
@@ -1488,6 +1641,7 @@ export async function submitOrdersCaptchaChallenge(params: {
       caseYear: caseData.caseYear,
       details: caseData.details,
     }),
+    prepareOrderJudgmentEntries(caseData.orderJudgments),
   ]);
 
   const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(
@@ -1513,14 +1667,14 @@ export async function submitOrdersCaptchaChallenge(params: {
       filename: `orders-${safeName}.xlsx`,
       base64: xlsxBuf.toString('base64'),
     },
-    orderJudgments: caseData.orderJudgments,
+    orderJudgments,
   };
 }
 
 export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
   const caseData = await fetchCaseDataForOrders(input);
 
-  const [pdfBuf, xlsxBuf] = await Promise.all([
+  const [pdfBuf, xlsxBuf, orderJudgments] = await Promise.all([
     buildPdf(caseData.detailsHtml),
     buildExcel({
       caseTypeLabel: caseData.caseTypeLabel,
@@ -1528,6 +1682,7 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
       caseYear: caseData.caseYear,
       details: caseData.details,
     }),
+    prepareOrderJudgmentEntries(caseData.orderJudgments),
   ]);
 
   const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(
@@ -1553,7 +1708,7 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
       filename: `orders-${safeName}.xlsx`,
       base64: xlsxBuf.toString('base64'),
     },
-    orderJudgments: caseData.orderJudgments,
+    orderJudgments,
   };
 }
 
@@ -1562,6 +1717,8 @@ export async function fetchOrderJudgmentsForCase(
 ): Promise<OrderJudgmentCaseFetchResult> {
   const caseData = await fetchCaseDataForOrders(input);
 
+  const orderJudgments = await annotateOrderJudgmentEntries(caseData.orderJudgments);
+
   return {
     city: caseData.source.city,
     caseInfo: {
@@ -1571,6 +1728,6 @@ export async function fetchOrderJudgmentsForCase(
       status: caseData.infoParsed.status,
       petitionerVsRespondent: caseData.infoParsed.petitionerVsRespondent,
     },
-    orderJudgments: caseData.orderJudgments,
+    orderJudgments,
   };
 }
