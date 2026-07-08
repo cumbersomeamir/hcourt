@@ -8,7 +8,15 @@ import ExcelJS from 'exceljs';
 import { chromium } from 'playwright';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -137,6 +145,12 @@ type OrderCaseTypesCacheDoc = {
 const ORDERS_CAPTCHA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const DEFAULT_CASE_TYPES_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_COURT_FETCH_TIMEOUT_MS = 15000;
+const STALE_PLAYWRIGHT_ARTIFACT_MS = 60 * 60 * 1000;
+const CHROMIUM_CRASH_SAFE_ARGS = [
+  '--disable-crash-reporter',
+  '--disable-crashpad',
+  '--disable-breakpad',
+];
 
 let ordersCaptchaIndexesEnsured = false;
 let orderJudgmentCacheIndexesEnsured = false;
@@ -1598,6 +1612,36 @@ function getSystemChromiumExecutablePath(): string | null {
   return candidates.find((candidate) => existsSync(candidate)) || null;
 }
 
+function cleanupStalePlaywrightArtifacts() {
+  let tmpRoot: string;
+  try {
+    tmpRoot = realpathSync(os.tmpdir());
+  } catch {
+    return;
+  }
+
+  const cutoff = Date.now() - STALE_PLAYWRIGHT_ARTIFACT_MS;
+  let entries: string[];
+  try {
+    entries = readdirSync(tmpRoot);
+  } catch {
+    return;
+  }
+
+  for (const entry of entries) {
+    if (!entry.startsWith('playwright-artifacts-')) continue;
+
+    const artifactPath = path.join(tmpRoot, entry);
+    try {
+      if (statSync(artifactPath).mtimeMs < cutoff) {
+        rmSync(artifactPath, { recursive: true, force: true });
+      }
+    } catch {
+      // Best-effort cleanup only; never block order generation.
+    }
+  }
+}
+
 async function launchChromiumForPdf() {
   const args = [
     '--no-sandbox',
@@ -1607,6 +1651,7 @@ async function launchChromiumForPdf() {
     '--no-first-run',
     '--no-zygote',
     '--disable-gpu',
+    ...CHROMIUM_CRASH_SAFE_ARGS,
   ];
 
   try {
@@ -1631,6 +1676,7 @@ async function launchChromiumForPdf() {
 }
 
 async function buildPdf(detailsHtml: string) {
+  cleanupStalePlaywrightArtifacts();
   const browser = await launchChromiumForPdf();
   try {
     const page = await browser.newPage();
