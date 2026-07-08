@@ -11,6 +11,7 @@ type MonitorTrackedOrdersSummary = {
   initialized: number;
   notifications: number;
   errors: number;
+  invalidCases: number;
   skippedRecentChecks: number;
 };
 
@@ -23,6 +24,9 @@ type TrackedOrderStateDoc = {
   caseYear: string;
   judgmentIds: string[];
   lastCheckedAt: Date;
+  lastSuccessfulAt?: Date;
+  lastErrorAt?: Date;
+  lastErrorMessage?: string;
   updatedAt: Date;
 };
 
@@ -31,6 +35,22 @@ type MonitorTrackedOrdersOptions = {
 };
 
 let indexesEnsured = false;
+const DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+
+function getDefaultTrackedOrderMinCheckIntervalMs() {
+  const configured = Number(process.env.TRACKED_ORDERS_MIN_CHECK_INTERVAL_MS || '');
+  return Number.isFinite(configured) && configured >= 0
+    ? configured
+    : DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRecordNotFoundError(error: unknown) {
+  return getErrorMessage(error).startsWith('Record not found for ');
+}
 
 async function ensureIndexes(db: Db) {
   if (indexesEnsured) return;
@@ -59,14 +79,20 @@ async function processTrackedOrderCases(
     initialized: 0,
     notifications: 0,
     errors: 0,
+    invalidCases: 0,
     skippedRecentChecks: 0,
   };
   const nowMs = Date.now();
-  const minCheckIntervalMs = Math.max(0, options?.minCheckIntervalMs || 0);
+  const minCheckIntervalMs = Math.max(
+    0,
+    options?.minCheckIntervalMs ?? getDefaultTrackedOrderMinCheckIntervalMs()
+  );
 
   for (const trackedCase of trackedOrderCasesByKey.values()) {
+    let existingState: TrackedOrderStateDoc | null = null;
+
     try {
-      const existingState = await stateCollection.findOne({
+      existingState = await stateCollection.findOne({
         trackingKey: trackedCase.trackingKey,
       });
 
@@ -105,8 +131,13 @@ async function processTrackedOrderCases(
               caseYear: trackedCase.caseYear,
               judgmentIds: currentJudgmentIds,
               lastCheckedAt: now,
+              lastSuccessfulAt: now,
               updatedAt: now,
             } satisfies TrackedOrderStateDoc,
+            $unset: {
+              lastErrorAt: '',
+              lastErrorMessage: '',
+            },
           },
           { upsert: true }
         );
@@ -183,16 +214,48 @@ async function processTrackedOrderCases(
             caseYear: trackedCase.caseYear,
             judgmentIds: currentJudgmentIds,
             lastCheckedAt: now,
+            lastSuccessfulAt: now,
             updatedAt: now,
           } satisfies TrackedOrderStateDoc,
+          $unset: {
+            lastErrorAt: '',
+            lastErrorMessage: '',
+          },
         },
         { upsert: true }
       );
     } catch (error) {
+      if (isRecordNotFoundError(error)) {
+        const now = new Date();
+        const message = getErrorMessage(error);
+        await stateCollection.updateOne(
+          { trackingKey: trackedCase.trackingKey },
+          {
+            $set: {
+              trackingKey: trackedCase.trackingKey,
+              city: trackedCase.city,
+              caseType: trackedCase.caseType,
+              caseTypeLabel: trackedCase.caseTypeLabel || trackedCase.caseType,
+              caseNo: trackedCase.caseNo,
+              caseYear: trackedCase.caseYear,
+              judgmentIds: existingState?.judgmentIds || [],
+              lastCheckedAt: now,
+              lastErrorAt: now,
+              lastErrorMessage: message,
+              updatedAt: now,
+            } satisfies TrackedOrderStateDoc,
+          },
+          { upsert: true }
+        );
+        summary.invalidCases += 1;
+        console.log(`[TrackedOrders] Invalid tracked case ${trackedCase.trackingKey}: ${message}`);
+        continue;
+      }
+
       summary.errors += 1;
       console.error(
         `[TrackedOrders] Failed for ${trackedCase.trackingKey}:`,
-        error instanceof Error ? error.message : error
+        getErrorMessage(error)
       );
     }
   }

@@ -35,7 +35,21 @@ export async function proxyOrdersRequest(
     init.body = await request.arrayBuffer();
   }
 
-  const upstream = await fetch(buildUpstreamUrl(pathname, request.url), init);
+  let upstream: Response;
+  try {
+    upstream = await fetch(buildUpstreamUrl(pathname, request.url), init);
+  } catch (error) {
+    return Response.json(
+      {
+        success: false,
+        code: 'backend_unreachable',
+        error: 'Orders service is temporarily unavailable. Please retry shortly.',
+        details: error instanceof Error ? error.message : 'Unknown upstream error',
+      },
+      { status: 502 }
+    );
+  }
+
   const responseHeaders = new Headers();
   const upstreamContentType = upstream.headers.get('content-type');
   const upstreamContentDisposition = upstream.headers.get('content-disposition');

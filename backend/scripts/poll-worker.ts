@@ -31,7 +31,7 @@ async function pollSchedule() {
 
     const duration = Date.now() - startTime;
     console.log(
-      `[Worker] Poll completed in ${duration}ms - Changes: ${result.changes.length}, Notifications: ${result.notificationsCreated}, History: ${result.historyInserted}, Tracked Orders: ${result.trackedOrders?.trackedCases ?? 0}, Order Notifications: ${result.trackedOrders?.notifications ?? 0}, Refreshed: ${result.refreshed}, Stale: ${result.stale}${result.warning ? `, Warning: ${result.warning}` : ''}`
+      `[Worker] Poll completed in ${duration}ms - Changes: ${result.changes.length}, Notifications: ${result.notificationsCreated}, History: ${result.historyInserted}, Tracked Orders: ${result.trackedOrders?.trackedCases ?? 0}, Invalid Tracked Orders: ${result.trackedOrders?.invalidCases ?? 0}, Order Notifications: ${result.trackedOrders?.notifications ?? 0}, Refreshed: ${result.refreshed}, Stale: ${result.stale}${result.warning ? `, Warning: ${result.warning}` : ''}`
     );
   } catch (error) {
     console.error('[Worker] Error during poll:', error);

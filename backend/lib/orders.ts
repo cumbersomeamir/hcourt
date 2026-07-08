@@ -127,11 +127,25 @@ type OrderJudgmentCacheDoc = {
   lastAccessedAt: Date;
 };
 
+type OrderCaseTypesCacheDoc = {
+  city: OrdersCity;
+  types: CaseTypeOption[];
+  fetchedAt: Date;
+  updatedAt: Date;
+};
+
 const ORDERS_CAPTCHA_CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const DEFAULT_CASE_TYPES_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_COURT_FETCH_TIMEOUT_MS = 15000;
 
 let ordersCaptchaIndexesEnsured = false;
 let orderJudgmentCacheIndexesEnsured = false;
+let orderCaseTypesCacheIndexesEnsured = false;
 const orderJudgmentPrefetches = new Map<string, Promise<void>>();
+const caseTypesMemoryCache = new Map<
+  OrdersCity,
+  { types: CaseTypeOption[]; fetchedAt: number }
+>();
 
 class OrdersCaptchaRequiredError extends Error {
   readonly code = 'captcha_required';
@@ -225,6 +239,21 @@ async function getOrderJudgmentCacheCollection() {
       collection.createIndex({ lastAccessedAt: -1 }),
     ]);
     orderJudgmentCacheIndexesEnsured = true;
+  }
+
+  return collection;
+}
+
+async function getOrderCaseTypesCacheCollection() {
+  const db = await getDb();
+  const collection = db.collection<OrderCaseTypesCacheDoc>('order_case_types_cache');
+
+  if (!orderCaseTypesCacheIndexesEnsured) {
+    await Promise.all([
+      collection.createIndex({ city: 1 }, { unique: true }),
+      collection.createIndex({ updatedAt: -1 }),
+    ]);
+    orderCaseTypesCacheIndexesEnsured = true;
   }
 
   return collection;
@@ -345,26 +374,146 @@ function normalizeText(s: string) {
   return s.replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-export async function fetchCaseTypes(city?: string): Promise<CaseTypeOption[]> {
-  const source = getSourceConfig(city);
-  const res = await fetch(source.caseNumberUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`Failed to load case types: ${res.status}`);
-  const html = await res.text();
-  const $ = cheerio.load(html);
+function getCaseTypesCacheTtlMs() {
+  const configured = Number(process.env.ORDERS_CASE_TYPES_CACHE_TTL_MS || '');
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_CASE_TYPES_CACHE_TTL_MS;
+}
 
+function getCourtFetchTimeoutMs() {
+  const configured = Number(process.env.ORDERS_COURT_FETCH_TIMEOUT_MS || '');
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_COURT_FETCH_TIMEOUT_MS;
+}
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function parseCaseTypeOptions(html: string): CaseTypeOption[] {
+  const $ = cheerio.load(html);
   const opts: CaseTypeOption[] = [];
+
   $('#case_type option').each((_, el) => {
     const value = ($(el).attr('value') || '').trim();
     const label = normalizeText($(el).text());
     if (!value || !label || label.toLowerCase().includes('select case type')) return;
     opts.push({ value, label });
   });
+
   return opts;
+}
+
+async function getCachedCaseTypes(source: OrdersSourceConfig) {
+  const memory = caseTypesMemoryCache.get(source.city);
+  if (memory?.types.length) {
+    return {
+      types: memory.types,
+      fetchedAt: new Date(memory.fetchedAt),
+    };
+  }
+
+  const collection = await getOrderCaseTypesCacheCollection();
+  const doc = await collection.findOne({ city: source.city });
+  if (!doc?.types?.length) return null;
+
+  caseTypesMemoryCache.set(source.city, {
+    types: doc.types,
+    fetchedAt: new Date(doc.fetchedAt).getTime(),
+  });
+
+  return {
+    types: doc.types,
+    fetchedAt: new Date(doc.fetchedAt),
+  };
+}
+
+async function cacheCaseTypes(source: OrdersSourceConfig, types: CaseTypeOption[]) {
+  if (types.length === 0) return;
+
+  const now = new Date();
+  caseTypesMemoryCache.set(source.city, {
+    types,
+    fetchedAt: now.getTime(),
+  });
+
+  const collection = await getOrderCaseTypesCacheCollection();
+  await collection.updateOne(
+    { city: source.city },
+    {
+      $set: {
+        city: source.city,
+        types,
+        fetchedAt: now,
+        updatedAt: now,
+      } satisfies OrderCaseTypesCacheDoc,
+    },
+    { upsert: true }
+  );
+}
+
+async function fetchCaseTypesLive(source: OrdersSourceConfig): Promise<CaseTypeOption[]> {
+  const res = await fetchWithTimeout(
+    source.caseNumberUrl,
+    {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+      cache: 'no-store',
+    },
+    getCourtFetchTimeoutMs()
+  );
+
+  if (!res.ok) throw new Error(`Failed to load case types: ${res.status}`);
+
+  const opts = parseCaseTypeOptions(await res.text());
+  if (opts.length === 0) {
+    throw new Error(`No case types found for ${source.label}`);
+  }
+
+  return opts;
+}
+
+export async function fetchCaseTypes(city?: string): Promise<CaseTypeOption[]> {
+  const source = getSourceConfig(city);
+  const cached = await getCachedCaseTypes(source);
+  const cacheTtlMs = getCaseTypesCacheTtlMs();
+  const now = Date.now();
+
+  if (
+    cached?.types.length &&
+    now - new Date(cached.fetchedAt).getTime() < cacheTtlMs
+  ) {
+    return cached.types;
+  }
+
+  try {
+    const liveTypes = await fetchCaseTypesLive(source);
+    await cacheCaseTypes(source, liveTypes);
+    return liveTypes;
+  } catch (error) {
+    if (cached?.types.length) {
+      console.log(
+        `[orders] Serving stale ${source.city} case types after live fetch failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      return cached.types;
+    }
+
+    throw error;
+  }
 }
 
 function extractViewParams(caseInfoHtml: string) {
@@ -999,7 +1148,7 @@ function startOrderJudgmentPrefetch(entry: Pick<OrderJudgmentEntry, 'judgmentId'
   })()
     .catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[orders] Unable to prepare judgment ${judgmentId}: ${message}`);
+      console.log(`[orders] Unable to prepare judgment ${judgmentId}: ${message}`);
     })
     .finally(() => {
       orderJudgmentPrefetches.delete(judgmentId);
@@ -1069,7 +1218,7 @@ export async function downloadOrderJudgment(viewUrl: string, date?: string): Pro
   } catch (error) {
     startOrderJudgmentPrefetch({ judgmentId, viewUrl, date: date || '' });
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[orders] Judgment ${judgmentId} is not ready yet: ${message}`);
+    console.log(`[orders] Judgment ${judgmentId} is not ready yet: ${message}`);
     throw new OrderJudgmentPendingError(
       'This court PDF is still being prepared. Please retry shortly.'
     );
@@ -1472,7 +1621,7 @@ async function launchChromiumForPdf() {
       throw error;
     }
 
-    console.warn(`Bundled Chromium unavailable; using system browser at ${executablePath}`);
+    console.log(`Bundled Chromium unavailable; using system browser at ${executablePath}`);
     return chromium.launch({
       executablePath,
       headless: true,
