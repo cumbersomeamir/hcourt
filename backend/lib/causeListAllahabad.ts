@@ -20,6 +20,27 @@ const VIEW_LIST_URL = `${BASE_URL}/viewlistA.jsp`;
 const CAPTCHA_URL = `${BASE_URL}/test`;
 const COUNSEL_RESULT_URL = `${BASE_URL}/counselSearchResult.jsp`;
 
+async function fetchSource(url: string, init?: RequestInit): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      if (response.status < 500 || attempt === 3) return response;
+      await response.body?.cancel();
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Source request failed');
+}
+
 const LIST_TYPE_LABELS: Record<string, string> = {
   D: 'Cause List',
   Z: 'Combined Cause List',
@@ -161,7 +182,7 @@ async function createCounselCaptchaChallenge(
   input: CounselCaptchaSession['input'],
   cookieJar: Map<string, string>
 ): Promise<CauseListCounselCaptchaChallenge> {
-  const response = await fetch(`${CAPTCHA_URL}?_t=${Date.now()}`, {
+  const response = await fetchSource(`${CAPTCHA_URL}?_t=${Date.now()}`, {
     headers: {
       'User-Agent': USER_AGENT,
       Referer: INPUT2_URL,
@@ -213,7 +234,7 @@ async function loadInput1Html(listType?: string): Promise<string> {
   const form = new URLSearchParams();
   form.set('listType', normalized);
 
-  const response = await fetch(INPUT1_URL, {
+  const response = await fetchSource(INPUT1_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -240,7 +261,7 @@ async function loadCourtOptionsHtml(input: {
   form.set('criteria', 'court');
   form.set('listDate', listDate);
 
-  const response = await fetch(INPUT2_URL, {
+  const response = await fetchSource(INPUT2_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -273,7 +294,7 @@ async function loadCourtResultHtml(input: {
   form.set('listDate', listDate);
   form.set('courtNo', courtNo);
 
-  const response = await fetch(VIEW_LIST_URL, {
+  const response = await fetchSource(VIEW_LIST_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -393,7 +414,7 @@ export async function downloadAllahabadCourtPdf(pdfUrl: string): Promise<CauseLi
     throw new Error('pdfUrl is required');
   }
 
-  const response = await fetch(url, {
+  const response = await fetchSource(url, {
     headers: {
       'User-Agent': USER_AGENT,
       Referer: VIEW_LIST_URL,
@@ -547,7 +568,7 @@ async function initializeCounselSession(input: {
   form.set('criteria', 'counsel');
   form.set('listDate', input.listDate);
 
-  const response = await fetch(INPUT2_URL, {
+  const response = await fetchSource(INPUT2_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -584,7 +605,7 @@ async function fetchCounselRows(input: {
   const maxCodesPerImage = 8;
 
   for (let imageAttempt = 1; imageAttempt <= maxImages; imageAttempt++) {
-    const captchaResponse = await fetch(`${CAPTCHA_URL}?_t=${Date.now()}${imageAttempt}`, {
+    const captchaResponse = await fetchSource(`${CAPTCHA_URL}?_t=${Date.now()}${imageAttempt}`, {
       headers: {
         'User-Agent': USER_AGENT,
         Referer: INPUT2_URL,
@@ -606,7 +627,7 @@ async function fetchCounselRows(input: {
       form.set('counselName', input.counselName);
       form.set('captchaValue', code);
 
-      const response = await fetch(COUNSEL_RESULT_URL, {
+      const response = await fetchSource(COUNSEL_RESULT_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
@@ -792,7 +813,7 @@ export async function submitAllahabadCounselCaptcha(input: {
   form.set('counselName', session.input.counselName);
   form.set('captchaValue', captchaCode);
 
-  const response = await fetch(COUNSEL_RESULT_URL, {
+  const response = await fetchSource(COUNSEL_RESULT_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
