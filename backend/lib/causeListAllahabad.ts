@@ -5,6 +5,7 @@ if (typeof window !== 'undefined') {
 
 import * as cheerio from 'cheerio';
 import ExcelJS from 'exceljs';
+import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -71,6 +72,35 @@ export type CauseListCounselSearchResult = {
   };
 };
 
+export type CauseListCounselCaptchaChallenge = {
+  challengeId: string;
+  imageBase64: string;
+  mimeType: string;
+  expiresAt: string;
+  prompt: string;
+};
+
+type CounselCaptchaSession = {
+  input: { listType: string; listDate: string; counselName: string };
+  cookieJar: Map<string, string>;
+  expiresAt: number;
+};
+
+const COUNSEL_CAPTCHA_TTL_MS = 10 * 60 * 1000;
+const counselCaptchaSessions = new Map<string, CounselCaptchaSession>();
+
+export class CauseListCounselCaptchaRequiredError extends Error {
+  readonly code = 'captcha_required';
+
+  constructor(
+    message: string,
+    readonly challenge: CauseListCounselCaptchaChallenge
+  ) {
+    super(message);
+    this.name = 'CauseListCounselCaptchaRequiredError';
+  }
+}
+
 export type CauseListPdfDownload = {
   filename: string;
   mimeType: string;
@@ -125,6 +155,39 @@ function toCookieHeader(cookieJar: Map<string, string>): string {
   return Array.from(cookieJar.entries())
     .map(([k, v]) => `${k}=${v}`)
     .join('; ');
+}
+
+async function createCounselCaptchaChallenge(
+  input: CounselCaptchaSession['input'],
+  cookieJar: Map<string, string>
+): Promise<CauseListCounselCaptchaChallenge> {
+  const response = await fetch(`${CAPTCHA_URL}?_t=${Date.now()}`, {
+    headers: {
+      'User-Agent': USER_AGENT,
+      Referer: INPUT2_URL,
+      Cookie: toCookieHeader(cookieJar),
+    },
+    cache: 'no-store',
+  });
+  updateCookieJar(cookieJar, response);
+  ensureOk(response, 'Failed to load counsel captcha');
+
+  const challengeId = randomUUID();
+  const expiresAt = Date.now() + COUNSEL_CAPTCHA_TTL_MS;
+  const image = Buffer.from(await response.arrayBuffer());
+  counselCaptchaSessions.set(challengeId, { input, cookieJar, expiresAt });
+
+  for (const [id, session] of counselCaptchaSessions) {
+    if (session.expiresAt <= Date.now()) counselCaptchaSessions.delete(id);
+  }
+
+  return {
+    challengeId,
+    imageBase64: image.toString('base64'),
+    mimeType: response.headers.get('content-type') || 'image/png',
+    expiresAt: new Date(expiresAt).toISOString(),
+    prompt: 'Enter the captcha shown to continue the Allahabad counsel search.',
+  };
 }
 
 function toAbsoluteUrl(url: string): string {
@@ -517,8 +580,8 @@ async function fetchCounselRows(input: {
     cookieJar,
   });
 
-  const maxImages = 18;
-  const maxCodesPerImage = 16;
+  const maxImages = 3;
+  const maxCodesPerImage = 8;
 
   for (let imageAttempt = 1; imageAttempt <= maxImages; imageAttempt++) {
     const captchaResponse = await fetch(`${CAPTCHA_URL}?_t=${Date.now()}${imageAttempt}`, {
@@ -584,7 +647,11 @@ async function fetchCounselRows(input: {
     }
   }
 
-  throw new Error('Unable to solve counsel captcha automatically after multiple attempts');
+  const challenge = await createCounselCaptchaChallenge(input, cookieJar);
+  throw new CauseListCounselCaptchaRequiredError(
+    'Automatic captcha solving failed. Enter the captcha shown to continue.',
+    challenge
+  );
 }
 
 function getOrderedCounselColumns(rows: CauseListCounselRow[]): string[] {
@@ -659,25 +726,11 @@ async function buildCounselExcel(input: {
   return Buffer.from(buffer);
 }
 
-export async function fetchAllahabadCounselCauseList(input: {
-  listType?: string;
-  listDate: string;
-  counselName: string;
-}): Promise<CauseListCounselSearchResult> {
-  const listType = normalizeListType(input.listType);
-  const listDate = validateListingDate(input.listDate);
-  const counselName = normalizeText(String(input.counselName || ''));
-
-  if (counselName.length < 4) {
-    throw new Error('Counsel name must be at least 4 characters');
-  }
-
-  const rows = await fetchCounselRows({
-    listType,
-    listDate,
-    counselName,
-  });
-
+async function buildCounselSearchResult(
+  input: { listType: string; listDate: string; counselName: string },
+  rows: CauseListCounselRow[]
+): Promise<CauseListCounselSearchResult> {
+  const { listType, listDate, counselName } = input;
   const listTypeLabel = getListTypeLabel(listType);
   const excel = await buildCounselExcel({
     listTypeLabel,
@@ -698,4 +751,80 @@ export async function fetchAllahabadCounselCauseList(input: {
       base64: excel.toString('base64'),
     },
   };
+}
+
+export async function fetchAllahabadCounselCauseList(input: {
+  listType?: string;
+  listDate: string;
+  counselName: string;
+}): Promise<CauseListCounselSearchResult> {
+  const normalizedInput = {
+    listType: normalizeListType(input.listType),
+    listDate: validateListingDate(input.listDate),
+    counselName: normalizeText(String(input.counselName || '')),
+  };
+
+  if (normalizedInput.counselName.length < 4) {
+    throw new Error('Counsel name must be at least 4 characters');
+  }
+
+  const rows = await fetchCounselRows(normalizedInput);
+  return buildCounselSearchResult(normalizedInput, rows);
+}
+
+export async function submitAllahabadCounselCaptcha(input: {
+  challengeId: string;
+  captchaCode: string;
+}): Promise<CauseListCounselSearchResult> {
+  const challengeId = String(input.challengeId || '').trim();
+  const captchaCode = String(input.captchaCode || '').replace(/[^a-z0-9]/gi, '').trim();
+  const session = counselCaptchaSessions.get(challengeId);
+
+  if (!session || session.expiresAt <= Date.now()) {
+    counselCaptchaSessions.delete(challengeId);
+    throw new Error('Captcha session expired. Start the counsel search again.');
+  }
+  if (!captchaCode) throw new Error('Enter the captcha to continue');
+
+  const form = new URLSearchParams();
+  form.set('listingType', session.input.listType);
+  form.set('listingDate', session.input.listDate);
+  form.set('counselName', session.input.counselName);
+  form.set('captchaValue', captchaCode);
+
+  const response = await fetch(COUNSEL_RESULT_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'User-Agent': USER_AGENT,
+      Origin: 'https://www.allahabadhighcourt.in',
+      Referer: INPUT2_URL,
+      Cookie: toCookieHeader(session.cookieJar),
+    },
+    body: form.toString(),
+    cache: 'no-store',
+  });
+  updateCookieJar(session.cookieJar, response);
+  ensureOk(response, 'Counsel search failed');
+
+  const parsed = parseJsonLoose(await response.text());
+  if (Array.isArray(parsed)) {
+    counselCaptchaSessions.delete(challengeId);
+    return buildCounselSearchResult(session.input, normalizeCounselRows(parsed));
+  }
+
+  const record = parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null;
+  if (record?.invalidSession) {
+    await initializeCounselSession({
+      listType: session.input.listType,
+      listDate: session.input.listDate,
+      cookieJar: session.cookieJar,
+    });
+  } else if (record?.error && !record.captchaError) {
+    throw new Error('Source returned an error while fetching counsel cause list');
+  }
+
+  counselCaptchaSessions.delete(challengeId);
+  const challenge = await createCounselCaptchaChallenge(session.input, session.cookieJar);
+  throw new CauseListCounselCaptchaRequiredError('Captcha did not match. Enter the new captcha.', challenge);
 }

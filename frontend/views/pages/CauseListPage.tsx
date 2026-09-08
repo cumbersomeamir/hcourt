@@ -37,6 +37,14 @@ type CounselSearchResult = {
   };
 };
 
+type CounselCaptchaChallenge = {
+  challengeId: string;
+  imageBase64: string;
+  mimeType: string;
+  expiresAt: string;
+  prompt: string;
+};
+
 type MediationListLink = {
   label: string;
   url: string;
@@ -155,6 +163,8 @@ export default function CauseListPage() {
 
   const [counselName, setCounselName] = useState('');
   const [counselResult, setCounselResult] = useState<CounselSearchResult | null>(null);
+  const [counselCaptchaChallenge, setCounselCaptchaChallenge] = useState<CounselCaptchaChallenge | null>(null);
+  const [counselCaptchaCode, setCounselCaptchaCode] = useState('');
   const [mediationData, setMediationData] = useState<MediationResult | null>(null);
   const [mediationCity, setMediationCity] = useState<MediationCity>('allahabad');
   const [loadingMediation, setLoadingMediation] = useState(false);
@@ -185,6 +195,8 @@ export default function CauseListPage() {
     setCourtResult(null);
     setSelectedPdfUrl('');
     setCounselResult(null);
+    setCounselCaptchaChallenge(null);
+    setCounselCaptchaCode('');
   }
 
   function resetBenchState() {
@@ -382,6 +394,8 @@ export default function CauseListPage() {
     setInfo('');
     setCourtResult(null);
     setCounselResult(null);
+    setCounselCaptchaChallenge(null);
+    setCounselCaptchaCode('');
 
     if (!selectedDate) {
       setError('Please select listing date.');
@@ -398,20 +412,58 @@ export default function CauseListPage() {
 
     setLoadingSearch(true);
     try {
-      const response = await fetch(`/api/cause-list/${activeBench}/counsel-search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listType: LIST_TYPE,
-          listDate: selectedDate,
-          counselName: counselName.trim(),
-        }),
+      await requestCounselSearch(`/api/cause-list/${activeBench}/counsel-search`, {
+        listType: LIST_TYPE,
+        listDate: selectedDate,
+        counselName: counselName.trim(),
       });
-      const result = await parseApiResult<CounselSearchResult>(response);
-      setCounselResult(result);
-      setInfo(`Found ${result.totalRows} row(s).`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Counsel search failed');
+    } finally {
+      setLoadingSearch(false);
+    }
+  }
+
+  async function requestCounselSearch(url: string, body: Record<string, string>) {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json() as {
+      success?: boolean;
+      result?: CounselSearchResult;
+      code?: string;
+      error?: string;
+      captchaChallenge?: CounselCaptchaChallenge;
+    };
+    if (payload.success && payload.result) {
+      setCounselCaptchaChallenge(null);
+      setCounselCaptchaCode('');
+      setCounselResult(payload.result);
+      setInfo(`Found ${payload.result.totalRows} row(s).`);
+      return;
+    }
+    if (payload.code === 'captcha_required' && payload.captchaChallenge) {
+      setCounselCaptchaChallenge(payload.captchaChallenge);
+      setCounselCaptchaCode('');
+      setError(payload.error || 'Enter the captcha shown to continue.');
+      return;
+    }
+    throw new Error(payload.error || 'Counsel search failed');
+  }
+
+  async function submitCounselCaptcha() {
+    if (!activeBench || !counselCaptchaChallenge) return;
+    setLoadingSearch(true);
+    setError('');
+    try {
+      await requestCounselSearch(`/api/cause-list/${activeBench}/counsel-search`, {
+        challengeId: counselCaptchaChallenge.challengeId,
+        captchaCode: counselCaptchaCode,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to submit captcha');
     } finally {
       setLoadingSearch(false);
     }
@@ -662,6 +714,41 @@ export default function CauseListPage() {
                       {loadingSearch ? 'Searching...' : 'Search'}
                     </button>
                   </div>
+
+                  {counselCaptchaChallenge && (
+                    <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4">
+                      <p className="text-sm text-amber-100">{counselCaptchaChallenge.prompt}</p>
+                      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+                        <img
+                          src={`data:${counselCaptchaChallenge.mimeType};base64,${counselCaptchaChallenge.imageBase64}`}
+                          alt="Allahabad counsel search captcha"
+                          className="h-16 w-auto rounded-lg bg-white p-1"
+                        />
+                        <input
+                          value={counselCaptchaCode}
+                          onChange={(e) => setCounselCaptchaCode(e.target.value.replace(/[^a-z0-9]/gi, '').slice(0, 8))}
+                          placeholder="Enter captcha"
+                          className="rounded-lg border border-slate-500/40 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-cyan-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={submitCounselCaptcha}
+                          disabled={loadingSearch || counselCaptchaCode.length < 4}
+                          className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
+                        >
+                          {loadingSearch ? 'Submitting...' : 'Submit Captcha'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCounselSearch}
+                          disabled={loadingSearch}
+                          className="rounded-lg border border-slate-500/50 px-4 py-2 text-sm font-semibold text-slate-100 disabled:opacity-60"
+                        >
+                          New Captcha
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {counselResult && (
                     <div className="mt-4 rounded-lg border border-slate-500/30 bg-slate-900/55 p-3">

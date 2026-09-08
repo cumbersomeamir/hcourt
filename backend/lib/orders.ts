@@ -1384,7 +1384,7 @@ async function fetchAllahabadCaseInfoHtml(
     throw new Error(`Failed to initialize ${source.label}: ${initRes.status}`);
   }
 
-  const maxImages = 10;
+  const maxImages = 3;
   const maxCodesPerImage = 8;
   for (let imageAttempt = 1; imageAttempt <= maxImages; imageAttempt++) {
     let image: Buffer;

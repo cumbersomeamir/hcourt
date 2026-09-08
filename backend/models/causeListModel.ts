@@ -1,7 +1,9 @@
 export {
+  CauseListCounselCaptchaRequiredError,
   downloadAllahabadCourtPdf,
   fetchAllahabadCauseListDates,
   fetchAllahabadCounselCauseList,
+  submitAllahabadCounselCaptcha,
   fetchAllahabadCourtOptions,
   fetchAllahabadCourtPdfLinks,
 } from '@/lib/causeListAllahabad';
@@ -17,6 +19,7 @@ export {
   fetchLucknowCourtPdfLinks,
 } from '@/lib/causeListLucknow';
 export type {
+  CauseListCounselCaptchaChallenge,
   CauseListCourtSearchResult,
   CauseListCounselSearchResult,
   CauseListDateOption,
