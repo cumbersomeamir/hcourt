@@ -1,0 +1,22 @@
+services:
+  backend:
+    container_name: hcourt-preview-backend
+    build:
+      context: ..
+      dockerfile: ops/preview-backend.Dockerfile
+    env_file:
+      - ../.deploy/backend.env.local
+    ports:
+      - "127.0.0.1:4100:4000"
+    restart: unless-stopped
+
+  frontend:
+    container_name: hcourt-preview-frontend
+    build:
+      context: ..
+      dockerfile: ops/preview-frontend.Dockerfile
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:3100:3000"
+    restart: unless-stopped
