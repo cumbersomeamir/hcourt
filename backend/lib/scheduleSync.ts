@@ -8,6 +8,8 @@ import { ChangeRecord, CourtCase, Notification } from '../types/court';
 const COURT_VIEW_URL =
   'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do';
 const DEFAULT_STALE_AFTER_MS = 45_000;
+const COURT_FETCH_TIMEOUT_MS = 15_000;
+const COURT_FETCH_RETRIES = 2;
 
 type ScheduleDocument = {
   _id?: ObjectId;
@@ -130,22 +132,39 @@ async function getLatestScheduleDocument(db: Db): Promise<ScheduleDocument | nul
   return db.collection<ScheduleDocument>('schedules').findOne({}, { sort: { lastUpdated: -1 } });
 }
 
+async function fetchCourtView(): Promise<Response> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= COURT_FETCH_RETRIES; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), COURT_FETCH_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(COURT_VIEW_URL, {
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+
+      if (response.ok) return response;
+      lastError = new Error(`Failed to fetch live Lucknow court view: ${response.status} ${response.statusText}`);
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Failed to fetch live Lucknow court view');
+}
+
 async function syncScheduleInternal(
   db: Db,
   latestBeforeSync: ScheduleDocument | null,
   source: string,
   runTrackedOrders: boolean
 ): Promise<ScheduleSyncResult> {
-  const response = await fetch(COURT_VIEW_URL, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0',
-    },
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch live Lucknow court view: ${response.status} ${response.statusText}`);
-  }
+  const response = await fetchCourtView();
 
   const html = await response.text();
   const parsedCourts = parseCourtSchedule(html);

@@ -146,22 +146,17 @@ const navItems: NavItem[] = [
   },
 ];
 
+const moreNavKeys = new Set<NavKey>(['web-diary', 'ai-chat']);
+const primaryNavItems = navItems.filter((item) => !moreNavKeys.has(item.key));
+const moreNavItems = navItems.filter((item) => moreNavKeys.has(item.key));
+
 export default function WorkspaceNavigation({
   alertsCount = 0,
   current,
   onAlertsClick,
-  onRefresh,
-  refreshing = false,
 }: WorkspaceNavigationProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const hasAlertsAction = typeof onAlertsClick === 'function';
-  const handleRefresh = () => {
-    if (onRefresh) {
-      onRefresh();
-      return;
-    }
-    window.location.reload();
-  };
   const handleAlerts = () => {
     if (!onAlertsClick) return;
     onAlertsClick();
@@ -255,24 +250,6 @@ export default function WorkspaceNavigation({
                 <button
                   onClick={() => {
                     setMobileNavOpen(false);
-                    handleRefresh();
-                  }}
-                  disabled={refreshing}
-                  className={`${mobileMenuItemClass} border-slate-600/40 disabled:opacity-40`}
-                >
-                  <span className={`${mobileMenuIconClass} border-slate-600/40 bg-slate-800/40 text-slate-200`}>
-                    <svg className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </span>
-                  <span className="text-base font-semibold text-slate-100">
-                    {refreshing ? 'Loading...' : 'Refresh'}
-                  </span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMobileNavOpen(false);
                     handleAlerts();
                   }}
                   disabled={!hasAlertsAction}
@@ -297,7 +274,7 @@ export default function WorkspaceNavigation({
       )}
 
       <div className="hidden lg:flex flex-wrap items-center justify-end gap-2.5">
-        {navItems.map((item) => {
+        {primaryNavItems.map((item) => {
           const active = item.key === current;
           return (
             <Link
@@ -315,16 +292,31 @@ export default function WorkspaceNavigation({
           );
         })}
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}
-        >
-          <svg className={`h-4 w-4 text-slate-200 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          {refreshing ? 'Loading...' : 'Refresh'}
-        </button>
+        <details className="group relative">
+          <summary
+            className={`${desktopNavItemClass} cursor-pointer list-none border-slate-600/40 hover:border-slate-400/40 ${
+              moreNavItems.some((item) => item.key === current)
+                ? 'bg-slate-900/80 ring-1 ring-white/10'
+                : ''
+            }`}
+          >
+            More
+            <span className="text-xs transition-transform group-open:rotate-180">⌄</span>
+          </summary>
+          <div className="absolute right-0 z-30 mt-2 grid w-48 gap-1 rounded-xl border border-slate-700/60 bg-slate-950/95 p-2 shadow-xl backdrop-blur">
+            {moreNavItems.map((item) => (
+              <Link
+                key={item.key}
+                href={item.href}
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-slate-800 ${item.textClass}`}
+                title={item.title}
+              >
+                {item.icon}
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </details>
 
         <button
           onClick={handleAlerts}

@@ -22,18 +22,15 @@ const statusTiles: Array<{
     caption: 'Open Allahabad quick search',
   },
   {
-    label: 'Mediation (Allahabad & Lucknow)',
-    caption: 'Mediation module',
-  },
-  {
     label: 'Case Status Lucknow Bench',
     href: '/orders?mode=quick&city=lucknow',
     caption: 'Open Lucknow quick search',
   },
-  {
-    label: 'Computerized Copying Folio Application Status',
-    caption: 'Copying folio module',
-  },
+];
+
+const comingSoonTiles = [
+  { label: 'Mediation', caption: 'Allahabad & Lucknow' },
+  { label: 'Copying Folio', caption: 'Application status' },
 ];
 
 export default function StatusPage() {
@@ -93,6 +90,28 @@ export default function StatusPage() {
                 </div>
               )
             )}
+          </div>
+
+          <div className="mt-6 border-t border-slate-700/40 pt-5">
+            <p className="text-center text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              More services coming soon
+            </p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {comingSoonTiles.map((tile) => (
+                <div
+                  key={tile.label}
+                  className="flex items-center justify-between rounded-xl border border-slate-700/40 bg-slate-950/25 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-slate-300">{tile.label}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{tile.caption}</p>
+                  </div>
+                  <span className="rounded-full border border-slate-600/50 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.08em] text-slate-500">
+                    Coming soon
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>

@@ -73,7 +73,7 @@ export default function TrackCasesPage() {
   const [inputValue, setInputValue] = useState('');
   const [error, setError] = useState('');
   const [hasAccount, setHasAccount] = useState(false);
-  const [accountEmail, setAccountEmail] = useState('');
+  const [showStorageNotice, setShowStorageNotice] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -93,7 +93,11 @@ export default function TrackCasesPage() {
         const storedCaseIds = localStorage.getItem('trackedCaseIds');
         const storedTrackedOrderCases = localStorage.getItem('trackedOrderCases');
         const storedUserId = localStorage.getItem('userId');
-        const storedUserEmail = localStorage.getItem('userEmail');
+
+        if (!localStorage.getItem('trackCasesStorageNoticeSeen')) {
+          setShowStorageNotice(true);
+          localStorage.setItem('trackCasesStorageNoticeSeen', 'true');
+        }
 
         setHasAccount(Boolean(storedUserId));
         setUserId(storedUserId);
@@ -112,10 +116,6 @@ export default function TrackCasesPage() {
           } catch (loadError) {
             console.error('Error parsing tracked order cases:', loadError);
           }
-        }
-
-        if (storedUserEmail) {
-          setAccountEmail(storedUserEmail);
         }
 
         setCaseTypeLoading(true);
@@ -141,7 +141,6 @@ export default function TrackCasesPage() {
 
         setCaseIds(userCaseIds);
         setTrackedOrderCases(userTrackedOrderCases);
-        setAccountEmail(data.user.email || storedUserEmail || '');
         localStorage.setItem('trackedCaseIds', JSON.stringify(userCaseIds));
         localStorage.setItem('trackedOrderCases', JSON.stringify(userTrackedOrderCases));
       } catch (loadError) {
@@ -165,11 +164,6 @@ export default function TrackCasesPage() {
     () => trackedOrderCases.map((trackedCase) => trackedCase.trackingKey),
     [trackedOrderCases]
   );
-  const accountCaption = useMemo(() => {
-    if (!hasAccount) return 'Saved on this device only';
-    return accountEmail ? `Synced as ${accountEmail}` : 'Synced across devices';
-  }, [accountEmail, hasAccount]);
-
   useEffect(() => {
     let mounted = true;
 
@@ -362,7 +356,7 @@ export default function TrackCasesPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:min-w-[320px]">
+          <div className="sm:min-w-[320px]">
             <div className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
               <p className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">
                 Tracked Items
@@ -372,17 +366,25 @@ export default function TrackCasesPage() {
                 {caseIds.length} schedule case IDs and {trackedOrderCases.length} order watchers
               </p>
             </div>
-            <div className="rounded-3xl border border-slate-700/40 bg-slate-950/40 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">
-                Storage
-              </p>
-              <p className="mt-2 text-base font-semibold text-slate-100">{accountCaption}</p>
-              <p className="mt-1 text-sm text-slate-400">
-                Changes save automatically when you add or remove tracked cases.
-              </p>
-            </div>
           </div>
         </div>
+
+        {showStorageNotice && (
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-xl border border-cyan-400/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+            <span>
+              {hasAccount
+                ? 'Tracking changes sync automatically with your account.'
+                : 'Tracking changes are saved automatically on this device.'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowStorageNotice(false)}
+              className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/10"
+            >
+              Got it
+            </button>
+          </div>
+        )}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
           <div className="glass-card-lg overflow-hidden">
@@ -592,28 +594,6 @@ export default function TrackCasesPage() {
           </div>
 
           <aside className="space-y-6">
-            <div className="glass-card-lg p-5 sm:p-6">
-              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                Tracking Modes
-              </p>
-              <div className="mt-4 space-y-4">
-                <div className="rounded-2xl border border-cyan-400/15 bg-cyan-500/10 p-4">
-                  <h4 className="text-sm font-semibold text-cyan-100">Schedule Tracking</h4>
-                  <p className="mt-2 text-sm leading-6 text-cyan-100/75">
-                    Filters the live court schedule around the case IDs you save and drives
-                    schedule-related alerts for those entries.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-indigo-400/15 bg-indigo-500/10 p-4">
-                  <h4 className="text-sm font-semibold text-indigo-100">Order / Judgment Tracking</h4>
-                  <p className="mt-2 text-sm leading-6 text-indigo-100/75">
-                    Watches the orders feed for new entries tied to the saved case type, number,
-                    and year combination.
-                  </p>
-                </div>
-              </div>
-            </div>
-
             <div className="glass-card-lg p-5 sm:p-6">
               <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
                 Current Status

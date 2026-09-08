@@ -9,6 +9,7 @@ interface NotificationsPanelProps {
   trackedCaseIds?: string[];
   trackedOrderTrackingKeys?: string[];
   userId?: string | null;
+  onUnreadCountChange?: (count: number) => void;
 }
 
 function downloadBase64(filename: string, base64: string, mime: string) {
@@ -30,6 +31,7 @@ export default function NotificationsPanel({
   trackedCaseIds = [],
   trackedOrderTrackingKeys = [],
   userId,
+  onUnreadCountChange,
 }: NotificationsPanelProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,15 @@ export default function NotificationsPanel({
       const data = await response.json();
       if (data.success) {
         setNotifications(data.notifications);
-        setUnreadCount(data.notifications.filter((n: Notification) => !n.read).length);
+        const unreadIds = data.notifications
+          .filter((notification: Notification) => !notification.read)
+          .map((notification: Notification) => notification._id!)
+          .filter(Boolean);
+        setUnreadCount(unreadIds.length);
+        onUnreadCountChange?.(unreadIds.length);
+        if (unreadIds.length > 0) {
+          await markAsRead(unreadIds);
+        }
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
@@ -103,6 +113,7 @@ export default function NotificationsPanel({
         body: JSON.stringify({ notificationIds, read: true }),
       });
       if (response.ok) {
+        onUnreadCountChange?.(0);
         fetchNotifications();
       }
     } catch (error) {

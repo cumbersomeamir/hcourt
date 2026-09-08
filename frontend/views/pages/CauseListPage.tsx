@@ -768,10 +768,13 @@ export default function CauseListPage() {
                 <button
                   type="button"
                   onClick={loadMediationData}
-                  className="rounded-lg border border-slate-400/40 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/70 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/35 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-400/20 hover:border-cyan-300/70 disabled:opacity-60"
                   disabled={loadingMediation}
                 >
-                  {loadingMediation ? 'Loading...' : 'Refresh Lists'}
+                  <svg className={`h-4 w-4 ${loadingMediation ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  {loadingMediation ? 'Refreshing...' : 'Refresh latest lists'}
                 </button>
               </div>
 

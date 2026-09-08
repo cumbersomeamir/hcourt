@@ -24,21 +24,14 @@ export default function WebDiaryPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load current date's data on mount
-    fetchDiaryData(currentDay, currentMonth, currentYear);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    // When month/year changes, reset to day 1 and fetch
     if (month && year) {
       const newDay = parseInt(day);
-      if (newDay && newDay >= 1 && newDay <= 31) {
+      if (newDay && newDay >= 1 && newDay <= getDaysInMonth(parseInt(month), parseInt(year))) {
         fetchDiaryData(newDay, parseInt(month), parseInt(year));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [month, year]);
+  }, [day, month, year]);
 
   const fetchDiaryData = async (selectedDay: number, selectedMonth: number, selectedYear: number) => {
     try {
@@ -52,11 +45,7 @@ export default function WebDiaryPage() {
       const data = await response.json();
 
       if (data.success && data.data) {
-        if (data.data.notifications && data.data.notifications.length > 0) {
-          setNotifications(data.data.notifications);
-        } else {
-          setError('No notifications available for this date.');
-        }
+        setNotifications(data.data.notifications || []);
       } else {
         setError(data.error || 'Failed to fetch diary data');
       }
@@ -70,10 +59,6 @@ export default function WebDiaryPage() {
 
   const handleDateChange = (newDay: string) => {
     setDay(newDay);
-    const dayNum = parseInt(newDay);
-    if (dayNum && dayNum >= 1 && dayNum <= 31 && month && year) {
-      fetchDiaryData(dayNum, parseInt(month), parseInt(year));
-    }
   };
 
   const monthNames = [
@@ -142,8 +127,12 @@ export default function WebDiaryPage() {
               <select
                 value={month}
                 onChange={(e) => {
-                  setMonth(e.target.value);
-                  setDay('1');
+                  const nextMonth = e.target.value;
+                  setMonth(nextMonth);
+                  setDay((currentDay) => Math.min(
+                    parseInt(currentDay),
+                    getDaysInMonth(parseInt(nextMonth), parseInt(year))
+                  ).toString());
                 }}
                 className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               >
@@ -159,8 +148,12 @@ export default function WebDiaryPage() {
               <select
                 value={year}
                 onChange={(e) => {
-                  setYear(e.target.value);
-                  setDay('1');
+                  const nextYear = e.target.value;
+                  setYear(nextYear);
+                  setDay((currentDay) => Math.min(
+                    parseInt(currentDay),
+                    getDaysInMonth(parseInt(month), parseInt(nextYear))
+                  ).toString());
                 }}
                 className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
               >

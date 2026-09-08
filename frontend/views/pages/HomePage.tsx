@@ -485,31 +485,18 @@ export default function Home() {
                   </svg>
                   Status
                 </a>
-                <Link href="/ai-chat" className={`${desktopNavItemClass} border-blue-400/20 text-blue-100 hover:border-blue-300/40`} title="Open AI Chat">
-                  <svg className="w-4 h-4 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 10h8M8 14h5M7 4h10a3 3 0 013 3v6a3 3 0 01-3 3h-4l-4 4v-4H7a3 3 0 01-3-3V7a3 3 0 013-3z"
-                    />
-                  </svg>
-                  AI Chat
-                </Link>
-                <Link href="/my-cases" className={`${desktopNavItemClass} border-cyan-400/20 text-cyan-100 hover:border-cyan-300/40`} title="View saved cases">
-                  <svg className="w-4 h-4 text-cyan-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5V4H2v16h5" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20h6M8 8h8M8 12h5" />
-                  </svg>
-                  My Cases
-                </Link>
-                <a href="/track-cases" className={`${desktopNavItemClass} border-emerald-400/20 text-emerald-100 hover:border-emerald-300/40`} title="Manage tracked cases">
-                  <svg className="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                  {totalTrackedItems > 0 ? `Tracked (${totalTrackedItems})` : 'Track Cases'}
-                </a>
+                <details className="relative">
+                  <summary className={`${desktopNavItemClass} cursor-pointer list-none border-slate-600/40 hover:border-slate-400/40`}>
+                    More
+                  </summary>
+                  <div className="absolute left-0 z-20 mt-2 grid w-44 gap-1 rounded-xl border border-slate-700/60 bg-slate-950/95 p-2 shadow-xl backdrop-blur">
+                    <Link href="/ai-chat" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">AI Chat</Link>
+                    <Link href="/my-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">My Cases</Link>
+                    <a href="/track-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+                      {totalTrackedItems > 0 ? `Tracked (${totalTrackedItems})` : 'Track Cases'}
+                    </a>
+                  </div>
+                </details>
                 <button onClick={() => fetchSchedule(true)} disabled={loading} className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}>
                   <svg className={`w-4 h-4 text-slate-200 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -687,6 +674,7 @@ export default function Home() {
         trackedCaseIds={trackedCaseIds}
         trackedOrderTrackingKeys={trackedOrderTrackingKeys}
         userId={userId}
+        onUnreadCountChange={setUnreadCount}
       />
 
       <CaseIdModal

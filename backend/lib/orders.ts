@@ -501,7 +501,16 @@ async function fetchCaseTypesLive(source: OrdersSourceConfig): Promise<CaseTypeO
 
 export async function fetchCaseTypes(city?: string): Promise<CaseTypeOption[]> {
   const source = getSourceConfig(city);
-  const cached = await getCachedCaseTypes(source);
+  let cached: Awaited<ReturnType<typeof getCachedCaseTypes>> = null;
+  try {
+    cached = await getCachedCaseTypes(source);
+  } catch (error) {
+    console.warn(
+      `[orders] Could not read ${source.city} case types cache: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
   const cacheTtlMs = getCaseTypesCacheTtlMs();
   const now = Date.now();
 
@@ -514,7 +523,15 @@ export async function fetchCaseTypes(city?: string): Promise<CaseTypeOption[]> {
 
   try {
     const liveTypes = await fetchCaseTypesLive(source);
-    await cacheCaseTypes(source, liveTypes);
+    try {
+      await cacheCaseTypes(source, liveTypes);
+    } catch (error) {
+      console.warn(
+        `[orders] Could not cache ${source.city} case types: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
     return liveTypes;
   } catch (error) {
     if (cached?.types.length) {
