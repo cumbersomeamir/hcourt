@@ -607,8 +607,8 @@ async function fetchCounselRows(input: {
     cookieJar,
   });
 
-  const maxImages = 3;
-  const maxCodesPerImage = 8;
+  const maxImages = 1;
+  const maxCodesPerImage = 1;
 
   for (let imageAttempt = 1; imageAttempt <= maxImages; imageAttempt++) {
     const captchaResponse = await fetchSource(`${CAPTCHA_URL}?_t=${Date.now()}${imageAttempt}`, {
