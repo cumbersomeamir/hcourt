@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { Agent } from 'undici';
+import { getDb } from '@/lib/mongodb';
+import { getLatestWebDiarySnapshot, saveWebDiarySnapshot } from '@/lib/aiStore';
 
 // Ensure this is server-only
 export const runtime = 'nodejs';
@@ -68,6 +70,7 @@ function isSelectedDateLabel(label: string, day: number, month: number, year: nu
 }
 
 export async function GET(request: Request) {
+  let cacheDate = '';
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
@@ -79,6 +82,20 @@ export async function GET(request: Request) {
     const requestedYear = parseYear(year);
     const requestedMonthName =
       requestedMonthNumber !== null ? MONTH_NAMES[requestedMonthNumber - 1] : month?.trim() || '';
+
+    if (date && /^\d{1,2}$/.test(date) && requestedMonthNumber && requestedYear) {
+      cacheDate = `${parseInt(date, 10)}/${requestedMonthNumber}/${requestedYear}`;
+      try {
+        const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
+        if (snapshot && Date.now() - snapshot.fetchedAt.getTime() <= 10 * 60 * 1000) {
+          return NextResponse.json({
+            success: true,
+            data: { notifications: snapshot.notifications },
+            meta: { cached: true, cachedAt: snapshot.fetchedAt.toISOString() },
+          });
+        }
+      } catch {}
+    }
 
     if (requestedMonthName && requestedYear !== null) {
       url += `?month=${encodeURIComponent(requestedMonthName)}&year=${requestedYear}`;
@@ -115,6 +132,7 @@ export async function GET(request: Request) {
       calendar: [],
       diaryLinks: [],
     };
+    let dateDataLoaded = false;
 
     // Extract month options
     $('select[name="month"] option').each((_, el) => {
@@ -181,6 +199,7 @@ export async function GET(request: Request) {
       }
 
       if (dayNum && monthNum && yearNum) {
+        cacheDate = cacheDate || `${dayNum}/${monthNum}/${yearNum}`;
         const monthName = MONTH_NAMES[monthNum - 1];
         const frameUrl =
           `${WEB_DIARY_BASE_URL}/calendar/frame.jsp?` +
@@ -206,6 +225,16 @@ export async function GET(request: Request) {
             // If timeout or network error, log and continue with empty data
             if (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('timeout'))) {
               console.error(`Timeout fetching diary for date ${dayNum}/${monthNum}/${yearNum}`);
+              try {
+                const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
+                if (snapshot) {
+                  return NextResponse.json({
+                    success: true,
+                    data: { notifications: snapshot.notifications },
+                    meta: { cached: true, cachedAt: snapshot.fetchedAt.toISOString() },
+                  });
+                }
+              } catch {}
               calendarData.diaryLinks = [];
               calendarData.notifications = [];
               return NextResponse.json({
@@ -326,6 +355,7 @@ export async function GET(request: Request) {
 
             calendarData.diaryLinks = links;
             calendarData.notifications = notifications;
+            dateDataLoaded = true;
           }
         } catch (err) {
           console.error('Error fetching date-specific diary:', err);
@@ -337,12 +367,40 @@ export async function GET(request: Request) {
       }
     }
 
+    if (cacheDate && dateDataLoaded) {
+      try {
+        await saveWebDiarySnapshot(await getDb(), {
+          date: cacheDate,
+          notifications: calendarData.notifications || [],
+        });
+      } catch {}
+    } else if (cacheDate) {
+      try {
+        const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
+        if (snapshot) {
+          calendarData.notifications = snapshot.notifications;
+        }
+      } catch {}
+    }
+
     return NextResponse.json({
       success: true,
       data: calendarData,
     });
   } catch (error) {
     console.error('Error fetching web diary:', error);
+    if (cacheDate) {
+      try {
+        const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
+        if (snapshot) {
+          return NextResponse.json({
+            success: true,
+            data: { notifications: snapshot.notifications },
+            meta: { cached: true, cachedAt: snapshot.fetchedAt.toISOString() },
+          });
+        }
+      } catch {}
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

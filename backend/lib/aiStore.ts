@@ -119,6 +119,7 @@ async function ensureIndexes(db: Db, collectionName: string) {
       await Promise.all([
         collection.createIndex({ snapshotKey: 1 }, { unique: true }),
         collection.createIndex({ caseKey: 1, fetchedAt: -1 }),
+        collection.createIndex({ fetchedAt: 1 }, { expireAfterSeconds: 172800 }),
       ]);
       break;
     }
@@ -135,6 +136,7 @@ async function ensureIndexes(db: Db, collectionName: string) {
       await Promise.all([
         collection.createIndex({ snapshotKey: 1 }, { unique: true }),
         collection.createIndex({ date: 1, fetchedAt: -1 }),
+        collection.createIndex({ fetchedAt: 1 }, { expireAfterSeconds: 172800 }),
       ]);
       break;
     }
@@ -282,6 +284,22 @@ export async function saveStatusSnapshot(
   });
 }
 
+export async function getLatestStatusSnapshot(
+  db: Db,
+  input: { city: 'lucknow' | 'allahabad'; caseType: string; caseNo: string; caseYear: string }
+) {
+  await ensureIndexes(db, 'status_snapshots');
+  return db.collection<StatusSnapshotDoc>('status_snapshots').findOne(
+    {
+      city: input.city,
+      caseType: input.caseType,
+      caseNo: input.caseNo,
+      caseYear: input.caseYear,
+    },
+    { sort: { fetchedAt: -1 } }
+  );
+}
+
 export async function saveCauseListSnapshot(
   db: Db,
   input: {
@@ -328,6 +346,14 @@ export async function saveWebDiarySnapshot(
     fetchedAt,
     notifications: input.notifications,
   });
+}
+
+export async function getLatestWebDiarySnapshot(db: Db, date: string) {
+  await ensureIndexes(db, 'web_diary_snapshots');
+  return db.collection<WebDiarySnapshotDoc>('web_diary_snapshots').findOne(
+    { date },
+    { sort: { fetchedAt: -1 } }
+  );
 }
 
 export async function upsertCaseLatestSummary(

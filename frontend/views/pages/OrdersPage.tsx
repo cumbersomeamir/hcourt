@@ -23,6 +23,8 @@ type OrdersResult = {
   };
   pdf: { filename: string; base64: string };
   excel: { filename: string; base64: string };
+  servedFromCache?: boolean;
+  cachedAt?: string;
   orderJudgments?: Array<{
     srNo: number;
     date: string;
@@ -587,6 +589,11 @@ export default function OrdersPage() {
 
         {result && (
           <div className="glass-card p-4 sm:p-6">
+            {result.servedFromCache && (
+              <div className="mb-4 rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                Showing the last successful court response while the source is slow.
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
               <div className="min-w-0">
                 <h2 className="text-lg sm:text-xl font-bold text-slate-100">
@@ -605,13 +612,15 @@ export default function OrdersPage() {
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
-                <button
-                  onClick={() => downloadBase64(result.pdf.filename, result.pdf.base64, 'application/pdf')}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-sky-300 hover:bg-sky-500/25 w-full sm:w-auto"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  Download PDF
-                </button>
+                {result.pdf.base64 && (
+                  <button
+                    onClick={() => downloadBase64(result.pdf.filename, result.pdf.base64, 'application/pdf')}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-sky-300 hover:bg-sky-500/25 w-full sm:w-auto"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Download PDF
+                  </button>
+                )}
               </div>
             </div>
 
