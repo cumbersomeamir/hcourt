@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { Agent } from 'undici';
 
 // Ensure this is server-only
 export const runtime = 'nodejs';
@@ -7,6 +8,20 @@ export const dynamic = 'force-dynamic';
 
 const WEB_DIARY_URL = 'https://www.allahabadhighcourt.in/calendar/dateWise.jsp';
 const WEB_DIARY_BASE_URL = 'https://www.allahabadhighcourt.in';
+const WEB_DIARY_AGENT = new Agent({ connect: { timeout: 30_000 } });
+
+async function fetchWebDiary(url: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await fetch(url, { ...init, dispatcher: WEB_DIARY_AGENT } as RequestInit);
+    } catch (error) {
+      lastError = error;
+      if (attempt === 3) throw error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Web diary request failed');
+}
 const MONTH_NAMES = [
   'January',
   'February',
@@ -69,7 +84,7 @@ export async function GET(request: Request) {
       url += `?month=${encodeURIComponent(requestedMonthName)}&year=${requestedYear}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetchWebDiary(url, {
       cache: 'no-store',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -178,7 +193,7 @@ export async function GET(request: Request) {
           
           let dateResponse: Response;
           try {
-            dateResponse = await fetch(frameUrl, {
+            dateResponse = await fetchWebDiary(frameUrl, {
               signal: controller.signal,
               cache: 'no-store',
               headers: {
