@@ -15,7 +15,8 @@ function buildUpstreamUrl(pathname: string, requestUrl?: string): string {
 
 export async function proxyOrdersRequest(
   request: Request,
-  pathname: string
+  pathname: string,
+  unavailableMessage = 'Orders service is temporarily unavailable. Please retry shortly.'
 ): Promise<Response> {
   const headers = new Headers();
   const contentType = request.headers.get('content-type');
@@ -43,7 +44,7 @@ export async function proxyOrdersRequest(
       {
         success: false,
         code: 'backend_unreachable',
-        error: 'Orders service is temporarily unavailable. Please retry shortly.',
+        error: unavailableMessage,
         details: error instanceof Error ? error.message : 'Unknown upstream error',
       },
       { status: 502 }
