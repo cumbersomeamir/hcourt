@@ -11,6 +11,7 @@ import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
+import { Agent } from 'undici';
 
 const USER_AGENT = 'Mozilla/5.0';
 const BASE_URL = 'https://www.allahabadhighcourt.in/causelist';
@@ -19,15 +20,20 @@ const INPUT2_URL = `${BASE_URL}/input2A.jsp`;
 const VIEW_LIST_URL = `${BASE_URL}/viewlistA.jsp`;
 const CAPTCHA_URL = `${BASE_URL}/test`;
 const COUNSEL_RESULT_URL = `${BASE_URL}/counselSearchResult.jsp`;
+const SOURCE_AGENT = new Agent({ connect: { timeout: 30_000 } });
 
 async function fetchSource(url: string, init?: RequestInit): Promise<Response> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20_000);
+    const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
+      const response = await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        dispatcher: SOURCE_AGENT,
+      } as RequestInit);
       if (response.status < 500 || attempt === 3) return response;
       await response.body?.cancel();
     } catch (error) {
