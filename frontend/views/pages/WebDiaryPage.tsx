@@ -10,6 +10,8 @@ interface Notification {
   allLinks?: Array<{ type: string; link: string }>;
 }
 
+type Bench = 'allahabad' | 'lucknow';
+
 export default function WebDiaryPage() {
   const currentDate = new Date();
   const currentDay = currentDate.getDate();
@@ -19,39 +21,48 @@ export default function WebDiaryPage() {
   const [month, setMonth] = useState<string>(currentMonth.toString());
   const [year, setYear] = useState<string>(currentYear.toString());
   const [day, setDay] = useState<string>(currentDay.toString());
+  const [bench, setBench] = useState<Bench>('allahabad');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (month && year) {
       const newDay = parseInt(day);
       if (newDay && newDay >= 1 && newDay <= getDaysInMonth(parseInt(month), parseInt(year))) {
-        fetchDiaryData(newDay, parseInt(month), parseInt(year));
+        fetchDiaryData(newDay, parseInt(month), parseInt(year), bench);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [day, month, year]);
+  }, [day, month, year, bench]);
 
-  const fetchDiaryData = async (selectedDay: number, selectedMonth: number, selectedYear: number) => {
+  const fetchDiaryData = async (
+    selectedDay: number,
+    selectedMonth: number,
+    selectedYear: number,
+    selectedBench: Bench = bench
+  ) => {
     try {
       setLoading(true);
       setError(null);
+      setWarning(null);
       setNotifications([]);
 
       const response = await fetch(
-        `/api/web-diary?date=${selectedDay}&month=${selectedMonth}&year=${selectedYear}`
+        `/api/web-diary?date=${selectedDay}&month=${selectedMonth}&year=${selectedYear}&bench=${selectedBench}`
       );
       const data = await response.json();
 
       if (data.success && data.data) {
         setNotifications(data.data.notifications || []);
+        setWarning(data.meta?.warning || null);
       } else {
-        setError(data.error || 'Failed to fetch diary data');
+        setError(`Connection issue from the official court website. The court server may be unavailable. ${data.error || 'Please try again shortly.'}`);
       }
     } catch (err) {
       console.error('Error fetching diary data:', err);
-      setError('Failed to load diary data. Please try again.');
+      setError('Connection issue from the official court website. The court server may be unavailable. Please try again shortly.');
     } finally {
       setLoading(false);
     }
@@ -105,7 +116,20 @@ export default function WebDiaryPage() {
 
         {/* Date Selector */}
         <div className="glass-card p-4 sm:p-5 mb-5 sm:mb-6">
-          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4">
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
+                Court
+              </label>
+              <select
+                value={bench}
+                onChange={(e) => setBench(e.target.value as Bench)}
+                className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-2 sm:px-3 py-2 sm:py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
+              >
+                <option value="allahabad">Allahabad Bench</option>
+                <option value="lucknow">Lucknow Bench</option>
+              </select>
+            </div>
             <div>
               <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
                 Day
@@ -168,13 +192,16 @@ export default function WebDiaryPage() {
         {/* Notifications */}
         <div className="glass-card p-4 sm:p-6">
           <h2 className="text-lg sm:text-xl font-bold text-slate-100 mb-4">
-            Notifications for {day} {monthNames[parseInt(month) - 1]} {year}
+            {bench === 'lucknow' ? 'Lucknow Bench' : 'Allahabad Bench'} notifications for {day} {monthNames[parseInt(month) - 1]} {year}
           </h2>
 
           {loading ? (
             <div className="flex flex-col items-center justify-center py-10">
               <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
-              <div className="text-slate-400 text-sm">Loading notifications...</div>
+              <div className="text-slate-300 text-sm font-medium">
+                Connecting to the official {bench === 'lucknow' ? 'Lucknow Bench' : 'Allahabad Bench'} court diary...
+              </div>
+              <div className="mt-1 text-xs text-slate-500">Fetching directly from the court website</div>
             </div>
           ) : error ? (
             <div className="text-center py-10">
@@ -185,11 +212,15 @@ export default function WebDiaryPage() {
               </div>
               <div className="text-red-400 text-sm mb-3">{error}</div>
               <button
-                onClick={() => fetchDiaryData(parseInt(day), parseInt(month), parseInt(year))}
+                onClick={() => fetchDiaryData(parseInt(day), parseInt(month), parseInt(year), bench)}
                 className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
               >
                 Retry
               </button>
+            </div>
+          ) : warning ? (
+            <div className="text-center py-10 text-amber-300 text-sm">
+              Connection issue from the official court website. The court server may be unavailable. {warning}
             </div>
           ) : notifications.length > 0 ? (
             <div className="space-y-3">

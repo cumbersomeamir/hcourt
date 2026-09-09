@@ -70,9 +70,6 @@ export default function NotificationsPanel({
           .filter(Boolean);
         setUnreadCount(unreadIds.length);
         onUnreadCountChange?.(unreadIds.length);
-        if (unreadIds.length > 0) {
-          await markAsRead(unreadIds);
-        }
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);

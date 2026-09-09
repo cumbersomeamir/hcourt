@@ -5,7 +5,10 @@ import { useState, useEffect, useMemo } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import CaseIdModal from '@/views/components/CaseIdModal';
+import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 import { CourtCase, TrackedOrderCase } from '@/types/court';
+
+type CourtBench = 'allahabad' | 'lucknow';
 
 function buildOrderTrackingKey(params: {
   city: string;
@@ -63,6 +66,7 @@ export default function Home() {
   const [courts, setCourts] = useState<CourtCase[]>([]);
   const [filteredCourts, setFilteredCourts] = useState<CourtCase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [courtBench, setCourtBench] = useState<CourtBench>('lucknow');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [scheduleDate, setScheduleDate] = useState<string>('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -93,6 +97,7 @@ export default function Home() {
     return Array.from(new Set(normalized));
   }, [trackedCaseIds, derivedTrackedCaseIdsFromOrders]);
   const totalTrackedItems = trackedCaseIds.length + trackedOrderCases.length;
+  const courtBenchLabel = courtBench === 'allahabad' ? 'Allahabad Bench' : 'Lucknow Bench';
   const hasTrackedScheduleCases = effectiveTrackedCaseIds.length > 0;
   const shouldApplyScheduleFilter = scheduleFilterEnabled && hasTrackedScheduleCases;
   const desktopNavItemClass =
@@ -106,6 +111,7 @@ export default function Home() {
     try {
       setError(null);
       const params = new URLSearchParams();
+      params.set('bench', courtBench);
       if (force) {
         params.append('force', 'true');
       }
@@ -116,9 +122,7 @@ export default function Home() {
         params.append('userId', userId);
       }
 
-      const url = force || shouldApplyScheduleFilter || (scheduleFilterEnabled && userId)
-        ? `/api/schedule/latest?${params.toString()}`
-        : '/api/schedule/latest';
+      const url = `/api/schedule/latest?${params.toString()}`;
 
       const response = await fetch(url);
       const data = await response.json();
@@ -136,11 +140,11 @@ export default function Home() {
           setFilteredCourts(courtsData);
         }
       } else {
-        setError(data.error || 'Failed to fetch schedule');
+        setError(`Connection issue from the official court website. The court server may be unavailable. ${data.error || 'Please try again shortly.'}`);
       }
     } catch (error) {
       console.error('Error fetching schedule:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch schedule');
+      setError(courtSourceError(error, 'Unable to load the court schedule.'));
     } finally {
       setLoading(false);
     }
@@ -265,7 +269,7 @@ export default function Home() {
       clearInterval(notificationInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
+  }, [courtBench, effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
 
   useEffect(() => {
     if (courts.length > 0 && !searchTerm) {
@@ -400,7 +404,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </span>
-              <span className="text-base font-semibold text-slate-100">{loading ? 'Loading...' : 'Refresh'}</span>
+              <span className="text-base font-semibold text-slate-100">{loading ? 'Connecting to court...' : 'Refresh'}</span>
             </button>
             <button
               onClick={() => {
@@ -446,10 +450,10 @@ export default function Home() {
                     </div>
                     <div className="min-w-0">
                       <h1 className="truncate text-2xl font-semibold tracking-[-0.03em] text-slate-50">
-                        High Court of Judicature at Allahabad
+                        {courtBenchLabel} Court View
                       </h1>
                       <p className="mt-1 text-sm text-slate-400">
-                        Lucknow Bench &mdash; Online Court Activity Digital Display Board
+                        Live data source: {courtBenchLabel} court activity board
                       </p>
                     </div>
                   </div>
@@ -501,7 +505,7 @@ export default function Home() {
                   <svg className={`w-4 h-4 text-slate-200 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {loading ? 'Loading...' : 'Refresh'}
+                  {loading ? 'Connecting to court...' : 'Refresh'}
                 </button>
                 <button onClick={() => setNotificationsOpen(true)} className={`${desktopNavItemClass} border-sky-400/20 text-sky-100 hover:border-sky-300/40`}>
                   <svg className="w-4 h-4 text-sky-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -529,19 +533,41 @@ export default function Home() {
                 Court View
                 </p>
                 <h1 className="mt-3 max-w-3xl text-3xl sm:text-[2.6rem] font-bold leading-[1.05] tracking-[-0.03em] text-slate-50">
-                  High Court of Judicature at Allahabad
+                  {courtBenchLabel} Court View
                 </h1>
                 <p className="mt-3 max-w-2xl text-sm sm:text-base text-slate-400">
-                  Lucknow Bench &mdash; Online Court Activity Digital Display Board
+                  Live data source: {courtBenchLabel} court activity board
                 </p>
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
                 <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Display Mode</p>
-                  <p className="mt-2 text-sm font-semibold text-slate-100">
-                    {shouldApplyScheduleFilter ? 'Tracked cases only' : 'All courts visible'}
+                  <label className="text-[11px] uppercase tracking-[0.24em] text-slate-500" htmlFor="court-bench">
+                    Court Bench
+                  </label>
+                  <select
+                    id="court-bench"
+                    value={courtBench}
+                    onChange={(event) => {
+                      setCourts([]);
+                      setFilteredCourts([]);
+                      setLoading(true);
+                      setCourtBench(event.target.value as CourtBench);
+                    }}
+                    className="mt-2 w-full bg-transparent text-sm font-semibold text-slate-100 outline-none"
+                  >
+                    <option value="allahabad" className="bg-slate-900">Allahabad Bench</option>
+                    <option value="lucknow" className="bg-slate-900">Lucknow Bench</option>
+                  </select>
+                </div>
+                <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Update</p>
+                  <p className="mt-2 text-sm font-semibold text-emerald-300">
+                    {loading ? 'Checking court server...' : lastUpdated ? 'Court data updated' : 'Waiting for court data'}
                   </p>
+                  {lastUpdated && (
+                    <p className="mt-1 text-xs text-slate-500">{lastUpdated.toLocaleTimeString()}</p>
+                  )}
                 </div>
                 <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                   <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Tracked Matters</p>
@@ -613,9 +639,8 @@ export default function Home() {
         </div>
 
         {loading && courts.length === 0 ? (
-          <div className="glass-card p-12 flex flex-col items-center justify-center">
-            <div className="w-8 h-8 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-4"></div>
-            <div className="text-slate-400 text-sm">Loading court schedule...</div>
+          <div className="glass-card p-12">
+            <CourtSourceLoader label={`the live ${courtBenchLabel} court schedule`} />
           </div>
         ) : error ? (
           <div className="glass-card p-12 flex flex-col items-center justify-center">

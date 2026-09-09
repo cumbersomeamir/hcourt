@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
+import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -73,7 +74,7 @@ export default function JudgmentViewerPage(props: {
         setBlobUrl(currentBlobUrl);
       } catch (loadError) {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : 'Failed to load latest order PDF');
+        setError(courtSourceError(loadError, 'Unable to load the latest order PDF.'));
       } finally {
         if (active) {
           setLoading(false);
@@ -138,8 +139,8 @@ export default function JudgmentViewerPage(props: {
 
         <div className="overflow-hidden rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 shadow-[0_30px_80px_rgba(2,6,23,0.35)]">
           {loading ? (
-            <div className="flex min-h-[70vh] items-center justify-center text-sm text-slate-400">
-              Loading latest order PDF...
+            <div className="min-h-[70vh]">
+              <CourtSourceLoader label="the latest court order PDF" className="min-h-[70vh] px-6" />
             </div>
           ) : error ? (
             <div className="flex min-h-[70vh] items-center justify-center px-6 text-sm text-red-300">

@@ -166,7 +166,7 @@ export default function WorkspaceNavigation({
     <>
       <button
         onClick={() => setMobileNavOpen((open) => !open)}
-        className="fixed right-4 top-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/80 text-slate-100 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-xl lg:hidden"
+        className="fixed right-4 top-4 z-50 inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-700/60 bg-slate-950/80 text-slate-100 shadow-[0_18px_40px_rgba(2,6,23,0.45)] backdrop-blur-xl xl:hidden"
         aria-label="Toggle navigation menu"
         aria-expanded={mobileNavOpen}
       >
@@ -183,13 +183,13 @@ export default function WorkspaceNavigation({
       {mobileNavOpen && (
         <>
           <div
-            className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-200 lg:hidden"
+            className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-200 xl:hidden"
             onClick={() => setMobileNavOpen(false)}
             aria-hidden={false}
           />
 
           <aside
-            className="fixed inset-y-0 right-0 z-50 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl lg:hidden"
+            className="fixed inset-y-0 right-0 z-50 flex w-[calc(100vw-1rem)] max-w-sm flex-col overflow-hidden border-l border-slate-700/60 bg-[#081127]/95 shadow-[-24px_0_80px_rgba(2,6,23,0.65)] backdrop-blur-2xl xl:hidden"
             aria-hidden={false}
           >
             <div className="flex items-center justify-between border-b border-slate-800/80 px-5 py-4">
@@ -273,7 +273,7 @@ export default function WorkspaceNavigation({
         </>
       )}
 
-      <div className="hidden lg:flex flex-wrap items-center justify-end gap-2.5">
+      <div className="hidden xl:flex flex-wrap items-center justify-end gap-2.5">
         {primaryNavItems.map((item) => {
           const active = item.key === current;
           return (

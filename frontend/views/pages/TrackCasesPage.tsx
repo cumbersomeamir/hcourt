@@ -6,6 +6,7 @@ import { Cinzel, Manrope } from 'next/font/google';
 import { TrackedOrderCase } from '@/types/court';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
+import { courtSourceError } from '@/views/components/CourtSourceStatus';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -145,6 +146,7 @@ export default function TrackCasesPage() {
         localStorage.setItem('trackedOrderCases', JSON.stringify(userTrackedOrderCases));
       } catch (loadError) {
         console.error('Error loading track cases page:', loadError);
+        if (mounted) setError(courtSourceError(loadError, 'Unable to load court case types.'));
       } finally {
         if (mounted) {
           setCaseTypeLoading(false);
@@ -507,7 +509,7 @@ export default function TrackCasesPage() {
                     className="rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                   >
                     <option value="">
-                      {caseTypeLoading ? 'Loading case types...' : 'Select case type'}
+                      {caseTypeLoading ? 'Connecting to court for case types...' : 'Select case type'}
                     </option>
                     {caseTypeOptions.map((option) => (
                       <option key={option.value} value={option.value}>

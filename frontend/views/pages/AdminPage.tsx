@@ -207,18 +207,18 @@ export default function AdminPage() {
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-amber-300/75">Admin</p>
             <h1 className={`mt-3 text-3xl font-semibold text-slate-100 sm:text-4xl ${cinzel.className}`}>
-              Data Map
+              Admin Setup
             </h1>
             <p className="mt-3 max-w-3xl text-sm text-slate-300 sm:text-base">
-              Visual map of which collections power which features, plus the lawyer profile that
-              AI uses for assignment-style questions.
+              Manage the lawyer profile that powers AI checks, then use the technical data map
+              only when you need to inspect storage and feature health.
             </p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-5">
               <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/70">
-                Collections
+                Storage Health
               </p>
               <p className="mt-3 text-3xl font-semibold text-cyan-100">
                 {overview?.collections.length || 0}
@@ -271,7 +271,7 @@ export default function AdminPage() {
                     Lawyer Profile
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold text-slate-100">
-                    Counsel identity used by AI
+                    Your professional profile for AI checks
                   </h2>
                 </div>
                 <p className="text-sm text-slate-400">
@@ -376,19 +376,79 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section>
-              <div className="mb-5">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Features</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-100">
-                  Feature to collection map
+            <section className="grid gap-4 lg:grid-cols-2">
+              <article className="rounded-3xl border border-cyan-400/20 bg-cyan-500/10 p-6">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-200/70">
+                  Case Tracking
+                </p>
+                <h2 className="mt-2 text-xl font-semibold text-cyan-100">
+                  Manage your saved cases
                 </h2>
-              </div>
-              <div className="grid gap-4 xl:grid-cols-2">
-                {overview?.features.map((feature) => (
-                  <article
-                    key={feature.id}
-                    className="rounded-3xl border border-slate-800/80 bg-[#0a132b]/92 p-6"
+                <p className="mt-3 text-sm text-cyan-100/70">
+                  Add cases to tracking and review the cases currently saved to this account.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  <Link
+                    href="/track-cases"
+                    className="rounded-2xl border border-cyan-300/25 bg-cyan-950/30 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-950/60"
                   >
+                    Track Cases
+                  </Link>
+                  <Link
+                    href="/my-cases"
+                    className="rounded-2xl border border-cyan-300/25 bg-cyan-950/30 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-950/60"
+                  >
+                    View My Cases
+                  </Link>
+                </div>
+              </article>
+
+              <article className="rounded-3xl border border-emerald-400/20 bg-emerald-500/10 p-6">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-emerald-200/70">
+                  Alerts
+                </p>
+                <h2 className="mt-2 text-xl font-semibold text-emerald-100">
+                  Review tracked-case updates
+                </h2>
+                <p className="mt-3 text-sm text-emerald-100/70">
+                  Alerts are generated for changes affecting your tracked cases and orders.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setNotificationsOpen(true)}
+                  className="mt-5 inline-flex rounded-2xl border border-emerald-300/25 bg-emerald-950/30 px-4 py-2 text-sm font-semibold text-emerald-100 transition-colors hover:bg-emerald-950/60"
+                >
+                  Open Alerts
+                </button>
+              </article>
+            </section>
+
+            <details className="rounded-[2rem] border border-slate-800/80 bg-[#0a132b]/92 p-6 shadow-[0_30px_80px_rgba(2,6,23,0.35)] sm:p-8">
+              <summary className="cursor-pointer list-none">
+                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
+                  Technical Admin
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-slate-100">
+                  View data map and storage details
+                </h2>
+                <p className="mt-2 text-sm text-slate-400">
+                  Use this section to inspect feature sources, collections, and stored data.
+                </p>
+              </summary>
+
+              <section className="mt-8">
+                <div className="mb-5">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Features</p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-100">
+                    Feature to collection map
+                  </h3>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {overview?.features.map((feature) => (
+                    <article
+                      key={feature.id}
+                      className="rounded-3xl border border-slate-800/80 bg-[#0a132b]/92 p-6"
+                    >
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
@@ -424,24 +484,24 @@ export default function AdminPage() {
                         </span>
                       ))}
                     </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+                    </article>
+                  ))}
+                </div>
+              </section>
 
-            <section>
-              <div className="mb-5">
-                <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Collections</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-100">
-                  Stored collections by responsibility
-                </h2>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                {overview?.collections.map((collection) => (
-                  <article
-                    key={collection.name}
-                    className="rounded-3xl border border-slate-800/80 bg-[#0a132b]/92 p-5"
-                  >
+              <section className="mt-8">
+                <div className="mb-5">
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Collections</p>
+                  <h3 className="mt-2 text-xl font-semibold text-slate-100">
+                    Stored collections by responsibility
+                  </h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                  {overview?.collections.map((collection) => (
+                    <article
+                      key={collection.name}
+                      className="rounded-3xl border border-slate-800/80 bg-[#0a132b]/92 p-5"
+                    >
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
@@ -479,10 +539,11 @@ export default function AdminPage() {
                         </span>
                       ))}
                     </div>
-                  </article>
-                ))}
-              </div>
-            </section>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            </details>
           </div>
         )}
       </div>

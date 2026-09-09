@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
+import { courtSourceError } from '@/views/components/CourtSourceStatus';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -227,7 +228,7 @@ export default function CauseListPage() {
       setSelectedDate(result.dates[0]?.value || '');
       setInfo(`Loaded ${result.dates.length} listing dates.`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load dates');
+      setError(courtSourceError(e, 'Unable to load listing dates.'));
     } finally {
       setLoadingDates(false);
     }
@@ -256,7 +257,7 @@ export default function CauseListPage() {
         `Loaded mediation lists: Allahabad ${result.allahabad.length}, Lucknow ${result.lucknow.length}.`
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load mediation cause lists');
+      setError(courtSourceError(e, 'Unable to load mediation cause lists.'));
     } finally {
       setLoadingMediation(false);
     }
@@ -307,7 +308,7 @@ export default function CauseListPage() {
         setSelectedCourtNo(result.options[0]?.value || '');
         setInfo('Court numbers loaded. Choose one and click Search.');
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load court numbers');
+        setError(courtSourceError(e, 'Unable to load court numbers.'));
       } finally {
         setLoadingCourtOptions(false);
       }
@@ -351,7 +352,7 @@ export default function CauseListPage() {
       setSelectedPdfUrl(firstLink);
       setInfo(result.links.length > 0 ? `Found ${result.links.length} list PDF link(s).` : 'No PDF links found for this selection.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Court search failed');
+      setError(courtSourceError(e, 'Unable to search the court cause list.'));
     } finally {
       setLoadingSearch(false);
     }
@@ -383,7 +384,7 @@ export default function CauseListPage() {
       downloadBase64File(result.filename, result.mimeType, result.base64);
       setInfo('PDF downloaded.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download PDF');
+      setError(courtSourceError(e, 'Unable to download the court PDF.'));
     } finally {
       setDownloadingPdf(false);
     }
@@ -418,7 +419,7 @@ export default function CauseListPage() {
         counselName: counselName.trim(),
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Counsel search failed');
+      setError(courtSourceError(e, 'Unable to search the court cause list.'));
     } finally {
       setLoadingSearch(false);
     }
@@ -463,7 +464,7 @@ export default function CauseListPage() {
         captchaCode: counselCaptchaCode,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to submit captcha');
+      setError(courtSourceError(e, 'Unable to submit the captcha to the court.'));
     } finally {
       setLoadingSearch(false);
     }
@@ -495,7 +496,7 @@ export default function CauseListPage() {
       downloadBase64File(result.filename, result.mimeType, result.base64);
       setInfo('Mediation list downloaded.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download mediation file');
+      setError(courtSourceError(e, 'Unable to download the mediation list.'));
     } finally {
       setDownloadingMediationUrl(null);
     }
@@ -572,7 +573,7 @@ export default function CauseListPage() {
                     disabled={loadingDates}
                   >
                     <option value="">
-                      {loadingDates ? 'Loading dates...' : 'Select listing date'}
+                      {loadingDates ? 'Connecting to court for dates...' : 'Select listing date'}
                     </option>
                     {dates.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -616,7 +617,7 @@ export default function CauseListPage() {
                   className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
                   disabled={loadingDates || loadingCourtOptions || loadingSearch}
                 >
-                  {loadingCourtOptions ? 'Loading...' : 'Next'}
+                  {loadingCourtOptions ? 'Connecting to court...' : 'Next'}
                 </button>
                 <button
                   type="button"
@@ -655,7 +656,7 @@ export default function CauseListPage() {
                       className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
                       disabled={loadingSearch}
                     >
-                      {loadingSearch ? 'Searching...' : 'Search'}
+                      {loadingSearch ? 'Searching court records...' : 'Search'}
                     </button>
                   </div>
 
@@ -684,7 +685,7 @@ export default function CauseListPage() {
                             className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-60"
                             disabled={downloadingPdf}
                           >
-                            {downloadingPdf ? 'Downloading...' : 'Download PDF'}
+                            {downloadingPdf ? 'Downloading from court...' : 'Download PDF'}
                           </button>
                         </div>
                       )}
@@ -711,7 +712,7 @@ export default function CauseListPage() {
                       className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-400 disabled:opacity-60"
                       disabled={loadingSearch}
                     >
-                      {loadingSearch ? 'Searching...' : 'Search'}
+                      {loadingSearch ? 'Searching court records...' : 'Search'}
                     </button>
                   </div>
 
@@ -736,7 +737,7 @@ export default function CauseListPage() {
                           disabled={loadingSearch || counselCaptchaCode.length < 4}
                           className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 disabled:opacity-60"
                         >
-                          {loadingSearch ? 'Submitting...' : 'Submit Captcha'}
+                          {loadingSearch ? 'Sending to court...' : 'Submit Captcha'}
                         </button>
                         <button
                           type="button"
@@ -861,7 +862,7 @@ export default function CauseListPage() {
                   <svg className={`h-4 w-4 ${loadingMediation ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                   </svg>
-                  {loadingMediation ? 'Refreshing...' : 'Refresh latest lists'}
+                  {loadingMediation ? 'Connecting to court...' : 'Refresh latest lists'}
                 </button>
               </div>
 
@@ -878,7 +879,7 @@ export default function CauseListPage() {
                       <tr>
                         <td colSpan={2} className="px-3 py-4 text-sm text-slate-300">
                           {loadingMediation
-                            ? 'Loading mediation lists...'
+                            ? 'Connecting to the official court website for mediation lists...'
                             : 'No mediation rows available right now.'}
                         </td>
                       </tr>
@@ -899,7 +900,7 @@ export default function CauseListPage() {
                                 disabled={downloadingMediationUrl === item.url}
                               >
                                 {downloadingMediationUrl === item.url
-                                  ? `Downloading ${item.label}...`
+                                  ? `Downloading ${item.label} from court...`
                                   : `Download ${item.label}`}
                               </button>
                             ))}

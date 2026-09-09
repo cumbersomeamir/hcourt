@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
+import { courtSourceError } from '@/views/components/CourtSourceStatus';
 
 type CaseTypeOption = { value: string; label: string };
 
@@ -104,7 +105,7 @@ export default function OrdersPage() {
         if (!data.success) throw new Error(data.error || 'Failed to load case types');
         setTypes(data.types || []);
       } catch (e) {
-        setTypesError(e instanceof Error ? e.message : 'Failed to load case types');
+        setTypesError(courtSourceError(e, 'Unable to load court case types.'));
       } finally {
         setTypesLoading(false);
       }
@@ -178,7 +179,7 @@ export default function OrdersPage() {
       const data = await res.json();
       handleOrdersResponse(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to fetch orders');
+      setError(courtSourceError(e, 'Unable to fetch orders from the court.'));
     } finally {
       setLoading(false);
     }
@@ -202,7 +203,7 @@ export default function OrdersPage() {
       const data = await res.json();
       handleOrdersResponse(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to submit captcha');
+      setError(courtSourceError(e, 'Unable to submit the captcha to the court.'));
     } finally {
       setLoading(false);
     }
@@ -225,7 +226,7 @@ export default function OrdersPage() {
       const data = await res.json();
       handleOrdersResponse(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to refresh captcha');
+      setError(courtSourceError(e, 'Unable to refresh the court captcha.'));
     } finally {
       setLoading(false);
     }
@@ -271,7 +272,7 @@ export default function OrdersPage() {
               disabled={loading || captchaCode.trim().length < 4}
               className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40"
             >
-              {loading ? 'Submitting...' : 'Submit Captcha'}
+              {loading ? 'Sending to court...' : 'Submit Captcha'}
             </button>
             <button
               onClick={refreshCaptcha}
@@ -367,7 +368,7 @@ export default function OrdersPage() {
       const pdf = await fetchJudgmentPdfWithPolling(viewUrl, date, judgmentId);
       downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download order/judgment');
+      setError(courtSourceError(e, 'Unable to download the court order or judgment.'));
     } finally {
       setJudgmentLoadingId(null);
     }
@@ -399,7 +400,7 @@ export default function OrdersPage() {
         throw new Error(`Some downloads failed: ${failedDates.join(', ')}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to download all order/judgment PDFs');
+      setError(courtSourceError(e, 'Unable to download court order or judgment PDFs.'));
     } finally {
       setAllJudgmentsLoading(false);
     }
@@ -475,7 +476,7 @@ export default function OrdersPage() {
                   disabled={typesLoading}
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                 >
-                  <option value="">{typesLoading ? 'Loading...' : 'Select case type'}</option>
+                  <option value="">{typesLoading ? 'Connecting to court...' : 'Select case type'}</option>
                   {types.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
@@ -516,7 +517,7 @@ export default function OrdersPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25 disabled:opacity-40 w-full sm:w-auto"
               >
                 {loading && <span className="w-4 h-4 border-2 border-sky-300/30 border-t-sky-300 rounded-full animate-spin"></span>}
-                {loading ? 'Searching...' : 'Search'}
+                {loading ? 'Connecting to court...' : 'Search'}
               </button>
             </div>
             {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
@@ -538,7 +539,7 @@ export default function OrdersPage() {
                   disabled={typesLoading}
                   className="w-full rounded-lg border border-slate-600/25 bg-slate-900/60 px-3 py-2.5 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                 >
-                  <option value="">{typesLoading ? 'Loading...' : 'Select case type'}</option>
+                  <option value="">{typesLoading ? 'Connecting to court...' : 'Select case type'}</option>
                   {types.map((t) => (
                     <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
@@ -579,7 +580,7 @@ export default function OrdersPage() {
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500/15 border border-amber-400/25 px-5 py-2.5 text-sm font-semibold text-amber-300 hover:bg-amber-500/25 disabled:opacity-40"
               >
                 {loading && <span className="w-4 h-4 border-2 border-amber-300/30 border-t-amber-300 rounded-full animate-spin"></span>}
-                {loading ? 'Fetching...' : 'Fetch Orders'}
+                {loading ? 'Fetching from court...' : 'Fetch Orders'}
               </button>
             </div>
             {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
@@ -635,7 +636,7 @@ export default function OrdersPage() {
                     disabled={allJudgmentsLoading || judgmentLoadingId !== null}
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40 w-full sm:w-auto"
                   >
-                    {allJudgmentsLoading ? 'Downloading All...' : 'Download All PDFs'}
+                    {allJudgmentsLoading ? 'Downloading from court...' : 'Download All PDFs'}
                   </button>
                 </div>
                 <div className="space-y-2.5">
@@ -665,7 +666,7 @@ export default function OrdersPage() {
                         className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
                       >
                         {judgmentLoadingId === entry.judgmentId
-                          ? 'Preparing...'
+                          ? 'Preparing court document...'
                           : entry.documentStatus === 'cached'
                             ? 'Download Order/Judgment'
                             : 'Prepare PDF'}

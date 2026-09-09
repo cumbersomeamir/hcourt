@@ -5,8 +5,12 @@ import { appendCourtHistorySnapshot } from './courtHistory';
 import { monitorTrackedOrderCases } from './trackedOrdersMonitor';
 import { ChangeRecord, CourtCase, Notification } from '../types/court';
 
-const COURT_VIEW_URL =
-  'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do';
+type CourtBench = 'allahabad' | 'lucknow';
+
+const COURT_VIEW_URLS: Record<CourtBench, string> = {
+  allahabad: 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewAllahabad.do',
+  lucknow: 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do',
+};
 const DEFAULT_STALE_AFTER_MS = 45_000;
 const COURT_FETCH_TIMEOUT_MS = 15_000;
 const COURT_FETCH_RETRIES = 2;
@@ -17,12 +21,14 @@ type ScheduleDocument = {
   lastUpdated: Date;
   courts: CourtCase[];
   source?: string;
+  bench?: CourtBench;
 };
 
 type ScheduleSyncOptions = {
   db: Db;
   force?: boolean;
   source: string;
+  bench?: CourtBench;
   staleAfterMs?: number;
   runTrackedOrders?: boolean;
 };
@@ -38,7 +44,7 @@ type ScheduleSyncResult = {
   warning?: string;
 };
 
-let inFlightSync: Promise<ScheduleSyncResult> | null = null;
+const inFlightSync = new Map<CourtBench, Promise<ScheduleSyncResult>>();
 
 function cloneCaseDetails(details: CourtCase['caseDetails']): CourtCase['caseDetails'] {
   if (!details) return null;
@@ -128,11 +134,14 @@ function isFresh(schedule: ScheduleDocument | null, staleAfterMs: number): boole
   return Date.now() - updatedAt <= staleAfterMs;
 }
 
-async function getLatestScheduleDocument(db: Db): Promise<ScheduleDocument | null> {
-  return db.collection<ScheduleDocument>('schedules').findOne({}, { sort: { lastUpdated: -1 } });
+async function getLatestScheduleDocument(db: Db, bench: CourtBench): Promise<ScheduleDocument | null> {
+  return db.collection<ScheduleDocument>('schedules').findOne(
+    bench === 'lucknow' ? { $or: [{ bench }, { bench: { $exists: false } }] } : { bench },
+    { sort: { lastUpdated: -1 } }
+  );
 }
 
-async function fetchCourtView(): Promise<Response> {
+async function fetchCourtView(bench: CourtBench): Promise<Response> {
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= COURT_FETCH_RETRIES; attempt += 1) {
@@ -140,14 +149,14 @@ async function fetchCourtView(): Promise<Response> {
     const timeout = setTimeout(() => controller.abort(), COURT_FETCH_TIMEOUT_MS);
 
     try {
-      const response = await fetch(COURT_VIEW_URL, {
+      const response = await fetch(COURT_VIEW_URLS[bench], {
         headers: { 'User-Agent': 'Mozilla/5.0' },
         cache: 'no-store',
         signal: controller.signal,
       });
 
       if (response.ok) return response;
-      lastError = new Error(`Failed to fetch live Lucknow court view: ${response.status} ${response.statusText}`);
+      lastError = new Error(`Failed to fetch live ${bench} court view: ${response.status} ${response.statusText}`);
     } catch (error) {
       lastError = error;
     } finally {
@@ -155,16 +164,17 @@ async function fetchCourtView(): Promise<Response> {
     }
   }
 
-  throw lastError instanceof Error ? lastError : new Error('Failed to fetch live Lucknow court view');
+  throw lastError instanceof Error ? lastError : new Error(`Failed to fetch live ${bench} court view`);
 }
 
 async function syncScheduleInternal(
   db: Db,
   latestBeforeSync: ScheduleDocument | null,
   source: string,
+  bench: CourtBench,
   runTrackedOrders: boolean
 ): Promise<ScheduleSyncResult> {
-  const response = await fetchCourtView();
+  const response = await fetchCourtView(bench);
 
   const html = await response.text();
   const parsedCourts = parseCourtSchedule(html);
@@ -205,6 +215,7 @@ async function syncScheduleInternal(
           date: dateStr,
           lastUpdated: now,
           source,
+          bench,
         },
       }
     );
@@ -214,6 +225,7 @@ async function syncScheduleInternal(
       date: dateStr,
       lastUpdated: now,
       source,
+      bench,
     };
   } else {
     schedule = {
@@ -221,6 +233,7 @@ async function syncScheduleInternal(
       lastUpdated: now,
       courts: courtsToStore,
       source,
+      bench,
     };
 
     const insertResult = await scheduleCollection.insertOne(schedule);
@@ -255,11 +268,12 @@ export async function syncSchedule({
   db,
   force = false,
   source,
+  bench = 'lucknow',
   staleAfterMs,
   runTrackedOrders = true,
 }: ScheduleSyncOptions): Promise<ScheduleSyncResult> {
   const maxAgeMs = parseStaleAfterMs(staleAfterMs);
-  const latestBeforeSync = await getLatestScheduleDocument(db);
+  const latestBeforeSync = await getLatestScheduleDocument(db, bench);
 
   if (!force && isFresh(latestBeforeSync, maxAgeMs)) {
     return {
@@ -273,11 +287,12 @@ export async function syncSchedule({
     };
   }
 
-  if (inFlightSync) {
-    return inFlightSync;
+  const existingSync = inFlightSync.get(bench);
+  if (existingSync) {
+    return existingSync;
   }
 
-  const syncPromise = syncScheduleInternal(db, latestBeforeSync, source, runTrackedOrders)
+  const syncPromise = syncScheduleInternal(db, latestBeforeSync, source, bench, runTrackedOrders)
     .catch((error) => {
       if (latestBeforeSync) {
         return {
@@ -295,15 +310,15 @@ export async function syncSchedule({
       throw error;
     })
     .finally(() => {
-      if (inFlightSync === syncPromise) {
-        inFlightSync = null;
+      if (inFlightSync.get(bench) === syncPromise) {
+        inFlightSync.delete(bench);
       }
     });
 
-  inFlightSync = syncPromise;
+  inFlightSync.set(bench, syncPromise);
   return syncPromise;
 }
 
-export async function getLatestStoredSchedule(db: Db): Promise<ScheduleDocument | null> {
-  return getLatestScheduleDocument(db);
+export async function getLatestStoredSchedule(db: Db, bench: CourtBench = 'lucknow'): Promise<ScheduleDocument | null> {
+  return getLatestScheduleDocument(db, bench);
 }

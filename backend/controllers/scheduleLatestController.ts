@@ -13,6 +13,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const caseIdsParam = searchParams.get('caseIds');
     const userId = searchParams.get('userId');
+    const bench = searchParams.get('bench') === 'allahabad' ? 'allahabad' : 'lucknow';
     const forceRefresh = ['1', 'true', 'yes'].includes(
       String(searchParams.get('force') || '').toLowerCase()
     );
@@ -44,6 +45,7 @@ export async function GET(request: Request) {
       db,
       force: forceRefresh,
       source: forceRefresh ? 'schedule_latest_force' : 'schedule_latest',
+      bench,
     });
     const latestSchedule = latestResult.schedule;
 
@@ -78,6 +80,7 @@ export async function GET(request: Request) {
       refreshed: latestResult.refreshed,
       stale: latestResult.stale,
       warning: latestResult.warning,
+      bench,
     });
   } catch (error) {
     console.error('Error fetching latest schedule:', error);

@@ -6,6 +6,7 @@ import { Cinzel, Manrope } from 'next/font/google';
 import { CourtCase, Notification } from '@/types/court';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
+import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 import {
   buildSavedCaseProfiles,
   decodeCaseProfileSlug,
@@ -141,7 +142,7 @@ export default function CaseProfilePage({ caseSlug }: CaseProfilePageProps) {
         }
       } catch (loadError) {
         if (mounted) {
-          setError(loadError instanceof Error ? loadError.message : 'Failed to load case profile');
+          setError(courtSourceError(loadError, 'Unable to load the latest case details.'));
         }
       } finally {
         if (mounted) {
@@ -248,8 +249,8 @@ export default function CaseProfilePage({ caseSlug }: CaseProfilePageProps) {
         </div>
 
         {loading ? (
-          <div className="glass-card-lg p-12 text-center text-sm text-slate-400">
-            Loading case profile...
+          <div className="glass-card-lg p-12">
+            <CourtSourceLoader label="latest case details" />
           </div>
         ) : !profile ? (
           <div className="glass-card-lg p-10 sm:p-12">

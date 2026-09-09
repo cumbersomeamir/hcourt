@@ -69,6 +69,78 @@ function isSelectedDateLabel(label: string, day: number, month: number, year: nu
   return labelDay === day && labelMonth === month && labelYear === year;
 }
 
+function parseBench(input: string | null): 'allahabad' | 'lucknow' | null {
+  if (!input) return null;
+  const value = input.trim().toLowerCase();
+  return value === 'allahabad' || value === 'lucknow' ? value : null;
+}
+
+function belongsToBench(description: string, bench: 'allahabad' | 'lucknow' | null): boolean {
+  if (!bench) return true;
+  const isLucknowNotice = /\blucknow\b|\blko\b/i.test(description);
+  return bench === 'lucknow' ? isLucknowNotice : !isLucknowNotice;
+}
+
+async function fetchItemWiseFallback(input: {
+  day: number;
+  month: number;
+  year: number;
+  bench: 'allahabad' | 'lucknow' | null;
+}) {
+  const response = await fetchWebDiary(
+    `${WEB_DIARY_BASE_URL}/calendar/itemWiseList.jsp?group=6`,
+    {
+      cache: 'no-store',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    }
+  );
+  if (!response.ok) return [];
+
+  const $ = cheerio.load(await response.text());
+  const datePattern = new RegExp(`\\b0?${input.day}[/-]0?${input.month}[/-]${input.year}\\b`);
+  const notifications: Array<{
+    title: string;
+    pdfLink?: string;
+    date: string;
+    allLinks?: Array<{ type: string; link: string }>;
+  }> = [];
+
+  $('tr').each((_, row) => {
+    const $row = $(row);
+    if (!datePattern.test($row.text())) return;
+
+    const $links = $row.find('a');
+    const description = $links
+      .filter((_, link) => !/^(PDF|ODT|DOC|HTML)$/i.test($(link).text().trim()))
+      .first()
+      .text()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!description || !belongsToBench(description, input.bench)) return;
+
+    const allLinks: Array<{ type: string; link: string }> = [];
+    let pdfLink: string | undefined;
+    $links.each((_, link) => {
+      const href = ($(link).attr('href') || '').trim();
+      if (!href) return;
+      const fullLink = href.startsWith('http') ? href : `${WEB_DIARY_BASE_URL}${href}`;
+      const type = ($(link).text().trim().toUpperCase() || (/.pdf(\?|$)/i.test(href) ? 'PDF' : 'LINK'));
+      allLinks.push({ type, link: fullLink });
+      if (!pdfLink && (type === 'PDF' || /.pdf(\?|$)/i.test(href))) pdfLink = fullLink;
+    });
+
+    notifications.push({
+      title: description,
+      pdfLink,
+      date: `${input.day}/${input.month}/${input.year}`,
+      allLinks: allLinks.length ? allLinks : undefined,
+    });
+  });
+
+  return notifications;
+}
+
 export async function GET(request: Request) {
   let cacheDate = '';
   try {
@@ -76,6 +148,7 @@ export async function GET(request: Request) {
     const month = searchParams.get('month');
     const year = searchParams.get('year');
     const date = searchParams.get('date');
+    const bench = parseBench(searchParams.get('bench'));
 
     let url = WEB_DIARY_URL;
     const requestedMonthNumber = parseMonthToNumber(month);
@@ -84,10 +157,15 @@ export async function GET(request: Request) {
       requestedMonthNumber !== null ? MONTH_NAMES[requestedMonthNumber - 1] : month?.trim() || '';
 
     if (date && /^\d{1,2}$/.test(date) && requestedMonthNumber && requestedYear) {
-      cacheDate = `${parseInt(date, 10)}/${requestedMonthNumber}/${requestedYear}`;
+      const selectedDate = `${parseInt(date, 10)}/${requestedMonthNumber}/${requestedYear}`;
+      cacheDate = bench ? `${bench}:${selectedDate}` : selectedDate;
       try {
         const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
-        if (snapshot && Date.now() - snapshot.fetchedAt.getTime() <= 10 * 60 * 1000) {
+        if (
+          snapshot &&
+          snapshot.notifications.length > 0 &&
+          Date.now() - snapshot.fetchedAt.getTime() <= 10 * 60 * 1000
+        ) {
           return NextResponse.json({
             success: true,
             data: { notifications: snapshot.notifications },
@@ -199,7 +277,8 @@ export async function GET(request: Request) {
       }
 
       if (dayNum && monthNum && yearNum) {
-        cacheDate = cacheDate || `${dayNum}/${monthNum}/${yearNum}`;
+        const selectedDate = `${dayNum}/${monthNum}/${yearNum}`;
+        cacheDate = cacheDate || (bench ? `${bench}:${selectedDate}` : selectedDate);
         const monthName = MONTH_NAMES[monthNum - 1];
         const frameUrl =
           `${WEB_DIARY_BASE_URL}/calendar/frame.jsp?` +
@@ -210,7 +289,7 @@ export async function GET(request: Request) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
           
-          let dateResponse: Response;
+          let dateResponse: Response | null = null;
           try {
             dateResponse = await fetchWebDiary(frameUrl, {
               signal: controller.signal,
@@ -227,7 +306,7 @@ export async function GET(request: Request) {
               console.error(`Timeout fetching diary for date ${dayNum}/${monthNum}/${yearNum}`);
               try {
                 const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
-                if (snapshot) {
+                if (snapshot?.notifications.length) {
                   return NextResponse.json({
                     success: true,
                     data: { notifications: snapshot.notifications },
@@ -237,20 +316,13 @@ export async function GET(request: Request) {
               } catch {}
               calendarData.diaryLinks = [];
               calendarData.notifications = [];
-              return NextResponse.json({
-                success: true,
-                data: calendarData,
-                meta: {
-                  partial: true,
-                  timedOut: true,
-                  warning: 'Diary source timed out before notices could be loaded.',
-                },
-              });
+              dateResponse = null;
+            } else {
+              throw fetchError;
             }
-            throw fetchError; // Re-throw other errors
           }
           
-          if (dateResponse.ok) {
+          if (dateResponse?.ok) {
             const dateHtml = await dateResponse.text();
             const $date = cheerio.load(dateHtml);
 
@@ -311,6 +383,10 @@ export async function GET(request: Request) {
                   return;
                 }
 
+                if (!belongsToBench(description, bench)) {
+                  return;
+                }
+
                 const allLinks: Array<{ type: string; link: string }> = [];
                 let pdfLink: string | undefined;
 
@@ -363,6 +439,23 @@ export async function GET(request: Request) {
           // The error is logged but we don't want to fail the entire request
           calendarData.diaryLinks = [];
           calendarData.notifications = [];
+        }
+
+        if (!calendarData.notifications?.length) {
+          try {
+            const notifications = await fetchItemWiseFallback({
+              day: dayNum,
+              month: monthNum,
+              year: yearNum,
+              bench,
+            });
+            if (notifications.length) {
+              calendarData.notifications = notifications;
+              dateDataLoaded = true;
+            }
+          } catch (err) {
+            console.error('Error fetching item-wise diary fallback:', err);
+          }
         }
       }
     }
