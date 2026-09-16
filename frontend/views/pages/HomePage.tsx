@@ -332,30 +332,30 @@ export default function Home() {
               <span className="text-base font-semibold text-slate-100">Home</span>
             </Link>
 
-            <a href="/web-diary" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-violet-400/20`} title="View Web Diary">
+            <Link href="/web-diary" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-violet-400/20`} title="View Web Diary">
               <span className={`${mobileMenuIconClass} border-violet-400/20 bg-violet-500/10 text-violet-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </span>
               <span className="text-base font-semibold text-slate-100">Web Diary</span>
-            </a>
-            <a href="/cause-list" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-amber-400/20`} title="View Cause List">
+            </Link>
+            <Link href="/cause-list" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-amber-400/20`} title="View Cause List">
               <span className={`${mobileMenuIconClass} border-amber-400/20 bg-amber-500/10 text-amber-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
                 </svg>
               </span>
               <span className="text-base font-semibold text-slate-100">Cause List</span>
-            </a>
-            <a href="/status" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-indigo-400/20`} title="View Status">
+            </Link>
+            <Link href="/status" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-indigo-400/20`} title="View Status">
               <span className={`${mobileMenuIconClass} border-indigo-400/20 bg-indigo-500/10 text-indigo-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
                 </svg>
               </span>
               <span className="text-base font-semibold text-slate-100">Status</span>
-            </a>
+            </Link>
             <Link href="/ai-chat" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-blue-400/20`} title="Open AI Chat">
               <span className={`${mobileMenuIconClass} border-blue-400/20 bg-blue-500/10 text-blue-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -378,7 +378,7 @@ export default function Home() {
               </span>
               <span className="text-base font-semibold text-slate-100">My Cases</span>
             </Link>
-            <a href="/track-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-emerald-400/20`} title="Manage tracked cases">
+            <Link href="/track-cases" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-emerald-400/20`} title="Manage tracked cases">
               <span className={`${mobileMenuIconClass} border-emerald-400/20 bg-emerald-500/10 text-emerald-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -390,7 +390,7 @@ export default function Home() {
                   ? `Tracked (${trackedCaseIds.length + trackedOrderCases.length})`
                   : 'Track Cases'}
               </span>
-            </a>
+            </Link>
             <button
               onClick={() => {
                 setMobileNavOpen(false);
@@ -471,24 +471,24 @@ export default function Home() {
               </div>
 
               <div className="mt-5 flex flex-wrap items-center gap-2.5 border-t border-slate-800/70 pt-5">
-                <a href="/web-diary" className={`${desktopNavItemClass} border-violet-400/20 text-violet-100 hover:border-violet-300/40`} title="View Web Diary">
+                <Link href="/web-diary" className={`${desktopNavItemClass} border-violet-400/20 text-violet-100 hover:border-violet-300/40`} title="View Web Diary">
                   <svg className="w-4 h-4 text-violet-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                   Web Diary
-                </a>
-                <a href="/cause-list" className={`${desktopNavItemClass} border-amber-400/20 text-amber-100 hover:border-amber-300/40`} title="View Cause List">
+                </Link>
+                <Link href="/cause-list" className={`${desktopNavItemClass} border-amber-400/20 text-amber-100 hover:border-amber-300/40`} title="View Cause List">
                   <svg className="w-4 h-4 text-amber-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
                   </svg>
                   Cause List
-                </a>
-                <a href="/status" className={`${desktopNavItemClass} border-indigo-400/20 text-indigo-100 hover:border-indigo-300/40`} title="View Status">
+                </Link>
+                <Link href="/status" className={`${desktopNavItemClass} border-indigo-400/20 text-indigo-100 hover:border-indigo-300/40`} title="View Status">
                   <svg className="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
                   </svg>
                   Status
-                </a>
+                </Link>
                 <details className="relative">
                   <summary className={`${desktopNavItemClass} cursor-pointer list-none border-slate-600/40 hover:border-slate-400/40`}>
                     More
@@ -496,9 +496,9 @@ export default function Home() {
                   <div className="absolute left-0 z-20 mt-2 grid w-44 gap-1 rounded-xl border border-slate-700/60 bg-slate-950/95 p-2 shadow-xl backdrop-blur">
                     <Link href="/ai-chat" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">AI Chat</Link>
                     <Link href="/my-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">My Cases</Link>
-                    <a href="/track-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
+                    <Link href="/track-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
                       {totalTrackedItems > 0 ? `Tracked (${totalTrackedItems})` : 'Track Cases'}
-                    </a>
+                    </Link>
                   </div>
                 </details>
                 <button onClick={() => fetchSchedule(true)} disabled={loading} className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}>

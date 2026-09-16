@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useEffect, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
+
+const PdfPages = dynamic(() => import('@/views/components/PdfPages'), { ssr: false });
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -15,15 +18,6 @@ const manrope = Manrope({
   weight: ['500', '600', '700'],
 });
 
-function downloadBlob(filename: string, blobUrl: string) {
-  const anchor = document.createElement('a');
-  anchor.href = blobUrl;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-}
-
 export default function JudgmentViewerPage(props: {
   viewUrl: string;
   date?: string | null;
@@ -34,6 +28,12 @@ export default function JudgmentViewerPage(props: {
   const [filename, setFilename] = useState('latest-order.pdf');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const downloadParams = new URLSearchParams({
+    viewUrl: props.viewUrl,
+    download: '1',
+  });
+  if (props.date) downloadParams.set('date', props.date);
+  const downloadHref = `/api/orders/judgment/download?${downloadParams.toString()}`;
 
   useEffect(() => {
     let active = true;
@@ -94,23 +94,17 @@ export default function JudgmentViewerPage(props: {
     };
   }, [props.date, props.viewUrl]);
 
-  const iframeSrc = useMemo(() => {
-    if (!blobUrl) return '';
-    const page = props.page && props.page > 0 ? props.page : 1;
-    return `${blobUrl}#page=${page}&view=FitH`;
-  }, [blobUrl, props.page]);
-
   return (
     <div className={`min-h-screen bg-[#081127] ${manrope.className}`}>
       <header className="border-b border-slate-800/80 bg-[#081127]/90 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
-          <div>
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-center gap-4 px-4 py-4 text-center sm:flex-row sm:justify-between sm:px-6 sm:text-left">
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-[0.26em] text-cyan-300/70">Latest Order</p>
             <h1 className={`mt-2 text-2xl font-semibold text-slate-100 sm:text-3xl ${cinzel.className}`}>
               {props.title || 'Judgment Viewer'}
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Link
               href="/ai-chat"
               className="inline-flex items-center rounded-full border border-slate-700/50 bg-slate-950/35 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 transition-colors hover:bg-slate-900/70"
@@ -118,12 +112,13 @@ export default function JudgmentViewerPage(props: {
               Back to AI Chat
             </Link>
             {blobUrl && (
-              <button
-                onClick={() => downloadBlob(filename, blobUrl)}
+              <a
+                href={downloadHref}
+                download={filename}
                 className="inline-flex items-center rounded-full border border-cyan-400/25 bg-cyan-500/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100 transition-colors hover:bg-cyan-500/18"
               >
                 Download PDF
-              </button>
+              </a>
             )}
           </div>
         </div>
@@ -147,11 +142,12 @@ export default function JudgmentViewerPage(props: {
               {error}
             </div>
           ) : (
-            <iframe
-              title={props.title || 'Latest order PDF'}
-              src={iframeSrc}
-              className="h-[78vh] w-full bg-white"
-            />
+            <div className="max-h-[78vh] overflow-auto bg-slate-200 px-3 py-4 sm:px-4">
+              <PdfPages
+                file={blobUrl}
+                onError={() => setError('Unable to display this order PDF.')}
+              />
+            </div>
           )}
         </div>
       </div>

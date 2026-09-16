@@ -4,13 +4,15 @@ import Link from 'next/link';
 import { ReactNode, useState } from 'react';
 
 type NavKey =
+  | 'court-view'
   | 'web-diary'
   | 'cause-list'
   | 'status'
   | 'orders'
   | 'ai-chat'
   | 'my-cases'
-  | 'track-cases';
+  | 'track-cases'
+  | 'admin-map';
 
 type WorkspaceNavigationProps = {
   alertsCount?: number;
@@ -39,6 +41,20 @@ const mobileMenuIconClass =
   'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border bg-slate-950/80';
 
 const navItems: NavItem[] = [
+  {
+    key: 'court-view',
+    href: '/court-view',
+    label: 'Court View',
+    title: 'Open Court View',
+    borderClass: 'border-emerald-400/20',
+    textClass: 'text-emerald-100',
+    iconClass: 'border-emerald-400/20 bg-emerald-500/10 text-emerald-200',
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19h16M5 16V8l7-4 7 4v8M8 16v-5m4 5v-5m4 5v-5" />
+      </svg>
+    ),
+  },
   {
     key: 'web-diary',
     href: '/web-diary',
@@ -84,8 +100,8 @@ const navItems: NavItem[] = [
   {
     key: 'orders',
     href: '/orders',
-    label: 'Orders',
-    title: 'View Orders',
+    label: 'Orders & Judgments',
+    title: 'View Orders and Judgments',
     borderClass: 'border-rose-400/20',
     textClass: 'text-rose-100',
     iconClass: 'border-rose-400/20 bg-rose-500/10 text-rose-200',
@@ -144,9 +160,23 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
+  {
+    key: 'admin-map',
+    href: '/admin/data-map',
+    label: 'Admin Map',
+    title: 'Open Admin Data Map',
+    borderClass: 'border-slate-400/20',
+    textClass: 'text-slate-100',
+    iconClass: 'border-slate-400/20 bg-slate-500/10 text-slate-200',
+    icon: (
+      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    ),
+  },
 ];
 
-const moreNavKeys = new Set<NavKey>(['web-diary', 'ai-chat']);
+const moreNavKeys = new Set<NavKey>(['web-diary', 'ai-chat', 'admin-map']);
 const primaryNavItems = navItems.filter((item) => !moreNavKeys.has(item.key));
 const moreNavItems = navItems.filter((item) => moreNavKeys.has(item.key));
 
@@ -228,7 +258,7 @@ export default function WorkspaceNavigation({
                   <span className="text-base font-semibold text-slate-100">Home</span>
                 </Link>
 
-                {navItems.map((item) => {
+                {navItems.filter((item) => item.key !== 'admin-map').map((item) => {
                   const active = item.key === current;
                   return (
                     <Link

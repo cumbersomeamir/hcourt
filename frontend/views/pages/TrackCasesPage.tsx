@@ -323,7 +323,7 @@ export default function TrackCasesPage() {
         userId={userId}
       />
 
-      <header className="border-b border-slate-800/80 bg-[#081127]/82 backdrop-blur-xl">
+      <header className="border-b border-slate-800/80 bg-[#081127]/95">
         <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="flex justify-end">
             <WorkspaceNavigation
@@ -389,7 +389,7 @@ export default function TrackCasesPage() {
         )}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,0.85fr)]">
-          <div className="glass-card-lg overflow-hidden">
+          <div className="min-w-0 glass-card-lg overflow-hidden">
             <div className="border-b border-slate-700/30 px-5 py-5 sm:px-8">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="max-w-2xl">
@@ -411,7 +411,7 @@ export default function TrackCasesPage() {
             </div>
 
             <div className="space-y-6 px-5 py-5 sm:px-8 sm:py-8">
-              <section className="rounded-3xl border border-slate-700/35 bg-slate-950/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-700/35 bg-slate-950/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-xl">
                     <p className="text-[11px] uppercase tracking-[0.24em] text-cyan-300/75">
@@ -480,7 +480,7 @@ export default function TrackCasesPage() {
                 </div>
               </section>
 
-              <section className="rounded-3xl border border-slate-700/35 bg-slate-950/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+              <section className="min-w-0 overflow-hidden rounded-3xl border border-slate-700/35 bg-slate-950/35 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-xl">
                     <p className="text-[11px] uppercase tracking-[0.24em] text-indigo-300/75">
@@ -499,14 +499,14 @@ export default function TrackCasesPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 grid gap-3 md:grid-cols-3">
+                <div className="mt-5 grid min-w-0 gap-3 md:grid-cols-3">
                   <select
                     value={orderCaseForm.caseType}
                     onChange={(event) =>
                       setOrderCaseForm((prev) => ({ ...prev, caseType: event.target.value }))
                     }
                     disabled={caseTypeLoading}
-                    className="rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
+                    className="min-w-0 w-full rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none disabled:opacity-50"
                   >
                     <option value="">
                       {caseTypeLoading ? 'Connecting to court for case types...' : 'Select case type'}
@@ -528,7 +528,7 @@ export default function TrackCasesPage() {
                       }))
                     }
                     placeholder="Case no"
-                    className="rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
+                    className="min-w-0 w-full rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                   />
 
                   <input
@@ -541,7 +541,7 @@ export default function TrackCasesPage() {
                       }))
                     }
                     placeholder="Case year"
-                    className="rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
+                    className="min-w-0 w-full rounded-2xl border border-slate-600/25 bg-slate-900/60 px-4 py-3 text-sm text-slate-100 placeholder-slate-500 focus:border-cyan-400/50 focus:ring-2 focus:ring-cyan-400/15 focus:outline-none"
                   />
                 </div>
 

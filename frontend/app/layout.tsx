@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Clarity from "@/components/Clarity";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
+import GlobalMobileNavigation from "@/views/components/GlobalMobileNavigation";
+import RoutePrefetcher from "@/views/components/RoutePrefetcher";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +33,8 @@ export default function RootLayout({
       >
         <Clarity />
         <ClientErrorReporter />
+        <GlobalMobileNavigation />
+        <RoutePrefetcher />
         {children}
       </body>
     </html>

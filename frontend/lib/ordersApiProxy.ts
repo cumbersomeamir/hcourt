@@ -1,6 +1,6 @@
 const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
-function buildUpstreamUrl(pathname: string, requestUrl?: string): string {
+export function buildUpstreamUrl(pathname: string, requestUrl?: string): string {
   const upstream = new URL(pathname, backendOrigin);
 
   if (requestUrl) {
@@ -21,9 +21,11 @@ export async function proxyOrdersRequest(
   const headers = new Headers();
   const contentType = request.headers.get('content-type');
   const accept = request.headers.get('accept');
+  const authorization = request.headers.get('authorization');
 
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
+  if (authorization) headers.set('authorization', authorization);
 
   const method = request.method.toUpperCase();
   const init: RequestInit = {

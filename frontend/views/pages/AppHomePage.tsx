@@ -15,6 +15,7 @@ type HomeTile = {
   titleClassName: string;
   ctaClassName: string;
   icon: ReactNode;
+  nativeAction?: string;
 };
 
 const homeTiles: HomeTile[] = [
@@ -189,23 +190,24 @@ const homeTiles: HomeTile[] = [
     ),
   },
   {
-    href: '/admin',
-    title: 'Admin Data Map',
-    label: 'Admin',
-    description: 'Open the admin workspace for collection mapping, controls, and AI support views.',
-    className: 'sm:col-span-2 sm:min-h-[180px] lg:col-span-1',
+    href: '#',
+    title: 'Account Settings',
+    label: 'Profile',
+    description: 'Manage your practice profile, privacy preferences, and account access.',
+    className: 'sm:min-h-[180px]',
     surfaceClassName:
-      'border-slate-400/18 bg-[linear-gradient(145deg,rgba(15,23,42,0.95),rgba(30,41,59,0.88)_52%,rgba(71,85,105,0.42))] shadow-[0_22px_55px_rgba(15,23,42,0.24)]',
+      'border-sky-300/18 bg-[linear-gradient(145deg,rgba(10,21,43,0.96),rgba(13,51,81,0.86)_55%,rgba(14,165,233,0.38))] shadow-[0_24px_58px_rgba(8,47,73,0.24)]',
     glowClassName:
-      'bg-[radial-gradient(circle_at_top_left,rgba(226,232,240,0.14),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(148,163,184,0.18),transparent_36%)]',
-    orbClassName: 'bg-slate-300/20',
-    iconClassName: 'border-slate-200/12 bg-slate-200/8 text-slate-50',
-    labelClassName: 'text-slate-300/55',
+      'bg-[radial-gradient(circle_at_top_right,rgba(125,211,252,0.24),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.16),transparent_40%)]',
+    orbClassName: 'bg-sky-300/25',
+    iconClassName: 'border-sky-200/15 bg-sky-200/10 text-sky-50',
+    labelClassName: 'text-sky-100/55',
     titleClassName: 'text-slate-50',
-    ctaClassName: 'border-slate-200/12 bg-slate-100/8 text-slate-50',
+    ctaClassName: 'border-sky-200/12 bg-sky-100/8 text-sky-50',
+    nativeAction: 'open-account-settings',
     icon: (
       <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 6h16M4 12h16M4 18h10" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 21a8 8 0 00-16 0M12 13a4 4 0 100-8 4 4 0 000 8z" />
       </svg>
     ),
   },
@@ -226,6 +228,7 @@ export default function AppHomePage() {
             <Link
               key={tile.href}
               href={tile.href}
+              data-native-action={tile.nativeAction}
               className={`group relative min-w-0 overflow-hidden rounded-2xl border p-3 shadow-[0_20px_55px_rgba(2,6,23,0.28)] backdrop-blur-xl transition-all duration-200 hover:-translate-y-1 hover:border-slate-200/20 sm:rounded-[1.7rem] sm:p-5 ${tile.className} ${tile.surfaceClassName}`}
             >
               <div className={`pointer-events-none absolute inset-0 opacity-100 transition-opacity duration-200 group-hover:opacity-90 ${tile.glowClassName}`} />
@@ -263,6 +266,13 @@ export default function AppHomePage() {
             </Link>
           ))}
         </section>
+        <footer className="px-2 py-4 text-center text-[11px] leading-5 text-slate-500">
+          <p>Courtlens is not an official court or government app. Verify critical information with official court records.</p>
+          <div className="mt-2 flex justify-center gap-4">
+            <Link href="/privacy" className="text-cyan-300/80">Privacy Policy</Link>
+            <Link href="/delete-account" className="text-cyan-300/80">Delete Account</Link>
+          </div>
+        </footer>
       </div>
     </main>
   );
