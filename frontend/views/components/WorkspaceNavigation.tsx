@@ -258,7 +258,7 @@ export default function WorkspaceNavigation({
                   <span className="text-base font-semibold text-slate-100">Home</span>
                 </Link>
 
-                {navItems.filter((item) => item.key !== 'admin-map').map((item) => {
+                {navItems.filter((item) => item.key !== 'admin-map' && item.href !== '/status').map((item) => {
                   const active = item.key === current;
                   return (
                     <Link
@@ -304,7 +304,7 @@ export default function WorkspaceNavigation({
       )}
 
       <div className="hidden xl:flex flex-wrap items-center justify-end gap-2.5">
-        {primaryNavItems.map((item) => {
+        {primaryNavItems.filter((item) => item.href !== '/status').map((item) => {
           const active = item.key === current;
           return (
             <Link

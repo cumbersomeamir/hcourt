@@ -136,8 +136,15 @@ async function ensureIndexes(db: Db, collectionName: string) {
       await Promise.all([
         collection.createIndex({ snapshotKey: 1 }, { unique: true }),
         collection.createIndex({ date: 1, fetchedAt: -1 }),
-        collection.createIndex({ fetchedAt: 1 }, { expireAfterSeconds: 172800 }),
       ]);
+      try {
+        await db.command({
+          collMod: 'web_diary_snapshots',
+          index: { keyPattern: { fetchedAt: 1 }, expireAfterSeconds: 604800 },
+        });
+      } catch {
+        await collection.createIndex({ fetchedAt: 1 }, { expireAfterSeconds: 604800 });
+      }
       break;
     }
     case 'case_latest_summary': {

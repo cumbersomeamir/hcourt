@@ -5,6 +5,7 @@ let historyIndexesEnsured = false;
 const MIN_HISTORY_DURATION_MS = 30_000;
 
 interface PendingCourtHistoryRecord {
+  bench?: 'allahabad' | 'lucknow';
   date: string;
   courtNo: string;
   firstSeenAt: Date;
@@ -20,6 +21,7 @@ interface PendingCourtHistoryRecord {
 
 export interface AppendCourtHistoryParams {
   db: Db;
+  bench?: 'allahabad' | 'lucknow';
   date: string;
   timestamp: Date;
   courts: CourtCase[];
@@ -61,7 +63,7 @@ function hasStayedLongEnough(firstSeenAt: Date | string, currentTimestamp: Date)
   const firstSeenMs = toTimestampMs(firstSeenAt);
   const currentMs = toTimestampMs(currentTimestamp);
   if (!Number.isFinite(firstSeenMs) || !Number.isFinite(currentMs)) return false;
-  return currentMs - firstSeenMs > MIN_HISTORY_DURATION_MS;
+  return currentMs - firstSeenMs >= MIN_HISTORY_DURATION_MS;
 }
 
 function shouldKeepHistoryRecord(
@@ -75,10 +77,11 @@ function shouldKeepHistoryRecord(
   const endMs = nextRecord ? toTimestampMs(nextRecord.timestamp) : nowMs;
   if (!Number.isFinite(endMs)) return false;
 
-  return endMs - startMs > MIN_HISTORY_DURATION_MS;
+  return endMs - startMs >= MIN_HISTORY_DURATION_MS;
 }
 
 function buildHistoryRecord(input: {
+  bench?: 'allahabad' | 'lucknow';
   date: string;
   courtNo: string;
   timestamp: Date;
@@ -86,6 +89,7 @@ function buildHistoryRecord(input: {
   source: string;
 }): CourtHistoryRecord {
   return {
+    bench: input.bench || 'lucknow',
     date: input.date,
     courtNo: input.courtNo,
     timestamp: input.timestamp,
@@ -100,6 +104,7 @@ function buildHistoryRecord(input: {
 }
 
 function buildPendingHistoryRecord(input: {
+  bench?: 'allahabad' | 'lucknow';
   date: string;
   courtNo: string;
   timestamp: Date;
@@ -107,6 +112,7 @@ function buildPendingHistoryRecord(input: {
   source: string;
 }): PendingCourtHistoryRecord {
   return {
+    bench: input.bench || 'lucknow',
     date: input.date,
     courtNo: input.courtNo,
     firstSeenAt: input.timestamp,
@@ -126,11 +132,17 @@ async function ensureHistoryIndexes(db: Db): Promise<void> {
   const collection = db.collection('court_history');
   const pendingCollection = db.collection('court_history_pending');
   await Promise.all([
-    collection.createIndex({ date: 1, courtNo: 1, timestamp: -1 }),
+    collection.createIndex({ bench: 1, date: 1, courtNo: 1, timestamp: -1 }),
     collection.createIndex({ timestamp: -1 }),
-    pendingCollection.createIndex({ date: 1, courtNo: 1 }, { unique: true }),
+    pendingCollection.createIndex({ bench: 1, date: 1, courtNo: 1 }, { unique: true }),
     pendingCollection.createIndex({ lastSeenAt: -1 }),
   ]);
+  const indexes = await pendingCollection.indexes();
+  if (indexes.some(index => index.name === 'date_1_courtNo_1')) {
+    await pendingCollection.dropIndex('date_1_courtNo_1').catch((error: { code?: number }) => {
+      if (error.code !== 27) throw error;
+    });
+  }
   historyIndexesEnsured = true;
 }
 
@@ -140,6 +152,7 @@ export async function appendCourtHistorySnapshot({
   timestamp,
   courts,
   source,
+  bench = 'lucknow',
 }: AppendCourtHistoryParams): Promise<number> {
   if (!courts || courts.length === 0) return 0;
 
@@ -161,13 +174,13 @@ export async function appendCourtHistorySnapshot({
   const [latestByCourt, pendingDocs] = await Promise.all([
     collection
       .aggregate<{ _id: string; state: CourtCase }>([
-        { $match: { date, courtNo: { $in: courtNos } } },
+        { $match: { bench, date, courtNo: { $in: courtNos } } },
         { $sort: { timestamp: -1 } },
         { $group: { _id: '$courtNo', state: { $first: '$state' } } },
       ])
       .toArray(),
     pendingCollection
-      .find({ date, courtNo: { $in: courtNos } })
+      .find({ bench, date, courtNo: { $in: courtNos } })
       .toArray(),
   ]);
 
@@ -195,8 +208,9 @@ export async function appendCourtHistorySnapshot({
 
       pendingOps.push({
         replaceOne: {
-          filter: { date, courtNo },
+          filter: { bench, date, courtNo },
           replacement: buildPendingHistoryRecord({
+            bench,
             date,
             courtNo,
             timestamp,
@@ -213,7 +227,7 @@ export async function appendCourtHistorySnapshot({
       if (isSameCourtState(previousState, normalizedState)) {
         pendingOps.push({
           deleteOne: {
-            filter: { date, courtNo },
+            filter: { bench, date, courtNo },
           },
         });
         continue;
@@ -222,6 +236,7 @@ export async function appendCourtHistorySnapshot({
       if (hasStayedLongEnough(pendingState.firstSeenAt, timestamp)) {
         docsToInsert.push(
           buildHistoryRecord({
+            bench,
             date,
             courtNo,
             timestamp: new Date(pendingState.firstSeenAt),
@@ -231,13 +246,13 @@ export async function appendCourtHistorySnapshot({
         );
         pendingOps.push({
           deleteOne: {
-            filter: { date, courtNo },
+            filter: { bench, date, courtNo },
           },
         });
       } else {
         pendingOps.push({
           updateOne: {
-            filter: { date, courtNo },
+            filter: { bench, date, courtNo },
             update: {
               $set: {
                 lastSeenAt: timestamp,
@@ -252,7 +267,7 @@ export async function appendCourtHistorySnapshot({
     if (isSameCourtState(previousState, normalizedState)) {
       pendingOps.push({
         deleteOne: {
-          filter: { date, courtNo },
+          filter: { bench, date, courtNo },
         },
       });
       continue;
@@ -260,8 +275,9 @@ export async function appendCourtHistorySnapshot({
 
     pendingOps.push({
       replaceOne: {
-        filter: { date, courtNo },
+        filter: { bench, date, courtNo },
         replacement: buildPendingHistoryRecord({
+          bench,
           date,
           courtNo,
           timestamp,
@@ -287,6 +303,7 @@ export async function appendCourtHistorySnapshot({
 export interface GetCourtHistoryParams {
   db: Db;
   courtNo: string;
+  bench?: 'allahabad' | 'lucknow';
   date: string;
   limit: number;
 }
@@ -296,13 +313,17 @@ export async function getCourtHistory({
   courtNo,
   date,
   limit,
+  bench = 'lucknow',
 }: GetCourtHistoryParams): Promise<CourtHistoryRecord[]> {
   const collection = db.collection<CourtHistoryRecord>('court_history');
-  const history = await collection
-    .find({ courtNo, date })
+  let history = await collection
+    .find({ bench, courtNo, date })
     .sort({ timestamp: 1 })
     .toArray();
 
+  if (history.length === 0 && bench === 'lucknow') {
+    history = await collection.find({ courtNo, date, bench: { $exists: false } }).sort({ timestamp: 1 }).toArray();
+  }
   const nowMs = Date.now();
   const filteredHistory = history.filter((record, index) =>
     shouldKeepHistoryRecord(record, history[index + 1] || null, nowMs)

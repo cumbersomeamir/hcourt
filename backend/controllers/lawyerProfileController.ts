@@ -4,17 +4,19 @@ import {
   serializeLawyerProfile,
   upsertLawyerProfile,
 } from '@/lib/lawyerProfiles';
+import { getAuthenticatedUser } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   try {
+    const user = getAuthenticatedUser(request);
     const { searchParams } = new URL(request.url);
     const profile = await findLawyerProfile({
-      profileKey: searchParams.get('profileKey'),
-      userId: searchParams.get('userId'),
-      email: searchParams.get('email'),
+      profileKey: user ? null : searchParams.get('profileKey'),
+      userId: user?.userId || searchParams.get('userId'),
+      email: user?.email || searchParams.get('email'),
     });
 
     return NextResponse.json({
@@ -31,11 +33,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = getAuthenticatedUser(request);
     const body = await request.json();
     const profile = await upsertLawyerProfile({
-      profileKey: body.profileKey,
-      userId: body.userId,
-      email: body.email,
+      profileKey: user ? null : body.profileKey,
+      userId: user?.userId || body.userId,
+      email: user?.email || body.email,
       counselName: body.counselName,
       aliases: body.aliases,
       chamberAliases: body.chamberAliases,

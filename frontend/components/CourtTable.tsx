@@ -8,9 +8,10 @@ interface CourtTableProps {
   courts: CourtCase[];
   lastUpdated?: Date;
   historyDate?: string;
+  bench?: 'allahabad' | 'lucknow';
 }
 
-export default function CourtTable({ courts, lastUpdated, historyDate }: CourtTableProps) {
+export default function CourtTable({ courts, lastUpdated, historyDate, bench = 'lucknow' }: CourtTableProps) {
   const [historyCourtNo, setHistoryCourtNo] = useState<string | null>(null);
 
   const openHistory = (courtNo: string) => {
@@ -224,6 +225,7 @@ export default function CourtTable({ courts, lastUpdated, historyDate }: CourtTa
         isOpen={Boolean(historyCourtNo)}
         courtNo={historyCourtNo}
         date={historyDate || ''}
+        bench={bench}
         onClose={closeHistory}
       />
     </div>

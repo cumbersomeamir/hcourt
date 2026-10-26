@@ -44,6 +44,13 @@ next-env.d.ts
 logs/
 *.log
 
+/ops/cloudflared.exe
+/ops/*.png
+/*.png
+/*.docx
+
 # nested apps
 node_modules/
 .next/
+/.codex-doc-review/
+/outputs/

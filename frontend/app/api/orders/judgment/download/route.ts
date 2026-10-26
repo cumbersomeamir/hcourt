@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     return Response.json({ success: false }, { status: upstream.status || 502 });
   }
 
-  const filename = String(data.result.filename || 'hcourt-order.pdf').replace(/["\r\n]/g, '');
+  const filename = String(data.result.filename || 'courtlens-order.pdf').replace(/["\r\n]/g, '');
   return new Response(Buffer.from(String(data.result.base64), 'base64'), {
     headers: {
       'Content-Type': String(data.result.mimeType || 'application/pdf'),

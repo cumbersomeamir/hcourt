@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Notification } from '@/types/court';
+import { downloadBase64File } from '@/lib/download';
 
 interface NotificationsPanelProps {
   isOpen: boolean;
@@ -10,19 +11,6 @@ interface NotificationsPanelProps {
   trackedOrderTrackingKeys?: string[];
   userId?: string | null;
   onUnreadCountChange?: (count: number) => void;
-}
-
-function downloadBase64(filename: string, base64: string, mime: string) {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 export default function NotificationsPanel({
@@ -90,10 +78,10 @@ export default function NotificationsPanel({
       if (!data.success || !data.result) {
         throw new Error(data.error || 'Failed to download order/judgment');
       }
-      downloadBase64(
+      downloadBase64File(
         data.result.filename,
-        data.result.base64,
-        data.result.mimeType || 'application/pdf'
+        data.result.mimeType || 'application/pdf',
+        data.result.base64
       );
     } catch (error) {
       console.error('Error downloading order/judgment:', error);

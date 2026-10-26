@@ -6,7 +6,7 @@ import { Cinzel, Manrope } from 'next/font/google';
 import { TrackedOrderCase } from '@/types/court';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
-import { courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -588,9 +588,7 @@ export default function TrackCasesPage() {
               </section>
 
               {error && (
-                <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-                  {error}
-                </div>
+                <CourtSourceError message={error} />
               )}
             </div>
           </div>

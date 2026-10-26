@@ -2,6 +2,9 @@ import { Buffer } from 'node:buffer';
 import { runAiAssistantChat } from '../lib/aiAssistant';
 
 async function main() {
+  console.log = (...args: unknown[]) => console.error(...args);
+  console.info = (...args: unknown[]) => console.error(...args);
+
   const encodedPayload = String(process.argv[2] || '').trim();
   if (!encodedPayload) {
     throw new Error('Missing AI chat payload');

@@ -4,6 +4,7 @@ if (typeof window !== 'undefined') {
 }
 
 import * as cheerio from 'cheerio';
+import { uploadMediaToR2 } from './r2';
 
 const USER_AGENT = 'Mozilla/5.0';
 const BASE_URL = 'https://www2.allahabadhighcourt.in';
@@ -142,6 +143,8 @@ export async function downloadMediationListFile(fileUrl: string): Promise<Mediat
   const filename = filenameToken ? safeFileToken(filenameToken) : `mediation-list-${Date.now()}.bin`;
   const headerMime = normalizeText(response.headers.get('content-type') || '');
   const mimeType = headerMime || guessMimeType(parsed.toString());
+
+  await uploadMediaToR2({ bytes, filename, contentType: mimeType, folder: 'cause-lists/mediation' });
 
   return {
     filename,

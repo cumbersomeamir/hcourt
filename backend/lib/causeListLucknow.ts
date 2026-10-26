@@ -6,6 +6,7 @@ if (typeof window !== 'undefined') {
 import * as cheerio from 'cheerio';
 import type { Element } from 'domhandler';
 import ExcelJS from 'exceljs';
+import { uploadMediaToR2 } from './r2';
 
 const USER_AGENT = 'Mozilla/5.0';
 const BASE_URL = 'https://hclko.allahabadhighcourt.in/causelist';
@@ -269,7 +270,7 @@ async function buildCounselExcel(input: {
   rows: LucknowCounselRow[];
 }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'hcourt';
+  wb.creator = 'Courtlens';
 
   const summary = wb.addWorksheet('Summary');
   summary.columns = [
@@ -438,6 +439,8 @@ export async function downloadLucknowCourtPdf(pdfUrl: string): Promise<LucknowPd
   } catch {
     filename = `cause-list-lucknow-${Date.now()}.pdf`;
   }
+
+  await uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/lucknow' });
 
   return {
     filename,

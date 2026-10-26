@@ -12,6 +12,8 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { Agent } from 'undici';
+import { uploadMediaToR2 } from './r2';
+import { recognizeImageText } from './ideaverseOcr';
 
 const USER_AGENT = 'Mozilla/5.0';
 const BASE_URL = 'https://www.allahabadhighcourt.in/causelist';
@@ -443,6 +445,8 @@ export async function downloadAllahabadCourtPdf(pdfUrl: string): Promise<CauseLi
     filename = `cause-list-${Date.now()}.pdf`;
   }
 
+  await uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/allahabad' });
+
   return {
     filename,
     mimeType: 'application/pdf',
@@ -485,6 +489,22 @@ function buildSixCharCandidates(raw: string): string[] {
 }
 
 async function getCounselCaptchaCandidates(image: Buffer): Promise<string[]> {
+  const ocrCandidates = await recognizeImageText(image);
+  const ocrScored = new Map<string, number>();
+  for (const raw of ocrCandidates) {
+    for (const candidate of buildSixCharCandidates(raw)) {
+      ocrScored.set(candidate, (ocrScored.get(candidate) || 0) + 10);
+    }
+  }
+  if (ocrScored.size > 0) {
+    return Array.from(ocrScored.entries())
+      .sort((a, b) => {
+        if (a[1] !== b[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([candidate]) => candidate);
+  }
+
   const tmpRoot = realpathSync(os.tmpdir());
   const workDir = mkdtempSync(path.join(tmpRoot, 'hcourt-cause-cap-'));
 
@@ -715,7 +735,7 @@ async function buildCounselExcel(input: {
   rows: CauseListCounselRow[];
 }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'hcourt';
+  wb.creator = 'Courtlens';
 
   const summary = wb.addWorksheet('Summary');
   summary.columns = [

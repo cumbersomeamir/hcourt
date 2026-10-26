@@ -7,12 +7,14 @@ import {
   normalizeTrackedOrderCases,
 } from '@/lib/tracking';
 import { getCourtHistory } from '@/lib/courtHistory';
-import { syncSchedule } from '@/lib/scheduleSync';
+import { getStoredScheduleByDate, syncSchedule } from '@/lib/scheduleSync';
 import { fetchAllahabadCounselCauseList, fetchLucknowCounselCauseList } from '@/models/causeListModel';
 import { fetchCaseTypes, fetchOrders } from '@/models/ordersModel';
 import { Notification, TrackedOrderCase } from '@/types/court';
 import { findLawyerProfile, markLawyerProfileUsed, serializeLawyerProfile } from '@/lib/lawyerProfiles';
 import {
+  getLatestStatusSnapshot,
+  getLatestWebDiarySnapshot,
   recordAiChatRun,
   saveCauseListSnapshot,
   saveNotificationSummary,
@@ -81,10 +83,30 @@ const ALLOWED_TOOLS = new Set([
   'get_case_status',
   'check_cause_list_assignments',
   'get_web_diary',
+  'get_today_court_view',
   'check_courtroom_transfer',
   'get_alerts',
   'track_case',
+  'untrack_case',
 ]);
+
+function isAppToolRequest(message: string) {
+  const normalized = normalizeIntentText(message);
+  const hasCaseReference = Boolean(extractCaseId(message) || extractCaseNumberParts(message));
+  const hasSavedContext = /\b(?:my\s+)?(?:tracked|saved)?\s*cases?\b/.test(normalized) &&
+    /\b(my|tracked|saved)\b/.test(normalized);
+  if (/^(what is|what are|explain|how do|how can|why does|draft|write|summarize)\b/.test(normalized) && !hasCaseReference && !hasSavedContext) {
+    return false;
+  }
+  return Boolean(
+    hasCaseReference ||
+      /\b(track|tracked|tracking|untrack|saved|my cases?|case status|orders?|judgments?|pdfs?|cause list|web diary|court view|live board|alerts?|notifications?|courtroom transfer)\b/.test(normalized)
+  );
+}
+
+function isDisallowedAiRequest(message: string) {
+  return /\b(child sexual|sexual content involving (a )?minor|build (a )?bomb|make (a )?bomb|create malware|steal passwords?|phishing kit|non-consensual intimate|fake official (court|government) document)\b/i.test(message);
+}
 
 function normalizeClientState(state: AiClientState): NormalizedClientState {
   return {
@@ -194,7 +216,7 @@ function extractCaseId(message: string): string | null {
 }
 
 function extractCaseNumberParts(message: string) {
-  const match = message.match(/([A-Za-z][A-Za-z .()/-]{1,50}?)\s+(\d{1,8})\s+(?:of|\/)\s+(\d{4})/i);
+  const match = message.match(/([A-Za-z][A-Za-z .()/-]{1,50}?)\s+(\d{1,8})\s*(?:(?:of|\/|-)\s*)?(\d{4})\b/i);
   if (!match) return null;
   return {
     caseTypeQuery: cleanCaseTypeQuery(match[1].trim()),
@@ -232,6 +254,8 @@ function cleanCaseTypeQuery(value: string) {
   let nextValue = String(value || '').trim();
 
   const leadingPatterns = [
+    /^(?:i\s+(?:need|want)|give\s+me|send\s+me)(?:\s+the)?(?:\s+(?:order|judgment))?\s+pdf(?:\s+(?:for|of))?\s+/i,
+    /^(?:download|open|get|fetch)(?:\s+the)?(?:\s+(?:order|judgment))?\s+pdf(?:\s+(?:for|of))?\s+/i,
     /^(what(?:'s| is)? the status of)\s+/i,
     /^(what(?:'s| is)? status of)\s+/i,
     /^(status of)\s+/i,
@@ -244,6 +268,9 @@ function cleanCaseTypeQuery(value: string) {
     /^(what(?:'s| is)? the latest order for)\s+/i,
     /^(latest order in)\s+/i,
     /^(latest order for)\s+/i,
+    /^(fetch|get|find)(?: me)?(?: the)? latest (?:order|judgment) (?:for|of|in)\s+/i,
+    /^(fetch|get|find)(?: me)?(?: the)? (?:orders?|judgments?)(?: and (?:orders?|judgments?))? (?:for|of|in)\s+/i,
+    /^(fetch|get|find)(?: me)?(?: the)? (?:order and judgment|judgment and order) (?:for|of|in)\s+/i,
     /^(how many orders are there in)\s+/i,
     /^(how many orders in)\s+/i,
     /^(orders in)\s+/i,
@@ -285,7 +312,39 @@ function extractBenchMention(message: string): 'lucknow' | 'allahabad' | null {
 
 function extractReferencedDate(message: string) {
   const match = String(message || '').match(/\b\d{1,4}[\/.-]\d{1,2}[\/.-]\d{1,4}\b/);
-  return match?.[0] || '';
+  if (match) return match[0];
+
+  const namedDate = String(message || '').match(
+    /\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s*,?\s*(\d{4}))?\b/i
+  );
+  if (!namedDate) return '';
+
+  const monthNames = [
+    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+    'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+  ];
+  const month = monthNames.indexOf(namedDate[2].slice(0, 3).toLowerCase()) + 1;
+  const currentYear = Number(getTimeZoneDateKey(new Date())?.slice(0, 4));
+  const year = Number(namedDate[3] || currentYear);
+  const day = Number(namedDate[1]);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) return '';
+
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function extractRelativeDate(message: string) {
+  const normalized = normalizeIntentText(message);
+  if (!/\b(today|yesterday|previous day)\b/.test(normalized)) return '';
+  const date = new Date();
+  if (/\b(yesterday|previous day)\b/.test(normalized)) {
+    date.setUTCDate(date.getUTCDate() - 1);
+  }
+  return getTimeZoneDateKey(date) || '';
 }
 
 function getTimeZoneDateKey(input: Date | string, timeZone = DISPLAY_TIME_ZONE) {
@@ -319,7 +378,16 @@ function isTrackedCasesLookup(message: string) {
 
 function isTrackedCasesStatusLookup(message: string) {
   const lowerMessage = normalizeIntentText(message);
+  const referencesTrackedCases =
+    /\b(track|tracked|tracking|saved)\b/.test(lowerMessage) &&
+    /\bcases?\b/.test(lowerMessage);
+  const asksForTrackedOrders =
+    /\b(orders?|judgments?)\b/.test(lowerMessage) &&
+    (referencesTrackedCases || /\bmy cases?\b/.test(lowerMessage)) &&
+    !/\b(new|updates?|alerts?)\b/.test(lowerMessage);
+  if (asksForTrackedOrders) return true;
   if (!/\bstatus\b/.test(lowerMessage)) return false;
+  if (referencesTrackedCases) return true;
 
   return [
     /\bwhat('?s| is)? the status of my cases?\b/,
@@ -355,8 +423,12 @@ function isOrderListLookup(message: string) {
   return [
     /\bshow( me)?\b.*\borders?\b/,
     /\blist\b.*\borders?\b/,
+    /\b(fetch|get|find)\b.*\borders?\b/,
     /\bshow( me)?\b.*\bjudgments?\b/,
     /\blist\b.*\bjudgments?\b/,
+    /\b(fetch|get|find)\b.*\bjudgments?\b/,
+    /\b(?:pdf|download)\b.*\b(?:order|judgment|case)\b/,
+    /\b(?:order|judgment|case)\b.*\b(?:pdf|download)\b/,
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
@@ -379,10 +451,10 @@ function isAlertsLookup(message: string) {
 }
 
 function getCaseStatusResponseMode(message: string, useTrackedCases: boolean) {
-  if (useTrackedCases) return 'tracked_overview' as const;
   if (isLatestOrderLookup(message)) return 'latest_order' as const;
   if (isOrderListLookup(message)) return 'order_list' as const;
   if (isOrderCountLookup(message)) return 'order_count' as const;
+  if (useTrackedCases) return 'tracked_overview' as const;
   return 'status' as const;
 }
 
@@ -402,17 +474,20 @@ function isTrackAction(message: string) {
   ].some((pattern) => pattern.test(lowerMessage));
 }
 
+function isUntrackAction(message: string) {
+  const lowerMessage = normalizeIntentText(message);
+  return [
+    /\buntrack\b/,
+    /\bstop tracking\b/,
+    /\bremove\b.*\b(track|tracked|tracking|my cases|saved cases)\b/,
+    /\bdelete\b.*\b(track|tracked|tracking|my cases|saved cases)\b/,
+  ].some((pattern) => pattern.test(lowerMessage));
+}
+
 function isCauseListAssignmentLookup(message: string) {
   const lowerMessage = normalizeIntentText(message);
   if (!lowerMessage.includes('cause list')) return false;
-
-  return [
-    /\bassigned to me\b/,
-    /\bany case assigned to me\b/,
-    /\bfor me\b/,
-    /\bmy aliases\b/,
-    /\bmy lawyer profile\b/,
-  ].some((pattern) => pattern.test(lowerMessage));
+  return true;
 }
 
 function isWebDiaryLookup(message: string) {
@@ -454,6 +529,11 @@ async function resolveCaseTypeValue(
   const normalizedCandidate = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
   const exactByValue = options.find((option) => option.value === candidate);
   if (exactByValue) return exactByValue;
+
+  if (normalizedCandidate === 'WRIT') {
+    const writC = options.find((option) => /\bWRIC\b/i.test(option.label));
+    if (writC) return writC;
+  }
 
   const scored = options
     .map((option) => {
@@ -501,6 +581,42 @@ function findLatestCaseContext(history: ChatTurn[]) {
       const context = pickCaseContext(data);
       if (context) return context;
     }
+
+    const caseId = extractCaseId(turn.content);
+    if (caseId) {
+      const [caseType, caseNo, caseYear] = caseId.split('/');
+      return {
+        city: extractBenchMention(turn.content) || 'lucknow',
+        caseType,
+        caseTypeQuery: caseType,
+        caseNo,
+        caseYear,
+        caseId,
+      };
+    }
+
+    const parts = extractCaseNumberParts(turn.content);
+    if (parts) {
+      return {
+        city: extractBenchMention(turn.content) || 'lucknow',
+        caseType: parts.caseTypeQuery,
+        caseId: undefined,
+        ...parts,
+      };
+    }
+
+    const numberYear = turn.content.match(/\b(\d{1,8})\s*(?:\/|of)\s*(\d{4})\b/i);
+    const acronym = turn.content.match(/\(([A-Z][A-Z0-9-]{1,12})\)/i);
+    if (numberYear && acronym) {
+      return {
+        city: extractBenchMention(turn.content) || 'lucknow',
+        caseType: acronym[1].toUpperCase(),
+        caseTypeQuery: acronym[1].toUpperCase(),
+        caseNo: numberYear[1],
+        caseYear: numberYear[2],
+        caseId: `${acronym[1].toUpperCase()}/${numberYear[1]}/${numberYear[2]}`,
+      };
+    }
   }
 
   return null;
@@ -508,8 +624,35 @@ function findLatestCaseContext(history: ChatTurn[]) {
 
 async function buildPlanner(message: string, history: ChatTurn[], clientState: NormalizedClientState, lawyerProfile: ReturnType<typeof serializeLawyerProfile>) {
   const latestCaseContext = findLatestCaseContext(history);
+  if (isWebDiaryLookup(message)) {
+    return { tools: [{ name: 'get_web_diary', arguments: {} }] };
+  }
+
+  const directCaseParts = extractCaseNumberParts(message);
+  if (
+    directCaseParts &&
+    /\b(case status|orders?|judgments?|pdfs?)\b/.test(normalizeIntentText(message))
+  ) {
+    return {
+      tools: [
+        {
+          name: 'get_case_status',
+          arguments: {
+            city: extractBenchMention(message) || normalizeBench(message),
+            ...directCaseParts,
+          },
+        },
+      ],
+    };
+  }
+
   const fallbackPlanner = () => {
     const lowerMessage = normalizeIntentText(message);
+    if (isUntrackAction(message)) {
+      return {
+        tools: [{ name: 'untrack_case', arguments: { ...latestCaseContext, caseId: extractCaseId(message) || latestCaseContext?.caseId } }],
+      };
+    }
     if (isTrackedCasesLookup(message)) {
       return { tools: [{ name: 'get_my_cases', arguments: {} }] };
     }
@@ -537,8 +680,9 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             name: 'track_case',
             arguments: {
-              caseId,
-              city: extractBenchMention(message) || undefined,
+              ...(latestCaseContext || {}),
+              caseId: caseId || latestCaseContext?.caseId,
+              city: extractBenchMention(message) || latestCaseContext?.city || undefined,
               ...(caseParts || {}),
             },
           },
@@ -548,6 +692,10 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
 
     if (isCauseListAssignmentLookup(message)) {
       return { tools: [{ name: 'check_cause_list_assignments', arguments: {} }] };
+    }
+
+    if (isCourtViewLookup(message)) {
+      return { tools: [{ name: 'get_today_court_view', arguments: {} }] };
     }
 
     if (isCourtroomTransferLookup(message)) {
@@ -567,7 +715,8 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
     if (
       lowerMessage.includes('status') ||
       lowerMessage.includes('judgment') ||
-      lowerMessage.includes('order')
+      lowerMessage.includes('order') ||
+      lowerMessage.includes('pdf')
     ) {
       const extractedParts = extractCaseNumberParts(message);
       return {
@@ -589,7 +738,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
       return { tools: [{ name: 'get_web_diary', arguments: {} }] };
     }
 
-    return { tools: [{ name: 'get_my_cases', arguments: {} }] };
+    return { tools: [] };
   };
 
   const historyText = history
@@ -623,7 +772,7 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
           {
             role: 'system',
             content:
-              'You route lawyer requests inside a court-monitoring app. Return only valid JSON. Schema: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, check_courtroom_transfer, get_alerts, track_case. If the request is about which cases are already being tracked or saved, use get_my_cases, not track_case. If the request asks for the status of saved, tracked, or "my" cases, use get_case_status with {"useTrackedCases":true}. If the request asks for alerts or updates on tracked/my/saved cases, use get_alerts. If the request is about "assigned to me", use check_cause_list_assignments. If it is about transfer or movement in a courtroom, use check_courtroom_transfer. If it is about case status or orders/judgments for a specific case, use get_case_status. If it is about saving or tracking a new case, use track_case. Never treat "which cases are tracked", "show tracked cases", or "updates in my tracked cases" as track_case.',
+              'You route requests inside a court-monitoring app. Return only valid JSON: {"tools":[{"name":"tool_name","arguments":{}}]}. Use at most 3 tools. Available tools: get_my_cases, get_case_status, check_cause_list_assignments, get_web_diary, get_today_court_view, check_courtroom_transfer, get_alerts, track_case, untrack_case. Use tools only for live or saved app data and mutations. Use get_today_court_view for Court View/live-board questions, get_web_diary for diary notices, check_cause_list_assignments for cause-list questions, get_my_cases to list saved cases, get_case_status for status/orders/judgments, get_alerts for alerts, track_case to save a case, and untrack_case to remove one. Return an empty tools array for explanations, drafting, general legal information, app-how-to questions, or normal conversation. Never invent missing arguments.',
           },
           {
             role: 'user',
@@ -687,6 +836,12 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
     return { tools: [{ name: 'get_my_cases', arguments: {} }] };
   }
 
+  if (isUntrackAction(message)) {
+    return {
+      tools: [{ name: 'untrack_case', arguments: { ...latestCaseContext, caseId: extractCaseId(message) || latestCaseContext?.caseId } }],
+    };
+  }
+
   if (isTrackedCasesStatusLookup(message)) {
     return { tools: [{ name: 'get_case_status', arguments: { useTrackedCases: true } }] };
   }
@@ -697,6 +852,10 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
 
   if (isCauseListAssignmentLookup(message)) {
     return { tools: [{ name: 'check_cause_list_assignments', arguments: {} }] };
+  }
+
+  if (isCourtViewLookup(message)) {
+    return { tools: [{ name: 'get_today_court_view', arguments: {} }] };
   }
 
   if (isCourtroomTransferLookup(message)) {
@@ -723,8 +882,9 @@ async function buildPlanner(message: string, history: ChatTurn[], clientState: N
         {
           name: 'track_case',
           arguments: {
-            caseId: extractCaseId(message) || undefined,
-            city: extractBenchMention(message) || undefined,
+            ...(latestCaseContext || {}),
+            caseId: extractCaseId(message) || latestCaseContext?.caseId,
+            city: extractBenchMention(message) || latestCaseContext?.city || undefined,
             ...(extractCaseNumberParts(message) || {}),
           },
         },
@@ -854,8 +1014,29 @@ async function loadTrackedStatuses(
   clientState: NormalizedClientState
 ): Promise<ExecutedToolResult> {
   const effectiveCaseIds = getEffectiveTrackedCaseIds(clientState);
+  const resolvedTrackedOrderCases = [...clientState.trackedOrderCases];
 
-  if (effectiveCaseIds.length === 0 && clientState.trackedOrderCases.length === 0) {
+  for (const caseId of effectiveCaseIds) {
+    if (
+      resolvedTrackedOrderCases.some(
+        (trackedCase) => deriveCaseIdFromTrackedOrderCase(trackedCase) === caseId
+      )
+    ) {
+      continue;
+    }
+
+    const registryTracker = await findTrackedOrderCaseByCaseId(db, clientState, caseId);
+    if (
+      registryTracker &&
+      !resolvedTrackedOrderCases.some(
+        (trackedCase) => trackedCase.trackingKey === registryTracker.trackingKey
+      )
+    ) {
+      resolvedTrackedOrderCases.push(registryTracker);
+    }
+  }
+
+  if (effectiveCaseIds.length === 0 && resolvedTrackedOrderCases.length === 0) {
     return {
       tool: 'get_case_status',
       ok: false,
@@ -886,6 +1067,12 @@ async function loadTrackedStatuses(
         title: string | null;
         latestOrderDate: string | null;
         orderJudgmentsCount: number;
+        orderJudgments: Array<{
+          srNo: number;
+          date: string;
+          viewUrl: string;
+          judgmentId: string;
+        }>;
       };
     }
   >();
@@ -900,7 +1087,7 @@ async function loadTrackedStatuses(
     });
   }
 
-  for (const trackedCase of clientState.trackedOrderCases) {
+  for (const trackedCase of resolvedTrackedOrderCases) {
     const derivedCaseId = deriveCaseIdFromTrackedOrderCase(trackedCase);
     const caseKey = derivedCaseId || trackedCase.trackingKey;
     const existing = caseEntries.get(caseKey);
@@ -972,7 +1159,7 @@ async function loadTrackedStatuses(
     }
   }
 
-  const trackedOrderCasesToCheck = clientState.trackedOrderCases.slice(0, 5);
+  const trackedOrderCasesToCheck = resolvedTrackedOrderCases.slice(0, 5);
   for (const trackedCase of trackedOrderCasesToCheck) {
     try {
       const result = await withTimeout(
@@ -1021,9 +1208,34 @@ async function loadTrackedStatuses(
           title: result.caseInfo.petitionerVsRespondent || null,
           latestOrderDate: result.orderJudgments[0]?.date || null,
           orderJudgmentsCount: result.orderJudgments.length,
+          orderJudgments: result.orderJudgments,
         },
       });
     } catch (error) {
+      const snapshot = await getLatestStatusSnapshot(db, trackedCase);
+      if (snapshot) {
+        const derivedCaseId = deriveCaseIdFromTrackedOrderCase(trackedCase);
+        const caseKey = derivedCaseId || trackedCase.trackingKey;
+        const existing = caseEntries.get(caseKey);
+        caseEntries.set(caseKey, {
+          caseKey,
+          caseId: derivedCaseId || existing?.caseId || null,
+          referenceLabel: derivedCaseId || existing?.referenceLabel || formatTrackedOrderLabel(trackedCase),
+          trackingModes: Array.from(new Set([...(existing?.trackingModes || []), 'order-status'])),
+          trackingKey: trackedCase.trackingKey,
+          liveBoard: existing?.liveBoard,
+          orderStatus: {
+            trackingKey: trackedCase.trackingKey,
+            city: trackedCase.city,
+            caseLabel: `${snapshot.caseInfo.caseType} ${trackedCase.caseNo}/${trackedCase.caseYear}`,
+            status: snapshot.caseInfo.status || null,
+            title: snapshot.caseInfo.petitionerVsRespondent || null,
+            latestOrderDate: snapshot.orderJudgments[0]?.date || null,
+            orderJudgmentsCount: snapshot.orderJudgments.length,
+            orderJudgments: snapshot.orderJudgments,
+          },
+        });
+      }
       errors.push(
         error instanceof Error
           ? error.message
@@ -1032,7 +1244,7 @@ async function loadTrackedStatuses(
     }
   }
 
-  const skippedOrderCases = Math.max(clientState.trackedOrderCases.length - trackedOrderCasesToCheck.length, 0);
+  const skippedOrderCases = Math.max(resolvedTrackedOrderCases.length - trackedOrderCasesToCheck.length, 0);
   const cases = Array.from(caseEntries.values());
   const visibleCount = cases.filter((entry) => entry.liveBoard?.visible).length;
   const orderLoadedCount = cases.filter((entry) => entry.orderStatus).length;
@@ -1058,6 +1270,46 @@ async function runTool(
   const db = await getDb();
   const trackedCaseIds = [...clientState.trackedCaseIds];
   const trackedOrderCases = [...clientState.trackedOrderCases];
+
+  if (tool.name === 'get_today_court_view') {
+    const bench = normalizeBench(String(tool.arguments?.bench || extractBenchMention(message) || 'lucknow'));
+    const requestedDate = extractReferencedDate(message) || extractRelativeDate(message);
+    const dateKey = requestedDate
+      ? (() => {
+          const parts = parseDateParts(requestedDate);
+          return parts
+            ? `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+            : '';
+        })()
+      : '';
+    const todayKey = getTimeZoneDateKey(new Date());
+    const schedule = dateKey && dateKey !== todayKey
+      ? await getStoredScheduleByDate(db, dateKey, bench)
+      : (await withTimeout(
+          syncSchedule({ db, source: 'ai-chat', bench, staleAfterMs: 30_000, runTrackedOrders: false }),
+          20_000,
+          `${bench} Court View live fetch`
+        )).schedule;
+    if (!schedule) {
+      return {
+        tool: tool.name,
+        ok: false,
+        summary: `Court View snapshot is not available for ${dateKey || 'today'}.`,
+      };
+    }
+
+    return {
+      tool: tool.name,
+      ok: true,
+      summary: `Loaded saved ${bench} Court View for ${schedule.date}, updated ${formatDisplayTimestamp(schedule.lastUpdated) || 'recently'}.`,
+      data: {
+        bench,
+        date: schedule.date,
+        lastUpdated: schedule.lastUpdated,
+        courts: schedule.courts.slice(0, 60),
+      },
+    };
+  }
 
   if (tool.name === 'get_my_cases') {
     const effectiveCaseIds = getEffectiveTrackedCaseIds(clientState);
@@ -1111,6 +1363,57 @@ async function runTool(
     };
   }
 
+  if (tool.name === 'untrack_case') {
+    const caseId = String(
+      getToolArg(tool.arguments, 'caseId', 'case_id') || extractCaseId(message) || ''
+    ).trim().toUpperCase();
+    const caseNo = String(getToolArg(tool.arguments, 'caseNo', 'case_no') || '').trim();
+    const caseYear = String(getToolArg(tool.arguments, 'caseYear', 'case_year') || '').trim();
+    const caseType = String(
+      getToolArg(tool.arguments, 'caseType', 'case_type', 'caseTypeQuery', 'case_type_query') || ''
+    ).trim();
+
+    if (!caseId && (!caseNo || !caseYear || !caseType)) {
+      return { tool: tool.name, ok: false, summary: 'Tell me which case to stop tracking.' };
+    }
+
+    const nextTrackedCaseIds = caseId
+      ? trackedCaseIds.filter((entry) => entry !== caseId)
+      : trackedCaseIds;
+    const nextTrackedOrderCases = trackedOrderCases.filter((entry) => {
+      if (caseId && deriveCaseIdFromTrackedOrderCase(entry) === caseId) return false;
+      return !(
+        entry.caseNo === caseNo &&
+        entry.caseYear === caseYear &&
+        (entry.caseType === caseType || entry.caseTypeLabel === caseType)
+      );
+    });
+
+    if (
+      nextTrackedCaseIds.length === trackedCaseIds.length &&
+      nextTrackedOrderCases.length === trackedOrderCases.length
+    ) {
+      return { tool: tool.name, ok: false, summary: 'That case is not currently tracked.' };
+    }
+
+    if (clientState.userId) {
+      await db.collection('users').updateOne(
+        clientState.email
+          ? { email: clientState.email }
+          : { userId: clientState.userId },
+        { $set: { caseIds: nextTrackedCaseIds, trackedOrderCases: nextTrackedOrderCases, updatedAt: new Date() } }
+      );
+    }
+
+    return {
+      tool: tool.name,
+      ok: true,
+      summary: `Stopped tracking ${caseId || `${caseType} ${caseNo}/${caseYear}`}.`,
+      clientMutation: { trackedCaseIds: nextTrackedCaseIds, trackedOrderCases: nextTrackedOrderCases },
+      data: { trackedCaseIds: nextTrackedCaseIds, trackedOrderCases: nextTrackedOrderCases },
+    };
+  }
+
   if (tool.name === 'track_case') {
     const caseId = String(
       getToolArg(tool.arguments, 'caseId', 'case_id') || extractCaseId(message) || ''
@@ -1140,6 +1443,31 @@ async function runTool(
         explicitCaseIds: [caseId],
       });
       changeSummary = `Case ID ${caseId} is now tracked.`;
+
+      const [caseTypeFromId, caseNoFromId, caseYearFromId] = caseId.split('/');
+      const resolvedCaseType = await resolveCaseTypeValue(city, caseTypeFromId);
+      const trackedOrderCase = resolvedCaseType
+        ? normalizeTrackedOrderCase({
+            city,
+            caseType: resolvedCaseType.value,
+            caseTypeLabel: resolvedCaseType.label,
+            caseNo: caseNoFromId,
+            caseYear: caseYearFromId,
+          })
+        : null;
+
+      if (trackedOrderCase) {
+        if (!nextTrackedOrderCases.some((entry) => entry.trackingKey === trackedOrderCase.trackingKey)) {
+          nextTrackedOrderCases = [...nextTrackedOrderCases, trackedOrderCase];
+        }
+        await upsertCaseRegistry(db, {
+          caseKey: caseId,
+          canonicalCaseId: caseId,
+          explicitCaseIds: [caseId],
+          orderTrackers: [trackedOrderCase],
+        });
+        changeSummary = `Case ${caseId} is now tracked with order-status updates.`;
+      }
     } else if (caseNo && caseYear && caseTypeCandidate) {
       const resolvedCaseType = await resolveCaseTypeValue(city, caseTypeCandidate);
       if (!resolvedCaseType) {
@@ -1189,7 +1517,9 @@ async function runTool(
     if (clientState.userId) {
       const usersCollection = db.collection('users');
       await usersCollection.updateOne(
-        { _id: new (await import('mongodb')).ObjectId(clientState.userId) },
+        clientState.email
+          ? { email: clientState.email }
+          : { userId: clientState.userId },
         {
           $set: {
             caseIds: nextTrackedCaseIds,
@@ -1242,6 +1572,13 @@ async function runTool(
           ''
       ).trim()
     );
+
+    if (caseId && (!caseNo || !caseYear || !caseTypeCandidate)) {
+      const [caseTypeFromId, caseNoFromId, caseYearFromId] = caseId.split('/');
+      caseTypeCandidate = caseTypeCandidate || caseTypeFromId || '';
+      caseNo = caseNo || caseNoFromId || '';
+      caseYear = caseYear || caseYearFromId || '';
+    }
 
     if (useTrackedCases && !caseNo && !caseYear && !caseTypeCandidate && !caseId) {
       const trackedResult = await loadTrackedStatuses(db, clientState);
@@ -1350,21 +1687,42 @@ async function runTool(
       };
     }
 
-    const resolvedCaseType = await resolveCaseTypeValue(city, caseTypeCandidate);
-    if (!resolvedCaseType) {
+    const mentionedBench = extractBenchMention(message);
+    const benches: Array<'lucknow' | 'allahabad'> = mentionedBench
+      ? [mentionedBench]
+      : [city, city === 'lucknow' ? 'allahabad' : 'lucknow'];
+    let resolvedCaseType: Awaited<ReturnType<typeof resolveCaseTypeValue>> = null;
+    let result: Awaited<ReturnType<typeof fetchOrders>> | null = null;
+    let lastError: unknown = null;
+
+    for (const bench of benches) {
+      const resolved = await resolveCaseTypeValue(bench, caseTypeCandidate);
+      if (!resolved) continue;
+      try {
+        result = await fetchOrders({
+          city: bench,
+          caseType: resolved.value,
+          caseNo,
+          caseYear,
+        });
+        city = bench;
+        resolvedCaseType = resolved;
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!resolvedCaseType || !result) {
       return {
         tool: tool.name,
         ok: false,
-        summary: `Could not match case type "${caseTypeCandidate}" for ${city}.`,
+        summary:
+          lastError instanceof Error
+            ? `Could not fetch this case from the court right now: ${lastError.message}`
+            : `Could not match case type "${caseTypeCandidate}" for either bench.`,
       };
     }
-
-    const result = await fetchOrders({
-      city,
-      caseType: resolvedCaseType.value,
-      caseNo,
-      caseYear,
-    });
 
     const caseKey =
       caseId ||
@@ -1491,15 +1849,9 @@ async function runTool(
 
     const rawDate =
       inputDate ||
-      extractReferencedDate(message);
-
-    if (!rawDate) {
-      return {
-        tool: tool.name,
-        ok: false,
-        summary: 'Cause list assignment checks need a date.',
-      };
-    }
+      extractReferencedDate(message) ||
+      extractRelativeDate(message) ||
+      getTimeZoneDateKey(new Date()) || '';
 
     const benchResults: Array<{
       bench: 'lucknow' | 'allahabad';
@@ -1592,7 +1944,11 @@ async function runTool(
   }
 
   if (tool.name === 'get_web_diary') {
-    const rawDate = String(tool.arguments?.date || '').trim() || extractReferencedDate(message);
+    const requestedBench = extractBenchMention(message);
+    const rawDate =
+      String(tool.arguments?.date || '').trim() ||
+      extractReferencedDate(message) ||
+      extractRelativeDate(message);
 
     const formatted = formatWebDiaryDate(rawDate || new Date().toLocaleDateString('en-GB'));
     if (!formatted) {
@@ -1612,9 +1968,36 @@ async function runTool(
       };
     }
 
+    const snapshotKey = requestedBench ? `${requestedBench}:${formatted}` : formatted;
+    const snapshot = await getLatestWebDiarySnapshot(db, snapshotKey);
+    const requestedDateKey = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+    const isToday = requestedDateKey === getTimeZoneDateKey(new Date());
+    if (
+      snapshot?.notifications.length &&
+      (!isToday || Date.now() - snapshot.fetchedAt.getTime() < 15 * 60 * 1000)
+    ) {
+      const notifications = (snapshot.notifications || []).filter((entry) => {
+        if (!requestedBench) return true;
+        const isLucknow = /\blucknow\b|\blko\b/i.test(entry.title || '');
+        return requestedBench === 'lucknow' ? isLucknow : !isLucknow;
+      });
+      return {
+        tool: tool.name,
+        ok: true,
+        summary: `Loaded saved web diary for ${formatted}, updated ${formatDisplayTimestamp(snapshot.fetchedAt) || 'recently'}.`,
+        data: {
+          date: formatted,
+          partial: false,
+          cached: true,
+          cachedAt: snapshot.fetchedAt,
+          notifications: notifications.slice(0, 8),
+        },
+      };
+    }
+
     const response = await getWebDiary(
       new Request(
-        `http://localhost/api/web-diary?date=${parts.day}&month=${parts.month}&year=${parts.year}`
+        `http://localhost/api/web-diary?date=${parts.day}&month=${parts.month}&year=${parts.year}${requestedBench ? `&bench=${requestedBench}` : ''}`
       )
     );
     const payload = (await response.json()) as {
@@ -1645,7 +2028,7 @@ async function runTool(
 
     const notifications = payload.data.notifications || [];
     await saveWebDiarySnapshot(db, {
-      date: formatted,
+      date: snapshotKey,
       notifications,
     });
 
@@ -2014,13 +2397,7 @@ function formatSpecificCaseStatusAnswer(data: Record<string, unknown>) {
   }
 
   if (caseInfo) {
-    const parts = [
-      status ? `Current status: ${status}.` : 'Current status is not shown in the source response.',
-      orderCount > 0
-        ? `${orderCount} order${orderCount === 1 ? '' : 's'} are available${latestOrderDate ? `, latest dated ${formatDisplayDate(latestOrderDate)}` : ''}.`
-        : 'No order/judgment entries are listed for this case.',
-    ];
-    return parts.join(' ');
+    return status ? `Current status: ${status}.` : 'Current status is not shown in the source response.';
   }
 
   if (liveBoard?.visible) {
@@ -2133,11 +2510,32 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
         : [];
 
       if (trackedCases.length > 0) {
+        const asksForOrders = /\b(orders?|judgments?)\b/.test(normalizeIntentText(message));
         const lines = trackedCases.map((entry) => {
           const parts: string[] = [];
           const label = String(entry.caseId || entry.referenceLabel || entry.caseKey || 'Tracked case');
           const liveBoard = entry.liveBoard as Record<string, unknown> | undefined;
           const orderStatus = entry.orderStatus as Record<string, unknown> | undefined;
+          const orders = Array.isArray(orderStatus?.orderJudgments)
+            ? (orderStatus.orderJudgments as Array<Record<string, unknown>>)
+            : [];
+
+          if (asksForOrders) {
+            if (!orderStatus) {
+              return `${label}\nI couldn't retrieve the orders or judgments for this case right now.`;
+            }
+
+            return [
+              `${label} — ${orderStatus.status || 'Status not shown'}`,
+              orders.length > 0
+                ? `${orders.length} order${orders.length === 1 ? '' : 's'} available:`
+                : 'No orders or judgments are currently listed.',
+              ...orders.map(
+                (order, index) =>
+                  `${index + 1}. ${formatDisplayDate(String(order.date || '')) || 'Date not shown'}`
+              ),
+            ].join('\n');
+          }
 
           if (liveBoard?.visible) {
             parts.push(
@@ -2148,11 +2546,9 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
           }
 
           if (orderStatus) {
-            parts.push(
-              `orders/status: ${orderStatus.status || 'status not shown'}, ${orderStatus.orderJudgmentsCount || 0} order${Number(orderStatus.orderJudgmentsCount || 0) === 1 ? '' : 's'}${orderStatus.latestOrderDate ? `, latest ${formatDisplayDate(String(orderStatus.latestOrderDate))}` : ''}`
-            );
+            parts.push(`case status: ${orderStatus.status || 'not shown'}`);
           } else {
-            parts.push('orders/status: no order tracker saved');
+            parts.push('case status: not available');
           }
 
           return `- ${label}: ${parts.join('. ')}.`;
@@ -2163,7 +2559,12 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
           : [];
 
         sections.push(
-          [...lines, ...(errors.length > 0 ? [`Source issues: ${errors.join(' | ')}`] : [])].join('\n')
+          [
+            ...lines,
+            ...(errors.length > 0
+              ? [`I couldn't retrieve complete court data for ${errors.length} tracked case${errors.length === 1 ? '' : 's'} right now.`]
+              : []),
+          ].join('\n')
         );
         continue;
       }
@@ -2274,6 +2675,24 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
       continue;
     }
 
+    if (result.tool === 'get_today_court_view') {
+      const data = (result.data as Record<string, unknown> | undefined) || {};
+      const courts = Array.isArray(data.courts) ? (data.courts as Array<Record<string, unknown>>) : [];
+      const bench = String(data.bench || 'lucknow').toUpperCase();
+      const date = formatDisplayDate(String(data.date || '')) || String(data.date || '').trim();
+
+      sections.push(
+        [
+          `${bench} Court View for ${date}: ${courts.length} saved board entries shown.`,
+          ...courts.slice(0, 12).map((court) => {
+            const caseDetails = court.caseDetails as Record<string, unknown> | null;
+            return `- Court ${court.courtNo || 'not shown'}, serial ${court.serialNo || 'not shown'}: ${caseDetails?.caseNumber || 'No case shown'}${caseDetails?.title ? ` - ${caseDetails.title}` : ''}${court.progress ? ` (${court.progress})` : ''}`;
+          }),
+        ].join('\n')
+      );
+      continue;
+    }
+
     if (result.tool === 'check_courtroom_transfer') {
       const data = (result.data as Record<string, unknown> | undefined) || {};
       const current = (data.current as Record<string, unknown> | null) || null;
@@ -2317,7 +2736,26 @@ function buildDeterministicAnswer(message: string, results: ExecutedToolResult[]
 async function writeFinalAnswer(message: string, results: ExecutedToolResult[]) {
   const deterministicAnswer = buildDeterministicAnswer(message, results);
   if (deterministicAnswer) {
-    return deterministicAnswer;
+    const language = getResponseLanguage(message);
+    if (language === 'English') return deterministicAnswer;
+    try {
+      return await withTimeout(
+        runGpt5Nano({
+          messages: [
+            {
+              role: 'system',
+              content: `Rewrite the supplied answer in ${language}. Preserve every fact, case identifier, date, and status exactly. Do not add information.`,
+            },
+            { role: 'user', content: deterministicAnswer },
+          ],
+          maxCompletionTokens: 1200,
+        }),
+        15000,
+        'answer language model'
+      );
+    } catch {
+      return deterministicAnswer;
+    }
   }
 
   try {
@@ -2357,6 +2795,57 @@ async function writeFinalAnswer(message: string, results: ExecutedToolResult[]) 
   }
 }
 
+function getResponseLanguage(message: string): 'English' | 'Hindi' | 'Hinglish' {
+  if (/[\u0900-\u097F]/.test(message)) return 'Hindi';
+  if (/\b(kya|kaise|karo|krdo|batao|dikhao|mera|meri|mujhe|nahi|hai|ka|ki|ke|wala|wali|aaj|kal|isko|case ko)\b/i.test(message)) {
+    return 'Hinglish';
+  }
+  return 'English';
+}
+
+function isCourtViewLookup(message: string) {
+  return /\b(court view|live board|today'?s court)\b/.test(normalizeIntentText(message));
+}
+
+async function writePersonalAssistantAnswer(message: string, history: ChatTurn[], guest = false) {
+  const responseLanguage = getResponseLanguage(message);
+  if (/^(hi|hii+|hello|hey|namaste|hy)[!. ]*$/i.test(message.trim())) {
+    return responseLanguage === 'Hindi'
+      ? 'नमस्ते! मैं Court View AI हूँ। मैं केस स्टेटस, आदेश, कॉज़ लिस्ट, ड्राफ्टिंग और सामान्य प्रश्नों में आपकी सहायता कर सकता हूँ।'
+      : responseLanguage === 'Hinglish'
+        ? 'Hi! Main Court View AI hoon. Main case status, orders, cause list, drafting aur normal questions mein help kar sakta hoon.'
+        : 'Hi! I am Court View AI. I can help with case status, orders, cause lists, drafting, and general questions.';
+  }
+
+  return withTimeout(
+    runGpt5Nano({
+      messages: [
+        {
+          role: 'system',
+          content:
+            `You are Court View AI, a reliable assistant for lawyers. Respond only in ${responseLanguage}. English is the default; use Hindi only when the current user message is in Hindi, and Hinglish only when the current user message is in Hinglish. Never switch languages on your own. Handle normal conversation, drafting, rewriting, summarizing, explaining legal concepts, planning, calculations, and research strategy. You also know the app features: live Court View, case status and orders, cause lists, Web Diary, tracked cases, alerts, judgment PDFs, lawyer profile, and account settings. Explain how to use these features when asked. Distinguish verified app data from general knowledge, never invent case facts, citations, dates, or completed actions, and clearly say when live data or missing details are required. Give concise practical answers. Legal information is general guidance, not a substitute for professional review.`,
+        },
+        ...(guest ? [{ role: 'system' as const, content: 'This is guest chat. Answer normal conversation and general court or legal questions. You have no access to personal cases, saved history, live court records, or tools. Never claim to retrieve records or perform actions. For live or personal court lookups, direct the user to sign in to the Courtlens mobile app. Ask for missing details instead of inventing case facts.' }] : []),
+        ...history.slice(-8).map((turn) => ({
+          role: turn.role,
+          content: turn.content,
+        })),
+        { role: 'user', content: message },
+      ],
+      maxCompletionTokens: 1800,
+    }),
+    30000,
+    'personal assistant model'
+  );
+}
+
+export async function runGuestAiAssistantChat(message: string, history: ChatTurn[] = []): Promise<AiAssistantResponse> {
+  const answer = isDisallowedAiRequest(message)
+    ? "I can't help with harmful, exploitative, deceptive, or illegal content."
+    : await writePersonalAssistantAnswer(message, history, true);
+  return { requestId: randomUUID(), answer, plan: { tools: [] }, toolResults: [], lawyerProfile: null };
+}
+
 export async function runAiAssistantChat(input: {
   message: string;
   history?: ChatTurn[];
@@ -2367,6 +2856,41 @@ export async function runAiAssistantChat(input: {
   const message = String(input.message || '').trim();
   if (!message) {
     throw new Error('message is required');
+  }
+
+  if (isDisallowedAiRequest(message)) {
+    return {
+      requestId,
+      answer: "I can't help with harmful, exploitative, deceptive, or illegal content.",
+      plan: { tools: [] },
+      toolResults: [],
+      lawyerProfile: null,
+    };
+  }
+
+  if (!isAppToolRequest(message)) {
+    const answer = await writePersonalAssistantAnswer(message, input.history || []);
+    void getDb()
+      .then((db) => recordAiChatRun(db, {
+        requestId,
+        profileKey: null,
+        userId: null,
+        message,
+        toolNames: [],
+        plan: { tools: [] },
+        toolResults: [],
+        answer,
+        latencyMs: Date.now() - startedAt,
+      }))
+      .catch(() => undefined);
+
+    return {
+      requestId,
+      answer,
+      plan: { tools: [] },
+      toolResults: [],
+      lawyerProfile: null,
+    };
   }
 
   const clientState = normalizeClientState(input.clientState || {});
@@ -2405,7 +2929,7 @@ export async function runAiAssistantChat(input: {
   const answer =
     toolResults.length > 0
       ? await writeFinalAnswer(message, toolResults)
-      : 'I could not map that request to the available court tools yet.';
+      : await writePersonalAssistantAnswer(message, input.history || []);
 
   const db = await getDb();
   await recordAiChatRun(db, {

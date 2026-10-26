@@ -51,11 +51,84 @@ function getAzureApiKey() {
   return apiKey;
 }
 
+function getResponsesEndpoint() {
+  return String(process.env.AI_AZURE_RESPONSES_ENDPOINT || '').trim();
+}
+
+function getResponsesApiKey() {
+  const apiKey = String(process.env.AI_AZURE_RESPONSES_API_KEY || '').trim();
+  if (!apiKey) throw new Error('Missing Azure Responses API key.');
+  return apiKey;
+}
+
+function getResponseText(payload: {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+}) {
+  if (payload.output_text?.trim()) return payload.output_text.trim();
+
+  return (payload.output || [])
+    .flatMap((item) => item.content || [])
+    .filter((content) => content.type === 'output_text')
+    .map((content) => content.text || '')
+    .join('')
+    .trim();
+}
+
 export async function runGpt5Nano(input: Gpt5NanoInput): Promise<string> {
+  const currentTime = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'long',
+  }).format(new Date());
+  input = { ...input, messages: [
+    { role: 'system', content: `Current date and time: ${currentTime}. Time zone: Asia/Kolkata (IST). Use this clock for today, yesterday, tomorrow and current-date questions, even if conversation history contains an older date. This clock does not establish that court records are current; use the dates in retrieved records for court facts.` },
+    ...input.messages,
+  ] };
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90000);
 
   try {
+    const responsesEndpoint = getResponsesEndpoint();
+    if (responsesEndpoint) {
+      const instructions = input.messages
+        .filter((message) => message.role === 'system')
+        .map((message) => message.content)
+        .join('\n\n');
+      const conversation = input.messages
+        .filter((message) => message.role !== 'system')
+        .map((message) => `${message.role.toUpperCase()}:\n${message.content}`)
+        .join('\n\n');
+
+      const response = await fetch(responsesEndpoint, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': getResponsesApiKey(),
+        },
+        body: JSON.stringify({
+          model: process.env.AI_AZURE_RESPONSES_DEPLOYMENT || 'gpt-5.6-luna',
+          instructions,
+          input: conversation,
+          max_output_tokens: input.maxCompletionTokens || 1600,
+          store: false,
+        }),
+        cache: 'no-store',
+      });
+
+      const payload = (await response.json()) as {
+        error?: { message?: string };
+        output_text?: string;
+        output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error?.message || `Azure Responses request failed with ${response.status}`);
+      }
+
+      const content = getResponseText(payload);
+      if (!content) throw new Error('Azure Responses returned an empty response.');
+      return content;
+    }
+
     const response = await fetch(`${getAzureOpenAiV1Base()}/chat/completions`, {
       method: 'POST',
       signal: controller.signal,

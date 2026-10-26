@@ -6,7 +6,7 @@ import { Cinzel, Manrope } from 'next/font/google';
 import { CourtCase, Notification } from '@/types/court';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import WorkspaceNavigation from '@/views/components/WorkspaceNavigation';
-import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 import {
   buildSavedCaseProfiles,
   encodeCaseProfileSlug,
@@ -249,9 +249,7 @@ export default function MyCasesPage() {
         </div>
 
         {error && (
-          <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {error}
-          </div>
+          <div className="mb-6"><CourtSourceError message={error} /></div>
         )}
 
         {loading ? (

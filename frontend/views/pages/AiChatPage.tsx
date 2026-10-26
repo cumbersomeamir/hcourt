@@ -57,9 +57,24 @@ function getMessageOrderLinks(tools: ChatMessage['tools']) {
   return tools.flatMap((tool) => {
     const data = (tool.data || {}) as Record<string, unknown>;
     if (!['order_list', 'latest_order'].includes(String(data.responseMode || ''))) return [];
+    const directLinks = Array.isArray(data.orderDocumentLinks)
+      ? (data.orderDocumentLinks as Array<Record<string, unknown>>)
+          .map((order, index) => {
+            const href = String(order.viewerHref || '').trim();
+            if (!href) return null;
+            const date = String(order.date || '').trim();
+            return { href, label: date ? `Download order: ${date}` : `Download order ${index + 1}` };
+          })
+          .filter((link): link is { href: string; label: string } => Boolean(link))
+      : [];
+    const latestOrderDocument = (data.latestOrderDocument || {}) as Record<string, unknown>;
+    const latestHref = String(latestOrderDocument.viewerHref || '').trim();
     const cases = Array.isArray(data.cases) ? (data.cases as Array<Record<string, unknown>>) : [];
 
-    return cases.flatMap((entry) => {
+    return [
+      ...directLinks,
+      ...(latestHref ? [{ href: latestHref, label: 'Download latest order PDF' }] : []),
+      ...cases.flatMap((entry) => {
       const caseLabel = String(entry.caseId || entry.referenceLabel || 'Tracked case');
       const orderStatus = (entry.orderStatus || {}) as Record<string, unknown>;
       const orders = Array.isArray(orderStatus.orderJudgments)
@@ -84,7 +99,8 @@ function getMessageOrderLinks(tools: ChatMessage['tools']) {
           };
         })
         .filter((link): link is { href: string; label: string } => Boolean(link));
-    });
+      }),
+    ];
   });
 }
 
@@ -461,7 +477,7 @@ export default function AiChatPage() {
                   }`}
                 >
                   <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">
-                    {message.role === 'user' ? 'You' : 'Hcourt AI'}
+                    {message.role === 'user' ? 'You' : 'Courtlens AI'}
                   </p>
                   {message.role === 'pending' ? (
                     <div className="mt-3 flex items-center gap-3 text-sm leading-7 text-slate-100">

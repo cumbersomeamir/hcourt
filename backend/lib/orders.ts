@@ -21,6 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { getDb } from './mongodb';
+import { getMediaFromR2, uploadMediaToR2 } from './r2';
+import { recognizeImageText } from './ideaverseOcr';
 
 export type CaseTypeOption = { value: string; label: string };
 export type OrdersCity = 'lucknow' | 'allahabad';
@@ -128,7 +130,9 @@ type OrderJudgmentCacheDoc = {
   filename: string;
   mimeType: string;
   sizeBytes: number;
-  base64: string;
+  base64?: string;
+  r2Key?: string;
+  r2Url?: string | null;
   source: 'direct' | 'proxy';
   createdAt: Date;
   updatedAt: Date;
@@ -283,6 +287,19 @@ async function getCachedOrderJudgment(
   const doc = await collection.findOne({ judgmentId: normalizedId });
   if (!doc) return null;
 
+  let bytes: Buffer | null = null;
+  try {
+    bytes = doc.r2Key
+      ? await getMediaFromR2(doc.r2Key)
+      : doc.base64
+        ? Buffer.from(doc.base64, 'base64')
+        : null;
+  } catch {
+    await collection.deleteOne({ judgmentId: normalizedId });
+    return null;
+  }
+  if (!bytes) return null;
+
   await collection.updateOne(
     { judgmentId: normalizedId },
     { $set: { lastAccessedAt: new Date() } }
@@ -293,7 +310,7 @@ async function getCachedOrderJudgment(
     filename: doc.filename,
     mimeType: doc.mimeType,
     sizeBytes: doc.sizeBytes,
-    base64: doc.base64,
+    base64: bytes.toString('base64'),
   };
 }
 
@@ -326,6 +343,13 @@ async function cacheOrderJudgment(
 ) {
   const collection = await getOrderJudgmentCacheCollection();
   const now = new Date();
+  const bytes = Buffer.from(download.base64, 'base64');
+  const stored = await uploadMediaToR2({
+    bytes,
+    filename: download.filename,
+    contentType: download.mimeType,
+    folder: 'orders-judgments',
+  });
   const doc: OrderJudgmentCacheDoc = {
     judgmentId: download.judgmentId,
     viewUrl: meta.viewUrl,
@@ -333,7 +357,8 @@ async function cacheOrderJudgment(
     filename: download.filename,
     mimeType: download.mimeType,
     sizeBytes: download.sizeBytes,
-    base64: download.base64,
+    r2Key: stored.key,
+    r2Url: stored.url,
     source: meta.source,
     createdAt: now,
     updatedAt: now,
@@ -345,6 +370,7 @@ async function cacheOrderJudgment(
     { judgmentId: download.judgmentId },
     {
       $set: updatableFields,
+      $unset: { base64: '' },
       $setOnInsert: { createdAt },
     },
     { upsert: true }
@@ -774,6 +800,23 @@ async function buildAllahabadColorMaskVariant(
 }
 
 async function getAllahabadCaptchaCandidates(image: Buffer): Promise<string[]> {
+  const ocrCandidates = await recognizeImageText(image);
+  const ocrScored = new Map<string, number>();
+  for (const candidate of ocrCandidates) {
+    addScoredCaptchaCandidate(ocrScored, candidate, 10);
+  }
+  if (ocrScored.size > 0) {
+    return Array.from(ocrScored.entries())
+      .sort((a, b) => {
+        const aLen4 = /^\d{4}$/.test(a[0]) ? 1 : 0;
+        const bLen4 = /^\d{4}$/.test(b[0]) ? 1 : 0;
+        if (aLen4 !== bLen4) return bLen4 - aLen4;
+        if (a[1] !== b[1]) return b[1] - a[1];
+        return b[0].length - a[0].length;
+      })
+      .map(([candidate]) => candidate);
+  }
+
   const tmpRoot = realpathSync(os.tmpdir());
   const workDir = mkdtempSync(path.join(tmpRoot, 'hcourt-allahabad-cap-'));
   try {
@@ -1576,7 +1619,7 @@ async function buildExcel(params: {
   details: ReturnType<typeof parseDetails>;
 }) {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'hcourt';
+  wb.creator = 'Courtlens';
 
   const summary = wb.addWorksheet('Summary');
   summary.columns = [
@@ -1618,6 +1661,15 @@ function getSystemChromiumExecutablePath(): string | null {
   const configured = String(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || '').trim();
   const candidates = [
     configured,
+    process.env.PROGRAMFILES
+      ? path.join(process.env.PROGRAMFILES, 'Google', 'Chrome', 'Application', 'chrome.exe')
+      : '',
+    process.env['PROGRAMFILES(X86)']
+      ? path.join(process.env['PROGRAMFILES(X86)'], 'Microsoft', 'Edge', 'Application', 'msedge.exe')
+      : '',
+    process.env.LOCALAPPDATA
+      ? path.join(process.env.LOCALAPPDATA, 'Google', 'Chrome', 'Application', 'chrome.exe')
+      : '',
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/usr/bin/google-chrome',

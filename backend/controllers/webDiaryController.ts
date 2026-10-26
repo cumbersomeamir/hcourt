@@ -141,7 +141,9 @@ async function fetchItemWiseFallback(input: {
   return notifications;
 }
 
-export async function GET(request: Request) {
+const diaryRefreshes = new Map<string, Promise<Response>>();
+
+export async function GET(request: Request, refresh = false) {
   let cacheDate = '';
   try {
     const { searchParams } = new URL(request.url);
@@ -160,15 +162,20 @@ export async function GET(request: Request) {
       const selectedDate = `${parseInt(date, 10)}/${requestedMonthNumber}/${requestedYear}`;
       cacheDate = bench ? `${bench}:${selectedDate}` : selectedDate;
       try {
-        const snapshot = await getLatestWebDiarySnapshot(await getDb(), cacheDate);
+        const db = await getDb();
+        const snapshot = await getLatestWebDiarySnapshot(db, cacheDate) ||
+          (bench ? await getLatestWebDiarySnapshot(db, selectedDate) : null);
         if (
-          snapshot &&
-          snapshot.notifications.length > 0 &&
-          Date.now() - snapshot.fetchedAt.getTime() <= 10 * 60 * 1000
+          !refresh && snapshot &&
+          Date.now() - snapshot.fetchedAt.getTime() < 7 * 86400000
         ) {
+          if (Date.now() - snapshot.fetchedAt.getTime() > 10 * 60 * 1000 && !diaryRefreshes.has(cacheDate)) {
+            const key = cacheDate;
+            diaryRefreshes.set(key, GET(new Request(request.url), true).finally(() => diaryRefreshes.delete(key)));
+          }
           return NextResponse.json({
             success: true,
-            data: { notifications: snapshot.notifications },
+            data: { notifications: snapshot.date === cacheDate ? snapshot.notifications : snapshot.notifications.filter((notice) => belongsToBench(notice.title, bench)) },
             meta: { cached: true, cachedAt: snapshot.fetchedAt.toISOString() },
           });
         }

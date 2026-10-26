@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
-import { courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
+import { downloadBase64File } from '@/lib/download';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -119,23 +120,6 @@ async function parseApiResult<T>(response: Response): Promise<T> {
     throw new Error(readApiError(payload));
   }
   return payload.result;
-}
-
-function downloadBase64File(filename: string, mimeType: string, base64: string) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  const blob = new Blob([bytes], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 function formatPreviewColumnLabel(column: string): string {
@@ -917,9 +901,7 @@ export default function CauseListPage() {
           {(error || info) && (
             <div className="mx-auto mt-6 max-w-3xl space-y-2">
               {error && (
-                <div className="rounded-lg border border-red-400/40 bg-red-900/25 px-3 py-2 text-sm text-red-200">
-                  {error}
-                </div>
+                <CourtSourceError message={error} />
               )}
               {info && (
                 <div className="rounded-lg border border-cyan-400/30 bg-cyan-900/25 px-3 py-2 text-sm text-cyan-100">

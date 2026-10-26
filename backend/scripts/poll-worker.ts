@@ -6,10 +6,68 @@
 
 import { getDb } from '../lib/mongodb';
 import { syncSchedule } from '../lib/scheduleSync';
+import { GET as getWebDiary } from '../controllers/webDiaryController';
+import { getLatestWebDiarySnapshot } from '../lib/aiStore';
 const POLL_INTERVAL_MS = 30000; // 30 seconds
+const WEB_DIARY_SYNC_INTERVAL_MS = 15 * 60 * 1000;
 
 let isRunning = false;
 let pollTimeout: NodeJS.Timeout | null = null;
+let lastWebDiarySyncAt = 0;
+let diaryRunning = false;
+
+function getIndiaDate() {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata',
+    day: 'numeric',
+    month: 'numeric',
+    year: 'numeric',
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return { day: value('day'), month: value('month'), year: value('year') };
+}
+
+function getRecentIndiaDates(days: number) {
+  return Array.from({ length: days }, (_, offset) => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() - offset);
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+    }).formatToParts(date);
+    const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+    return { day: value('day'), month: value('month'), year: value('year') };
+  });
+}
+
+async function syncWebDiary() {
+  if (diaryRunning || Date.now() - lastWebDiarySyncAt < WEB_DIARY_SYNC_INTERVAL_MS) return;
+  diaryRunning = true;
+  try {
+  lastWebDiarySyncAt = Date.now();
+
+  const db = await getDb();
+  for (const { day, month, year } of getRecentIndiaDates(7)) {
+    for (const bench of ['allahabad', 'lucknow']) {
+    const snapshotDate = `${bench}:${Number(day)}/${Number(month)}/${year}`;
+    const existing = await getLatestWebDiarySnapshot(db, snapshotDate);
+    if (existing && (snapshotDate !== `${bench}:${Number(getIndiaDate().day)}/${Number(getIndiaDate().month)}/${getIndiaDate().year}` || Date.now() - existing.fetchedAt.getTime() < WEB_DIARY_SYNC_INTERVAL_MS)) {
+      continue;
+    }
+
+    const response = await getWebDiary(
+      new Request(`http://localhost/api/web-diary?date=${day}&month=${month}&year=${year}&bench=${bench}`), true
+    );
+    const payload = (await response.json()) as { success?: boolean; data?: { notifications?: unknown[] } };
+    console.log(
+      `[Worker] Web diary ${snapshotDate}: ${payload.success ? `${payload.data?.notifications?.length || 0} notices saved` : 'source unavailable'}`
+    );
+    }
+  }
+  } finally { diaryRunning = false; }
+}
 
 async function pollSchedule() {
   if (isRunning) {
@@ -23,6 +81,9 @@ async function pollSchedule() {
   try {
     console.log(`[Worker] Starting poll at ${new Date().toISOString()}`);
     const db = await getDb();
+    void syncWebDiary().catch((error) => console.error('[Worker] Diary sync failed:', error));
+    await db.collection('schedules').createIndex({ lastUpdated: 1 }, { expireAfterSeconds: 604800 });
+    await syncSchedule({ db, force: true, source: 'worker', bench: 'allahabad', runTrackedOrders: false });
     const result = await syncSchedule({
       db,
       force: true,

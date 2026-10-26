@@ -10,6 +10,14 @@ services:
       - "127.0.0.1:4100:4000"
     restart: unless-stopped
 
+  worker:
+    container_name: hcourt-preview-worker
+    image: ops-backend
+    env_file:
+      - ../.deploy/backend.env.local
+    command: ["node", "--import", "tsx", "scripts/poll-worker.ts"]
+    restart: unless-stopped
+
   frontend:
     container_name: hcourt-preview-frontend
     build:

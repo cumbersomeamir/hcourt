@@ -224,7 +224,7 @@ export default function AppHomePage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-3 sm:px-6 sm:py-6">
         <section className="grid flex-1 auto-rows-[minmax(92px,1fr)] grid-cols-[repeat(2,minmax(0,1fr))] gap-2 py-1 sm:auto-rows-[minmax(168px,1fr)] sm:gap-4 sm:py-2 lg:grid-cols-4">
-          {homeTiles.map((tile) => (
+          {homeTiles.filter((tile) => tile.href !== '/status').map((tile) => (
             <Link
               key={tile.href}
               href={tile.href}
@@ -267,11 +267,7 @@ export default function AppHomePage() {
           ))}
         </section>
         <footer className="px-2 py-4 text-center text-[11px] leading-5 text-slate-500">
-          <p>Courtlens is not an official court or government app. Verify critical information with official court records.</p>
-          <div className="mt-2 flex justify-center gap-4">
-            <Link href="/privacy" className="text-cyan-300/80">Privacy Policy</Link>
-            <Link href="/delete-account" className="text-cyan-300/80">Delete Account</Link>
-          </div>
+          <Link href="/support" className="text-cyan-300/80">Help & Support</Link>
         </footer>
       </div>
     </main>

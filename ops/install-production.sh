@@ -83,4 +83,6 @@ wait_for_http 'http://127.0.0.1:3000/' >/dev/null
 log 'Saving PM2 process list'
 pm2 save >/dev/null
 
+rm -rf -- "$ROOT_DIR/backend/.next/cache/webpack" "$ROOT_DIR/frontend/.next/cache/webpack"
+
 log 'Production install complete'

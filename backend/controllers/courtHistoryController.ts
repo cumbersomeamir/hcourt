@@ -29,6 +29,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const courtNo = (searchParams.get('courtNo') || '').trim();
+    const bench = searchParams.get('bench') === 'allahabad' ? 'allahabad' : 'lucknow';
     const dateParam = (searchParams.get('date') || '').trim();
     const limitParam = parseInt(searchParams.get('limit') || '200', 10);
 
@@ -45,11 +46,12 @@ export async function GET(request: Request) {
       : 200;
 
     const db = await getDb();
-    const history = await getCourtHistory({ db, courtNo, date, limit });
+    const history = await getCourtHistory({ db, courtNo, date, limit, bench });
 
     return NextResponse.json({
       success: true,
       courtNo,
+      bench,
       date,
       count: history.length,
       history,
@@ -98,6 +100,7 @@ export async function POST(request: Request) {
     const db = await getDb();
     const inserted = await appendCourtHistorySnapshot({
       db,
+      bench: body?.bench === 'allahabad' ? 'allahabad' : 'lucknow',
       date,
       timestamp,
       courts,

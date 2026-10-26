@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
 
 interface Notification {
   title: string;
@@ -26,6 +27,7 @@ export default function WebDiaryPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const requestId = useRef(0);
 
   useEffect(() => {
     if (month && year) {
@@ -43,28 +45,41 @@ export default function WebDiaryPage() {
     selectedYear: number,
     selectedBench: Bench = bench
   ) => {
+    const id = ++requestId.current;
+    const cacheKey = `diary:${selectedBench}:${selectedYear}-${selectedMonth}-${selectedDay}`;
+    let cached = false;
     try {
-      setLoading(true);
+      const saved = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+      if (saved && Date.now() - saved.savedAt < 7 * 86400000) {
+        setNotifications(saved.notifications);
+        cached = true;
+      }
+    } catch {}
+    try {
+      setLoading(!cached);
       setError(null);
       setWarning(null);
-      setNotifications([]);
+      if (!cached) setNotifications([]);
 
       const response = await fetch(
         `/api/web-diary?date=${selectedDay}&month=${selectedMonth}&year=${selectedYear}&bench=${selectedBench}`
       );
       const data = await response.json();
+      if (id !== requestId.current) return;
 
       if (data.success && data.data) {
         setNotifications(data.data.notifications || []);
         setWarning(data.meta?.warning || null);
+        try { sessionStorage.setItem(cacheKey, JSON.stringify({ notifications: data.data.notifications || [], savedAt: Date.now() })); } catch {}
       } else {
-        setError(`Connection issue from the official court website. The court server may be unavailable. ${data.error || 'Please try again shortly.'}`);
+        setError(courtSourceError(data.error, 'Unable to load the court diary.'));
       }
     } catch (err) {
+      if (id !== requestId.current) return;
       console.error('Error fetching diary data:', err);
-      setError('Connection issue from the official court website. The court server may be unavailable. Please try again shortly.');
+      setError(courtSourceError(err, 'Unable to load the court diary.'));
     } finally {
-      setLoading(false);
+      if (id === requestId.current) setLoading(false);
     }
   };
 
@@ -210,7 +225,7 @@ export default function WebDiaryPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
-              <div className="text-red-400 text-sm mb-3">{error}</div>
+              <div className="mb-3 w-full max-w-md"><CourtSourceError message={error} /></div>
               <button
                 onClick={() => fetchDiaryData(parseInt(day), parseInt(month), parseInt(year), bench)}
                 className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"

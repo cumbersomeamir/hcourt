@@ -1,0 +1,29 @@
+App name
+Courtlens
+
+Short description
+Court records, case tracking and an AI assistant for advocates.
+
+Full description
+Courtlens helps advocates access essential court information from one clear, mobile-friendly app.
+
+Use Court View and Web Diary, review cause lists, track important cases, and retrieve available orders and judgments. The built-in AI assistant helps you navigate court records and understand retrieved information faster while keeping recent conversations available for continuity.
+
+Key features:
+• Court View and Web Diary access
+• Case tracking and status checks
+• Orders and judgments from supported court sources
+• Cause lists and court documents
+• Personalized AI assistance
+• Recent chat history for continuing your work
+
+Courtlens is an independent productivity tool and is not an official government or court application. Court information is obtained from supported public court sources and should always be verified with the relevant official court record before professional use.
+
+Support email
+info@tensorblue.com
+
+Privacy policy
+https://unable-tumor-millions-reasonably.trycloudflare.com/privacy
+
+Account deletion
+https://unable-tumor-millions-reasonably.trycloudflare.com/delete-account

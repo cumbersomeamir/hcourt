@@ -1,0 +1,21 @@
+{
+  "name": "HcourtMobile",
+  "displayName": "Courtlens",
+  "expo": {
+    "name": "Courtlens",
+    "slug": "courtlens",
+    "version": "1.0.0",
+    "ios": {
+      "bundleIdentifier": "tensorblue.coutlens",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f98ac698-2253-4c05-aab6-c180bbf65dbf"
+      }
+    }
+  }
+}

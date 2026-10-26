@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import CaseIdModal from '@/views/components/CaseIdModal';
-import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 import { CourtCase, TrackedOrderCase } from '@/types/court';
 
 type CourtBench = 'allahabad' | 'lucknow';
@@ -123,10 +123,22 @@ export default function Home() {
       }
 
       const url = `/api/schedule/latest?${params.toString()}`;
+      const cacheKey = `court-view:${url.replace('&force=true', '')}`;
+      try {
+        const saved = JSON.parse(sessionStorage.getItem(cacheKey) || 'null');
+        if (saved && Date.now() - new Date(saved.lastUpdated).getTime() < 7 * 86400000) {
+          setCourts(saved.courts);
+          applySearchFilter(saved.courts, searchTerm);
+          setLastUpdated(new Date(saved.lastUpdated));
+          setScheduleDate(saved.date);
+          setLoading(false);
+        }
+      } catch {}
 
       const response = await fetch(url);
       const data = await response.json();
       if (data.success && data.schedule) {
+        try { sessionStorage.setItem(cacheKey, JSON.stringify(data.schedule)); } catch {}
         const courtsData = data.schedule.courts || [];
         setCourts(courtsData);
         setLastUpdated(new Date(data.schedule.lastUpdated));
@@ -140,7 +152,7 @@ export default function Home() {
           setFilteredCourts(courtsData);
         }
       } else {
-        setError(`Connection issue from the official court website. The court server may be unavailable. ${data.error || 'Please try again shortly.'}`);
+        setError(courtSourceError(data.error, 'Unable to load the court schedule.'));
       }
     } catch (error) {
       console.error('Error fetching schedule:', error);
@@ -348,14 +360,6 @@ export default function Home() {
               </span>
               <span className="text-base font-semibold text-slate-100">Cause List</span>
             </Link>
-            <Link href="/status" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-indigo-400/20`} title="View Status">
-              <span className={`${mobileMenuIconClass} border-indigo-400/20 bg-indigo-500/10 text-indigo-200`}>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
-                </svg>
-              </span>
-              <span className="text-base font-semibold text-slate-100">Status</span>
-            </Link>
             <Link href="/ai-chat" onClick={() => setMobileNavOpen(false)} className={`${mobileMenuItemClass} border-blue-400/20`} title="Open AI Chat">
               <span className={`${mobileMenuIconClass} border-blue-400/20 bg-blue-500/10 text-blue-200`}>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -482,12 +486,6 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8m-8 4h8m-8 4h5M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
                   </svg>
                   Cause List
-                </Link>
-                <Link href="/status" className={`${desktopNavItemClass} border-indigo-400/20 text-indigo-100 hover:border-indigo-300/40`} title="View Status">
-                  <svg className="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m3 6V7m3 10v-3m4 7H5a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2z" />
-                  </svg>
-                  Status
                 </Link>
                 <details className="relative">
                   <summary className={`${desktopNavItemClass} cursor-pointer list-none border-slate-600/40 hover:border-slate-400/40`}>
@@ -649,7 +647,7 @@ export default function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <div className="text-red-400 mb-4 text-center text-sm">{error}</div>
+            <div className="mb-4 w-full max-w-md"><CourtSourceError message={error} /></div>
             <button
               onClick={() => fetchSchedule()}
               className="inline-flex items-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-5 py-2.5 text-sm font-semibold text-sky-300 hover:bg-sky-500/25"
@@ -665,6 +663,7 @@ export default function Home() {
           </div>
         ) : courts.length > 0 ? (
           <CourtTable
+            bench={courtBench}
             courts={searchTerm ? filteredCourts : courts}
             lastUpdated={lastUpdated || undefined}
             historyDate={scheduleDate}

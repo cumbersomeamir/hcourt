@@ -64,6 +64,7 @@ export interface TrackedOrderCase {
 }
 
 export interface CourtHistoryRecord {
+  bench?: 'allahabad' | 'lucknow';
   _id?: string;
   date: string;
   courtNo: string;

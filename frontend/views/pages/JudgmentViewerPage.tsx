@@ -4,7 +4,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
-import { CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, CourtSourceLoader, courtSourceError } from '@/views/components/CourtSourceStatus';
 
 const PdfPages = dynamic(() => import('@/views/components/PdfPages'), { ssr: false });
 
@@ -138,8 +138,18 @@ export default function JudgmentViewerPage(props: {
               <CourtSourceLoader label="the latest court order PDF" className="min-h-[70vh] px-6" />
             </div>
           ) : error ? (
-            <div className="flex min-h-[70vh] items-center justify-center px-6 text-sm text-red-300">
-              {error}
+            <div className="flex min-h-[70vh] items-center justify-center px-6">
+              <div className="w-full max-w-md space-y-3">
+                <CourtSourceError message={error} />
+                <a
+                  href={props.viewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex w-full items-center justify-center rounded-xl border border-cyan-400/25 bg-cyan-500/15 px-4 py-3 text-sm font-semibold text-cyan-100"
+                >
+                  Open on Official Court Website
+                </a>
+              </div>
             </div>
           ) : (
             <div className="max-h-[78vh] overflow-auto bg-slate-200 px-3 py-4 sm:px-4">

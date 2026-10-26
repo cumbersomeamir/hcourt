@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
-import { courtSourceError } from '@/views/components/CourtSourceStatus';
+import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
+import { downloadBase64File } from '@/lib/download';
 
 type CaseTypeOption = { value: string; label: string };
 
@@ -46,19 +47,6 @@ type OrdersCaptchaChallenge = {
   prompt: string;
 };
 
-function downloadBase64(filename: string, base64: string, mime: string) {
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  const blob = new Blob([bytes], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -81,6 +69,28 @@ export default function OrdersPage() {
   const [allJudgmentsLoading, setAllJudgmentsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OrdersResult | null>(null);
+  const [brief, setBrief] = useState<{ result: OrdersResult; text: string } | null>(null);
+  const [briefLoading, setBriefLoading] = useState(false);
+  const generateBrief = async () => {
+    if (!result || briefLoading) return;
+    setBriefLoading(true);
+    setError(null);
+    try {
+      const caseRecord = { city, caseInfo: result.caseInfo, details: result.details, orderJudgments: result.orderJudgments?.map(({ date }) => ({ date })) };
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'case-brief', caseRecord }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.result?.answer) throw new Error(data.error || 'Unable to generate case brief. Please try again.');
+      setBrief({ result, text: data.result.answer });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unable to generate case brief.');
+    } finally {
+      setBriefLoading(false);
+    }
+  };
   const [showSearchForm, setShowSearchForm] = useState(false);
   const [captchaChallenge, setCaptchaChallenge] = useState<OrdersCaptchaChallenge | null>(null);
   const [captchaCode, setCaptchaCode] = useState('');
@@ -288,11 +298,14 @@ export default function OrdersPage() {
   };
 
   const fetchJudgmentPdf = async (viewUrl: string, date: string) => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
     const res = await fetch('/api/orders/judgment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ viewUrl, date }),
-    });
+      signal: controller.signal,
+    }).finally(() => window.clearTimeout(timeoutId));
     const data = await res.json();
 
     if (res.status === 202 || data.code === 'document_preparing') {
@@ -336,7 +349,7 @@ export default function OrdersPage() {
     date: string,
     judgmentId: string
   ) => {
-    const maxAttempts = 6;
+    const maxAttempts = 2;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const result = await fetchJudgmentPdf(viewUrl, date);
@@ -366,8 +379,12 @@ export default function OrdersPage() {
       setJudgmentLoadingId(judgmentId);
       setError(null);
       const pdf = await fetchJudgmentPdfWithPolling(viewUrl, date, judgmentId);
-      downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
+      downloadBase64File(pdf.filename, pdf.mimeType || 'application/pdf', pdf.base64);
     } catch (e) {
+      updateJudgmentDocumentStatus(judgmentId, {
+        documentStatus: 'not_cached',
+        documentMessage: 'Open the official court website to download this document.',
+      });
       setError(courtSourceError(e, 'Unable to download the court order or judgment.'));
     } finally {
       setJudgmentLoadingId(null);
@@ -389,7 +406,7 @@ export default function OrdersPage() {
             entry.date,
             entry.judgmentId
           );
-          downloadBase64(pdf.filename, pdf.base64, pdf.mimeType || 'application/pdf');
+          downloadBase64File(pdf.filename, pdf.mimeType || 'application/pdf', pdf.base64);
           await new Promise((resolve) => setTimeout(resolve, 200));
         } catch {
           failedDates.push(entry.date || `#${entry.srNo}`);
@@ -397,7 +414,7 @@ export default function OrdersPage() {
       }
 
       if (failedDates.length > 0) {
-        throw new Error(`Some downloads failed: ${failedDates.join(', ')}`);
+        throw new Error('One or more court PDFs are temporarily unavailable.');
       }
     } catch (e) {
       setError(courtSourceError(e, 'Unable to download court order or judgment PDFs.'));
@@ -520,7 +537,7 @@ export default function OrdersPage() {
                 {loading ? 'Connecting to court...' : 'Search'}
               </button>
             </div>
-            {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
+            {error && <div className="mt-3"><CourtSourceError message={error} /></div>}
             {renderCaptchaFallback()}
           </div>
         )}
@@ -583,7 +600,7 @@ export default function OrdersPage() {
                 {loading ? 'Fetching from court...' : 'Fetch Orders'}
               </button>
             </div>
-            {error && <div className="mt-3 text-sm text-red-400">{error}</div>}
+            {error && <div className="mt-3"><CourtSourceError message={error} /></div>}
             {renderCaptchaFallback()}
           </div>
         )}
@@ -613,31 +630,37 @@ export default function OrdersPage() {
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
-                {result.pdf.base64 && (
                   <button
-                    onClick={() => downloadBase64(result.pdf.filename, result.pdf.base64, 'application/pdf')}
+                    onClick={generateBrief}
+                    disabled={briefLoading}
                     className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-500/15 border border-sky-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-sky-300 hover:bg-sky-500/25 w-full sm:w-auto"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    Download PDF
+                    {briefLoading ? 'Preparing Case Brief...' : 'Case Brief'}
                   </button>
-                )}
               </div>
             </div>
 
+            {brief?.result === result && (
+              <section className="mt-5 rounded-xl border border-sky-400/25 bg-sky-500/5 p-4">
+                <h3 className="mb-2 font-semibold text-sky-200">AI Case Brief</h3>
+                <p className="mb-3 text-xs text-slate-400">Based on available case-status details. Full judgment text is not included.</p>
+                <div className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{brief.text}</div>
+              </section>
+            )}
             {result.orderJudgments && result.orderJudgments.length > 0 && (
               <div className="mt-5">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <h3 className="text-sm sm:text-base font-semibold text-slate-200">
                     Order/Judgment Documents
                   </h3>
-                  <button
+                  {result.orderJudgments.length > 1 && <button
                     onClick={downloadAllJudgments}
                     disabled={allJudgmentsLoading || judgmentLoadingId !== null}
                     className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40 w-full sm:w-auto"
                   >
                     {allJudgmentsLoading ? 'Downloading from court...' : 'Download All PDFs'}
-                  </button>
+                  </button>}
                 </div>
                 <div className="space-y-2.5">
                   {result.orderJudgments.map((entry) => (
@@ -660,17 +683,27 @@ export default function OrdersPage() {
                           </span>
                         )}
                       </div>
-                      <button
-                        onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
-                        disabled={judgmentLoadingId === entry.judgmentId || allJudgmentsLoading}
-                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
-                      >
-                        {judgmentLoadingId === entry.judgmentId
-                          ? 'Preparing court document...'
-                          : entry.documentStatus === 'cached'
-                            ? 'Download Order/Judgment'
-                            : 'Prepare PDF'}
-                      </button>
+                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                        <button
+                          onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
+                          disabled={judgmentLoadingId === entry.judgmentId || allJudgmentsLoading}
+                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
+                        >
+                          {judgmentLoadingId === entry.judgmentId
+                            ? 'Preparing court document...'
+                            : entry.documentStatus === 'cached'
+                              ? 'Download Order/Judgment'
+                              : 'Prepare PDF'}
+                        </button>
+                        <a
+                          href={entry.viewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-xl border border-slate-600/40 bg-slate-700/25 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-700/40"
+                        >
+                          Open on Court Website
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>
