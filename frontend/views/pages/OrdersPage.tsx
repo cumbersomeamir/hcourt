@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
 import { downloadBase64File } from '@/lib/download';
+import CourtCaseDetails from '@/views/components/CourtCaseDetails';
 
 type CaseTypeOption = { value: string; label: string };
 
@@ -22,6 +23,7 @@ type OrdersResult = {
     keyValues: Array<{ key: string; value: string }>;
     listingHistory: Array<Record<string, string>>;
     iaDetails: Array<Record<string, string>>;
+    sections?: Array<{ title: string; columns: string[]; rows: string[][] }>;
   };
   pdf: { filename: string; base64: string };
   excel: { filename: string; base64: string };
@@ -710,25 +712,7 @@ export default function OrdersPage() {
               </div>
             )}
 
-            <div className="mt-6">
-              <h3 className="text-sm sm:text-base font-semibold text-slate-200 mb-3">Key details</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
-                {result.details.keyValues.slice(0, 40).map((kv, idx) => (
-                  <div
-                    key={`${kv.key}-${idx}`}
-                    className="rounded-lg border border-slate-700/40 bg-slate-800/30 px-3 py-2.5"
-                  >
-                    <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-0.5">{kv.key}</div>
-                    <div className="text-xs sm:text-sm text-slate-200 break-words">{kv.value}</div>
-                  </div>
-                ))}
-              </div>
-              {result.details.keyValues.length > 40 && (
-                <div className="mt-3 text-xs text-slate-500 px-1">
-                  Showing first 40 fields.
-                </div>
-              )}
-            </div>
+            <CourtCaseDetails sections={result.details.sections || [{ title: 'Case Status', columns: ['Particulars', 'Details'], rows: result.details.keyValues.map(({ key, value }) => [key, value]) }]} />
           </div>
         )}
       </div>

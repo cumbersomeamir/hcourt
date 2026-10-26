@@ -10,13 +10,13 @@ import {
   Feedback,
   Field,
   Page,
-  Records,
   Select,
   s,
   type Challenge,
   type Option,
 } from '../ui';
 import { saveBase64File, openBase64File } from '../downloads';
+import CourtCaseDetails from '../CourtCaseDetails';
 
 export type Document = { filename: string; base64: string; mimeType?: string };
 type OrdersResult = {
@@ -32,6 +32,7 @@ type OrdersResult = {
     keyValues: Array<{ key: string; value: string }>;
     listingHistory: Array<Record<string, string>>;
     iaDetails: Array<Record<string, string>>;
+    sections?: Array<{ title: string; columns: string[]; rows: string[][] }>;
   };
   pdf?: Document;
   excel?: Document;
@@ -273,14 +274,6 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               </Text>
               <Text style={s.accent}>{result.caseInfo.status}</Text>
               <Text style={s.muted}>{result.details.header}</Text>
-              {result.details.keyValues.map((item, index) => (
-                <View key={index}>
-                  <Text style={s.label}>{item.key}</Text>
-                  <Text selectable style={s.text}>
-                    {item.value}
-                  </Text>
-                </View>
-              ))}
               <View style={s.row}>
                 <Button
                   title="Case Brief"
@@ -351,10 +344,20 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
             {!result.orderJudgments?.length && (
               <Text style={s.muted}>No judgments available.</Text>
             )}
-            <Text style={s.heading}>Listing History</Text>
-            <Records rows={result.details.listingHistory} />
-            <Text style={s.heading}>IA Details</Text>
-            <Records rows={result.details.iaDetails} />
+            <CourtCaseDetails
+              sections={
+                result.details.sections || [
+                  {
+                    title: 'Case Status',
+                    columns: ['Particulars', 'Details'],
+                    rows: result.details.keyValues.map(({ key, value }) => [
+                      key,
+                      value,
+                    ]),
+                  },
+                ]
+              }
+            />
           </>
         )}
       </>

@@ -4,6 +4,7 @@ if (typeof window !== 'undefined') {
 }
 
 import * as cheerio from 'cheerio';
+import { buildCaseSections, type CaseDetailSection } from './caseDetails';
 import ExcelJS from 'exceljs';
 import { chromium } from 'playwright';
 import { randomUUID } from 'node:crypto';
@@ -77,6 +78,7 @@ export type OrdersFetchResult = {
     keyValues: Array<{ key: string; value: string }>;
     listingHistory: Array<Record<string, string>>;
     iaDetails: Array<Record<string, string>>;
+    sections?: CaseDetailSection[];
   };
   pdf: { filename: string; base64: string };
   excel: { filename: string; base64: string };
@@ -1553,11 +1555,32 @@ function parseDetails(detailsHtml: string) {
     if (headerRowText.includes('cause list type') || headerRowText.includes('listing date') || headerRowText.includes('short order')) return;
     if (headerRowText.includes('application(s) number') || headerRowText.includes('ia status')) return;
 
+    const firstCells = $t.find('tr').first().children('td,th').map((__, el) => normalizeText($(el).text())).get();
+    const columnHeaders = firstCells.length === 2 && (
+      (/petitioner|appellant|applicant/i.test(firstCells[0]) && /respondent|opposite party/i.test(firstCells[1])) ||
+      (/under act/i.test(firstCells[0]) && /under section/i.test(firstCells[1]))
+    );
+    const cellText = (el: Parameters<typeof $>[0]) => {
+      const cell = $(el).clone();
+      cell.find('br').replaceWith('\n');
+      return cell.text().split('\n').map(line => normalizeText(line)).filter(Boolean).join('\n');
+    };
+    if (columnHeaders) {
+      const rows: string[][] = [];
+      $t.find('tr').slice(1).each((__, tr) => { rows.push($(tr).children('td,th').map((___, el) => cellText(el)).get()); });
+      firstCells.forEach((key, column) => keyValues.push({ key, value: rows.map(row => row[column] || '').filter(Boolean).join('\n') }));
+      return;
+    }
+
     $t.find('tr').each((__, tr) => {
-      const cells = $(tr).find('td,th').map((___, el) => normalizeText($(el).text())).get().filter(Boolean);
+      const cells = $(tr).children('td,th').map((___, el) => cellText(el)).get();
       if (cells.length === 2) {
         const [k, v] = cells;
-        if (k && v) keyValues.push({ key: k, value: v });
+        if (k) keyValues.push({ key: k, value: v });
+      } else if (cells.length === 3) {
+        if (cells[0]) keyValues.push({ key: cells[0], value: cells[1] });
+        const colon = cells[2].indexOf(':');
+        if (colon > 0) keyValues.push({ key: cells[2].slice(0, colon).trim(), value: cells[2].slice(colon + 1).trim() });
       } else if (cells.length === 4) {
         const [k1, v1, k2, v2] = cells;
         if (k1 && v1) keyValues.push({ key: k1, value: v1 });
@@ -1609,7 +1632,8 @@ function parseDetails(detailsHtml: string) {
     return true;
   });
 
-  return { header, keyValues: deduped, listingHistory, iaDetails };
+  const details = { header, keyValues: deduped, listingHistory, iaDetails };
+  return { ...details, sections: buildCaseSections(details) };
 }
 
 async function buildExcel(params: {

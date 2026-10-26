@@ -6,6 +6,7 @@ import {
   submitOrdersCaptchaChallenge,
 } from '@/models/ordersModel';
 import { getDb } from '@/lib/mongodb';
+import { buildCaseSections } from '@/lib/caseDetails';
 import { getLatestStatusSnapshot, saveStatusSnapshot } from '@/lib/aiStore';
 
 // Server-only route configuration
@@ -23,7 +24,7 @@ function cachedResult(snapshot: NonNullable<Awaited<ReturnType<typeof getLatestS
   return {
     city: snapshot.city,
     caseInfo: snapshot.caseInfo,
-    details: snapshot.details,
+    details: { ...snapshot.details, sections: snapshot.details.sections || buildCaseSections(snapshot.details) },
     orderJudgments: snapshot.orderJudgments,
     pdf: { filename: '', base64: '' },
     excel: { filename: '', base64: '' },
