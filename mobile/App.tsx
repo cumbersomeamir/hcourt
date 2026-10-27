@@ -55,7 +55,6 @@ function AppLoadingScreen({ overlay = false }: { overlay?: boolean }) {
       <View style={styles.loadingGlowBottom} />
       <View style={styles.loadingBrandMark}><Text style={styles.loadingBrandMarkText}>H</Text></View>
       <Text style={styles.loadingBrand}>Courtlens</Text>
-      <Text style={styles.loadingEyebrow}>ADVOCATE DESK</Text>
       <View style={styles.loadingIndicator}><ActivityIndicator size="small" color="#7dd3fc" /></View>
       <Text style={styles.loadingTitle}>Preparing your workspace</Text>
       <Text style={styles.loadingDescription}>Bringing your legal work into view.</Text>
@@ -371,12 +370,10 @@ function App() {
           <View style={styles.brandRow}>
             <View>
               <Text style={styles.brandName}>Courtlens</Text>
-              <Text style={styles.brandTagline}>ADVOCATE DESK</Text>
             </View>
           </View>
 
           <View style={styles.authHero}>
-            <Text style={styles.authEyebrow}>YOUR PRIVATE LEGAL WORKSPACE</Text>
             <Text style={styles.authTitle}>Practice with clarity.</Text>
             <Text style={styles.authTitleAccent}>Move with confidence.</Text>
             <Text style={styles.authDescription}>
@@ -462,7 +459,6 @@ function App() {
         </View>
 
         <ScrollView contentContainerStyle={styles.profileScrollContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.authEyebrow}>MAKE Courtlens YOUR OWN</Text>
           <Text style={styles.profileTitle}>Set up your{`\n`}practice.</Text>
           <Text style={styles.profileDescription}>
             These details help Courtlens recognize your matters and personalize your workspace.

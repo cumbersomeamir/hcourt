@@ -133,8 +133,8 @@ export default function AccountPage() {
     <Script src="https://accounts.google.com/gsi/client" onReady={() => setReady(true)} onError={() => setError('Google could not load. Check your connection and refresh.')} />
     <div className={`${styles.content} ${!user ? styles.loginContent : editor ? styles.profileContent : styles.settingsContent}`}>
       {loading ? <p role="status">Loading account…</p> : !user ? <div className={styles.login}>
-        <div className={styles.brand}><div><strong>Courtlens</strong><small>ADVOCATE DESK</small></div></div>
-        <div className={styles.hero}><p className={styles.eyebrow}>YOUR PRIVATE LEGAL WORKSPACE</p><h1>Practice with clarity.<br /><span>Move with confidence.</span></h1><p className={styles.description}>One secure place for your matters, court updates, and the work that matters next.</p></div>
+        <div className={styles.brand}><div><strong>Courtlens</strong></div></div>
+        <div className={styles.hero}><h1>Practice with clarity.<br /><span>Move with confidence.</span></h1><p className={styles.description}>One secure place for your matters, court updates, and the work that matters next.</p></div>
         <div className={styles.benefits}><p>A workspace tailored to your practice</p><p>Secure access to your tracked matters</p></div>
         <div className={styles.loginFooter}><div className={styles.googleButton} style={busy ? { pointerEvents: 'none', opacity: .5 } : undefined} ref={button} />
           {busy && <p role="status" className={styles.footnote}>Connecting securely...</p>}
@@ -143,7 +143,7 @@ export default function AccountPage() {
         </div>
       </div> : editor ? <>
         <header className={styles.header}><button disabled={busy} onClick={editor === 'setup' ? signOut : cancelEditor}>‹ Back</button><button disabled={busy} onClick={cancelEditor}>{editor === 'settings' ? 'Cancel' : 'Skip for now'}</button></header>
-        <p className={styles.eyebrow}>MAKE Courtlens YOUR OWN</p><h1>Set up your <br />practice.</h1><p className={styles.description}>These details help Courtlens recognize your matters and personalize your workspace.</p>
+        <h1>Set up your <br />practice.</h1><p className={styles.description}>These details help Courtlens recognize your matters and personalize your workspace.</p>
         <div className={styles.linked}><span>G</span><div><small>SIGNED IN AS</small><p>{user.email}</p></div></div>
         <form className={styles.profileForm} onSubmit={saveProfile}>
           <label className={styles.field}>Full counsel name<input required autoComplete="name" placeholder="e.g. Adv. Priya Sharma" value={form.counselName} onChange={e => setForm({ ...form, counselName: e.target.value })} /></label>
