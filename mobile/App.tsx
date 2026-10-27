@@ -369,9 +369,6 @@ function App() {
         <View style={styles.authGlowBottom} />
         <View style={styles.authContent}>
           <View style={styles.brandRow}>
-            <View style={styles.brandMark}>
-              <Text style={styles.brandMarkText}>H</Text>
-            </View>
             <View>
               <Text style={styles.brandName}>Courtlens</Text>
               <Text style={styles.brandTagline}>ADVOCATE DESK</Text>
