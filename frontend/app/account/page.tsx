@@ -131,7 +131,7 @@ export default function AccountPage() {
   const accountName = profile?.counselName || 'Courtlens member';
   return <main className={styles.screen}>
     <Script src="https://accounts.google.com/gsi/client" onReady={() => setReady(true)} onError={() => setError('Google could not load. Check your connection and refresh.')} />
-    <div className={styles.content}>
+    <div className={`${styles.content} ${!user ? styles.loginContent : editor ? styles.profileContent : styles.settingsContent}`}>
       {loading ? <p role="status">Loading account…</p> : !user ? <div className={styles.login}>
         <div className={styles.brand}><span className={styles.brandMark}>H</span><div><strong>Courtlens</strong><small>ADVOCATE DESK</small></div></div>
         <div className={styles.hero}><p className={styles.eyebrow}>YOUR PRIVATE LEGAL WORKSPACE</p><h1>Practice with clarity.<br /><span>Move with confidence.</span></h1><p className={styles.description}>One secure place for your matters, court updates, and the work that matters next.</p></div>
@@ -143,9 +143,9 @@ export default function AccountPage() {
         </div>
       </div> : editor ? <>
         <header className={styles.header}><button disabled={busy} onClick={editor === 'setup' ? signOut : cancelEditor}>‹ Back</button><button disabled={busy} onClick={cancelEditor}>{editor === 'settings' ? 'Cancel' : 'Skip for now'}</button></header>
-        <p className={styles.eyebrow}>MAKE Courtlens YOUR OWN</p><h1>Set up your<br />practice.</h1><p className={styles.description}>These details help Courtlens recognize your matters and personalize your workspace.</p>
+        <p className={styles.eyebrow}>MAKE Courtlens YOUR OWN</p><h1>Set up your <br />practice.</h1><p className={styles.description}>These details help Courtlens recognize your matters and personalize your workspace.</p>
         <div className={styles.linked}><span>G</span><div><small>SIGNED IN AS</small><p>{user.email}</p></div></div>
-        <form onSubmit={saveProfile}>
+        <form className={styles.profileForm} onSubmit={saveProfile}>
           <label className={styles.field}>Full counsel name<input required autoComplete="name" placeholder="e.g. Adv. Priya Sharma" value={form.counselName} onChange={e => setForm({ ...form, counselName: e.target.value })} /></label>
           <label className={styles.field}>Bar enrollment number<input required placeholder="e.g. UP/1234/2022" value={form.enrollmentNo} onChange={e => setForm({ ...form, enrollmentNo: e.target.value })} /></label>
           <label className={styles.field}>Name aliases <small>OPTIONAL</small><textarea placeholder="Add alternate name spellings, one per line" value={form.aliases} onChange={e => setForm({ ...form, aliases: e.target.value })} /></label>
@@ -153,12 +153,14 @@ export default function AccountPage() {
           <button className={styles.save} disabled={busy}>{busy ? 'Saving your profile...' : 'Save and continue'}</button><p className={styles.footnote}>You can update these details anytime from your account settings.</p>
         </form>
       </> : <>
-        <header className={styles.header}><Link href="/">‹ Dashboard</Link></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace,<br />your way.</h1>
+        <header className={styles.header}><Link href="/">‹ Dashboard</Link></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace, <br />your way.</h1>
         <div className={styles.identity}><span className={styles.avatar}>{accountName.trim().charAt(0).toUpperCase()}</span><div className={styles.rowCopy}><strong>{accountName}</strong><p>{user.email}</p><span className={styles.badge}>GOOGLE ACCOUNT</span></div></div>
-        <h2>YOUR PRACTICE</h2><div className={styles.card}>{row('P', 'Profile details', profile?.enrollmentNo || 'Add your professional details', 'cyan', openProfile)}</div>
-        <h2>PRIVACY & SECURITY</h2><div className={styles.card}>{row('G', 'Connected account', user.email, 'indigo')}{row('✓', 'Private workspace', 'Your profile is used only for your Courtlens workspace', 'emerald')}</div>
-        <h2>SUPPORT & LEGAL</h2><div className={styles.card}>{row('?', 'Help & support', 'Contact us, privacy policy and legal information', 'slate', undefined, '/support')}</div>
-        <h2>ACCOUNT ACTIONS</h2><div className={styles.card}>{row('↪', 'Log out', 'Sign out from this device', 'slate', signOut)}{row('×', 'Delete account', 'Remove your account and data from Courtlens', 'red', deleteAccount)}</div>
+        <div className={styles.settingsGrid}>
+        <section><h2>YOUR PRACTICE</h2><div className={styles.card}>{row('P', 'Profile details', profile?.enrollmentNo || 'Add your professional details', 'cyan', openProfile)}</div></section>
+        <section><h2>PRIVACY & SECURITY</h2><div className={styles.card}>{row('G', 'Connected account', user.email, 'indigo')}{row('✓', 'Private workspace', 'Your profile is used only for your Courtlens workspace', 'emerald')}</div></section>
+        <section><h2>SUPPORT & LEGAL</h2><div className={styles.card}>{row('?', 'Help & support', 'Contact us, privacy policy and legal information', 'slate', undefined, '/support')}</div></section>
+        <section><h2>ACCOUNT ACTIONS</h2><div className={styles.card}>{row('↪', 'Log out', 'Sign out from this device', 'slate', signOut)}{row('×', 'Delete account', 'Remove your account and data from Courtlens', 'red', deleteAccount)}</div></section>
+        </div>
       </>}
       {error && <p role="alert" className={styles.error}>{error}</p>}
     </div>

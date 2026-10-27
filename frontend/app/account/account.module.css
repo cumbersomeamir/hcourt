@@ -57,4 +57,32 @@ button.row:hover, a.row:hover { background: #122541; }
 .googleButton { display: flex; justify-content: center; min-height: 40px; }
 .legal { display: flex; justify-content: center; gap: 8px; margin-top: 10px; color: #7dd3fc; font-size: 12px; font-weight: 600; }
 .legal span { color: #64748b; }
+.settingsGrid > section { min-width: 0; }
+@media (min-width: 640px) {
+  .content { max-width: 1120px; padding: 48px 40px 64px; }
+  .profileContent { max-width: 960px; }
+  .screen h1 { font-size: 42px; line-height: 1.15; }
+  .screen h1 br { display: none; }
+  .description { max-width: 600px; font-size: 16px; line-height: 26px; }
+  .settingsGrid, .profileForm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; }
+  .identity { padding: 24px; }
+  .row { min-height: 88px; padding: 18px; }
+  .rowCopy strong { font-size: 15px; }
+  .rowCopy small { font-size: 13px; line-height: 20px; }
+  .profileForm .save, .profileForm .footnote { grid-column: 1 / -1; }
+  .profileForm .save { width: 260px; justify-self: end; }
+  .profileForm .footnote { text-align: right; }
+  .linked { max-width: 440px; margin-bottom: 12px; }
+  .field textarea { min-height: 120px; }
+}
+@media (min-width: 900px) {
+  .login { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(320px, 1fr); grid-template-rows: auto 1fr auto; column-gap: 64px; min-height: min(760px, calc(100dvh - 112px)); }
+  .brand { grid-column: 1 / -1; }
+  .hero { grid-column: 1; align-self: end; margin-top: 72px; }
+  .hero h1 { font-size: 48px; line-height: 1.15; }
+  .hero h1 br { display: block; }
+  .hero .description { max-width: 470px; font-size: 18px; line-height: 28px; }
+  .benefits { grid-column: 1; margin-bottom: 48px; }
+  .loginFooter { grid-column: 2; grid-row: 2 / 4; align-self: center; margin: 0; padding: 44px 24px; background: #0d1b32; border: 1px solid #203d60; border-radius: 24px; }
+}
 @media (prefers-reduced-motion: no-preference) { .content { animation: appear .25s ease-out; } @keyframes appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } } }
