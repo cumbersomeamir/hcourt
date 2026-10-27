@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation';
 import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
 import { downloadBase64File } from '@/lib/download';
 import CourtCaseDetails from '@/views/components/CourtCaseDetails';
+import CaseBrief from '@/views/components/CaseBrief';
 
 type CaseTypeOption = { value: string; label: string };
 
@@ -621,7 +622,7 @@ export default function OrdersPage() {
                 </h2>
                 <div className="mt-1.5 flex items-center gap-2 text-sm text-slate-300">
                   <span className="font-medium text-slate-400">Status:</span>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-400/20">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/10 text-red-300 border border-red-400/30">
                     {result.caseInfo.status || '—'}
                   </span>
                 </div>
@@ -647,7 +648,7 @@ export default function OrdersPage() {
               <section className="mt-5 rounded-xl border border-sky-400/25 bg-sky-500/5 p-4">
                 <h3 className="mb-2 font-semibold text-sky-200">AI Case Brief</h3>
                 <p className="mb-3 text-xs text-slate-400">Based on available case-status details. Full judgment text is not included.</p>
-                <div className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{brief.text}</div>
+                <CaseBrief text={brief.text} />
               </section>
             )}
             {result.orderJudgments && result.orderJudgments.length > 0 && (
@@ -693,9 +694,7 @@ export default function OrdersPage() {
                         >
                           {judgmentLoadingId === entry.judgmentId
                             ? 'Preparing court document...'
-                            : entry.documentStatus === 'cached'
-                              ? 'Download Order/Judgment'
-                              : 'Prepare PDF'}
+                            : 'Download PDF'}
                         </button>
                         <a
                           href={entry.viewUrl}

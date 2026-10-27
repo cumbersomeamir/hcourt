@@ -10,7 +10,7 @@ export default function CourtCaseDetails({
   return (
     <View
       style={{
-        backgroundColor: '#0f172a',
+        backgroundColor: '#ffffff',
         borderRadius: 12,
         padding: 12,
         gap: 20,
@@ -18,12 +18,15 @@ export default function CourtCaseDetails({
     >
       {sections.map((section, index) => {
         const wide = section.columns.length > 2;
+        const status = section.title === 'Case Status';
+        const borderColor = status ? '#ef4444' : '#64748b';
+        const backgroundColor = status ? '#fff9df' : section.title === 'Acts' ? '#edf9f6' : section.title === 'Listing History' ? '#f4fae9' : '#ffffff';
         const table = (
           <View
             style={{
               borderLeftWidth: 1,
               borderTopWidth: 1,
-              borderColor: '#334155',
+              borderColor,
             }}
           >
             {(section.columns[0] === 'Particulars'
@@ -34,12 +37,7 @@ export default function CourtCaseDetails({
                 key={i}
                 style={{
                   flexDirection: 'row',
-                  backgroundColor:
-                    section.title === 'Case Status'
-                      ? '#13243a'
-                      : i === 0 && section.columns[0] !== 'Particulars'
-                      ? '#1e293b'
-                      : '#0f172a',
+                  backgroundColor,
                 }}
               >
                 {section.columns.map((_, j) => (
@@ -56,14 +54,14 @@ export default function CourtCaseDetails({
                           }),
                       borderRightWidth: 1,
                       borderBottomWidth: 1,
-                      borderColor: '#334155',
+                      borderColor,
                       padding: 8,
                     }}
                   >
                     <Text
                       selectable
                       style={{
-                        color: '#e2e8f0',
+                        color: status ? '#d71920' : '#1e293b',
                         fontSize: 12,
                         lineHeight: 18,
                         fontWeight: (
@@ -87,7 +85,7 @@ export default function CourtCaseDetails({
           <View key={`${section.title}-${index}`} style={{ gap: 8 }}>
             <Text
               style={{
-                color: '#e2e8f0',
+                color: status ? '#d71920' : '#1e293b',
                 textAlign: 'center',
                 fontSize: 14,
                 fontWeight: '600',

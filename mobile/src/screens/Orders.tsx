@@ -17,6 +17,7 @@ import {
 } from '../ui';
 import { saveBase64File, openBase64File } from '../downloads';
 import CourtCaseDetails from '../CourtCaseDetails';
+import CaseBrief from '../CaseBrief';
 
 export type Document = { filename: string; base64: string; mimeType?: string };
 type OrdersResult = {
@@ -272,7 +273,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                 {result.caseInfo.petitionerVsRespondent ||
                   `${caseType} ${caseNo}/${caseYear}`}
               </Text>
-              <Text style={s.accent}>{result.caseInfo.status}</Text>
+              <Text style={[s.accent, { color: '#fca5a5' }]}>{result.caseInfo.status}</Text>
               <Text style={s.muted}>{result.details.header}</Text>
               <View style={s.row}>
                 <Button
@@ -304,9 +305,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                   Based on available case-status details. Full judgment text is
                   not included.
                 </Text>
-                <Text selectable style={s.text}>
-                  {brief.text}
-                </Text>
+                <CaseBrief text={brief.text} />
               </Card>
             )}
             <Text style={s.heading}>Orders & Judgments</Text>
@@ -331,7 +330,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                     }
                   />
                   <Button
-                    title="Download"
+                    title="Download PDF"
                     quiet
                     disabled={action.busy}
                     onPress={() =>
