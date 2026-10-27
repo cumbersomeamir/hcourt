@@ -1,3 +1,5 @@
+import { isSameOrigin, readSessionCookie } from './webSession';
+
 const backendOrigin = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
 export function buildUpstreamUrl(pathname: string, requestUrl?: string): string {
@@ -21,7 +23,11 @@ export async function proxyOrdersRequest(
   const headers = new Headers();
   const contentType = request.headers.get('content-type');
   const accept = request.headers.get('accept');
-  const authorization = request.headers.get('authorization');
+  const cookieToken = readSessionCookie(request);
+  const authorization = request.headers.get('authorization') || (cookieToken ? `Bearer ${cookieToken}` : null);
+  if (cookieToken && !request.headers.has('authorization') && !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase()) && !isSameOrigin(request)) {
+    return Response.json({ success: false, error: 'Invalid request origin.' }, { status: 403 });
+  }
 
   if (contentType) headers.set('content-type', contentType);
   if (accept) headers.set('accept', accept);
@@ -54,6 +60,7 @@ export async function proxyOrdersRequest(
   }
 
   const responseHeaders = new Headers();
+  if (authorization) responseHeaders.set('Cache-Control', 'no-store');
   const upstreamContentType = upstream.headers.get('content-type');
   const upstreamContentDisposition = upstream.headers.get('content-disposition');
 

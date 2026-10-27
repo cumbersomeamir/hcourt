@@ -190,7 +190,7 @@ const homeTiles: HomeTile[] = [
     ),
   },
   {
-    href: '#',
+    href: '/account',
     title: 'Account Settings',
     label: 'Profile',
     description: 'Manage your practice profile, privacy preferences, and account access.',

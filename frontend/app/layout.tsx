@@ -5,6 +5,7 @@ import Clarity from "@/components/Clarity";
 import ClientErrorReporter from "@/components/ClientErrorReporter";
 import GlobalMobileNavigation from "@/views/components/GlobalMobileNavigation";
 import RoutePrefetcher from "@/views/components/RoutePrefetcher";
+import WebAccountLink from "@/components/WebAccountLink";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,6 +36,7 @@ export default function RootLayout({
         <ClientErrorReporter />
         <GlobalMobileNavigation />
         <RoutePrefetcher />
+        <WebAccountLink />
         {children}
       </body>
     </html>

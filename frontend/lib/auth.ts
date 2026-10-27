@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import { readSessionCookie } from './webSession';
 
 export type AuthenticatedUser = {
   userId: string;
@@ -23,7 +24,7 @@ export function createNativeSession(user: AuthenticatedUser) {
 }
 
 export function getAuthenticatedUser(request: Request): AuthenticatedUser | null {
-  const value = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+  const value = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1] || readSessionCookie(request);
   if (!value) return null;
   const [content, receivedSignature] = value.split('.');
   if (!content || !receivedSignature) return null;
