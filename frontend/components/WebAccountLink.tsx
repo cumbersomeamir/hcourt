@@ -1,10 +1,12 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { clearWebAccount } from '@/lib/webAccount';
 
 export default function WebAccountLink() {
+  const pathname = usePathname();
   const [email, setEmail] = useState('');
   useEffect(() => {
     let active = true;
@@ -18,6 +20,7 @@ export default function WebAccountLink() {
     }).catch(() => {});
     return () => { active = false; };
   }, []);
+  if (pathname === '/account') return null;
   return <div className="flex justify-end px-4 pt-3">
     <Link href="/account" className="max-w-[80%] truncate rounded-full border border-sky-400/25 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-200 hover:bg-sky-500/20">{email || 'Sign in with Google'}</Link>
   </div>;
