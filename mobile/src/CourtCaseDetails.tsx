@@ -20,7 +20,7 @@ export default function CourtCaseDetails({
         const wide = section.columns.length > 2;
         const status = section.title === 'Case Status';
         const borderColor = status ? '#7f3944' : '#334155';
-        const backgroundColor = status ? '#211a2a' : section.title === 'Acts' ? '#10252a' : section.title === 'Listing History' ? '#12262a' : '#0f172a';
+        const backgroundColor = status ? '#211a2a' : section.title === 'Acts' ? '#10252a' : section.title === 'Listing History' ? '#29251b' : '#0f172a';
         const table = (
           <View
             style={{
@@ -61,7 +61,7 @@ export default function CourtCaseDetails({
                     <Text
                       selectable
                       style={{
-                        color: status ? '#fca5a5' : section.title === 'Acts' || section.title === 'Listing History' ? '#bbf7d0' : '#e2e8f0',
+                        color: status ? '#fca5a5' : section.title === 'Listing History' ? '#fde68a' : section.title === 'Acts' ? '#bbf7d0' : '#e2e8f0',
                         fontSize: 12,
                         lineHeight: 18,
                         fontWeight: (
@@ -85,7 +85,7 @@ export default function CourtCaseDetails({
           <View key={`${section.title}-${index}`} style={{ gap: 8 }}>
             <Text
               style={{
-                color: status ? '#fca5a5' : section.title === 'Acts' || section.title === 'Listing History' ? '#bbf7d0' : '#e2e8f0',
+                color: status ? '#fca5a5' : section.title === 'Listing History' ? '#fde68a' : section.title === 'Acts' ? '#bbf7d0' : '#e2e8f0',
                 textAlign: 'center',
                 fontSize: 14,
                 fontWeight: '600',
