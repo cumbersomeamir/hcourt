@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   });
   const data = await upstream.json();
   if (!upstream.ok || !data.success || !data.result?.base64) {
-    return Response.json({ success: false }, { status: upstream.status || 502 });
+    return Response.json({ success: false, error: data.error || 'Unable to download the court PDF.', code: data.code, retryAfterMs: data.retryAfterMs }, { status: upstream.status === 200 ? 502 : upstream.status });
   }
 
   const filename = String(data.result.filename || 'courtlens-order.pdf').replace(/["\r\n]/g, '');

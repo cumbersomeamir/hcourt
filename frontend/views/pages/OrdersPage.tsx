@@ -302,7 +302,7 @@ export default function OrdersPage() {
 
   const fetchJudgmentPdf = async (viewUrl: string, date: string) => {
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+    const timeoutId = window.setTimeout(() => controller.abort(), 120000);
     const res = await fetch('/api/orders/judgment', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -388,7 +388,7 @@ export default function OrdersPage() {
         documentStatus: 'not_cached',
         documentMessage: 'Open the official court website to download this document.',
       });
-      setError(courtSourceError(e, 'Unable to download the court order or judgment.'));
+      setError(e instanceof Error ? e.message : 'Unable to download the court order or judgment.');
     } finally {
       setJudgmentLoadingId(null);
     }
@@ -411,8 +411,9 @@ export default function OrdersPage() {
           );
           downloadBase64File(pdf.filename, pdf.mimeType || 'application/pdf', pdf.base64);
           await new Promise((resolve) => setTimeout(resolve, 200));
-        } catch {
+        } catch (error) {
           failedDates.push(entry.date || `#${entry.srNo}`);
+          throw new Error(`${error instanceof Error ? error.message : 'PDF download failed.'} Remaining downloads stopped; retry the unfinished files later.`);
         }
       }
 
@@ -420,7 +421,7 @@ export default function OrdersPage() {
         throw new Error('One or more court PDFs are temporarily unavailable.');
       }
     } catch (e) {
-      setError(courtSourceError(e, 'Unable to download court order or judgment PDFs.'));
+      setError(e instanceof Error ? e.message : 'Unable to download court order or judgment PDFs.');
     } finally {
       setAllJudgmentsLoading(false);
     }

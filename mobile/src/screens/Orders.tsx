@@ -1,6 +1,6 @@
 import { Text } from '../typography';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Linking, View } from 'react-native';
 import { useAction, useRemote, useWorkspace } from '../workspace';
 import {
   benches,
@@ -18,6 +18,12 @@ import {
 import { saveBase64File, openBase64File } from '../downloads';
 import CourtCaseDetails from '../CourtCaseDetails';
 import CaseBrief from '../CaseBrief';
+
+const openCourtDocument = (url: string) => {
+  const target = new URL(url);
+  if (!['https:', 'http:'].includes(target.protocol) || target.hostname !== 'elegalix.allahabadhighcourt.in') throw new Error('Invalid court document URL.');
+  return Linking.openURL(url);
+};
 
 export type Document = { filename: string; base64: string; mimeType?: string };
 type OrdersResult = {
@@ -337,6 +343,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                       void downloadJudgment(item.viewUrl, item.date, false)
                     }
                   />
+                  <Button title="Open on Court Website" quiet onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} disabled={action.busy} />
                 </View>
               </Card>
             ))}
@@ -385,6 +392,7 @@ export function JudgmentScreen({ params }: { params: URLSearchParams }) {
       <Card>
         <Text style={s.text}>{params.get('date')}</Text>
         <Button title="Open PDF" onPress={open} disabled={action.busy} />
+        <Button title="Open on Court Website" quiet disabled={action.busy} onPress={() => void action.run(() => openCourtDocument(params.get('viewUrl') || ''))} />
         <Feedback {...action} />
       </Card>
     </Page>

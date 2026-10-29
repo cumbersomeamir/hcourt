@@ -161,7 +161,24 @@ const CHROMIUM_CRASH_SAFE_ARGS = [
 let ordersCaptchaIndexesEnsured = false;
 let orderJudgmentCacheIndexesEnsured = false;
 let orderCaseTypesCacheIndexesEnsured = false;
-const orderJudgmentPrefetches = new Map<string, Promise<void>>();
+const orderJudgmentPrefetches = new Map<string, Promise<OrderJudgmentDownload>>();
+let judgmentQueue: Promise<unknown> = Promise.resolve();
+let judgmentBlockedUntil = 0;
+
+export class OrderJudgmentSourceBusyError extends Error {
+  readonly code = 'document_source_busy';
+  constructor(public retryAfterMs: number) {
+    super('The court PDF service is temporarily limiting downloads. Please retry later or use Open on Court Website.');
+  }
+}
+
+function checkJudgmentSource(response: Response) {
+  if (response.status !== 403 && response.status !== 429) return;
+  const retry = response.headers.get('retry-after') || '';
+  const delay = /^\d+$/.test(retry) ? Number(retry) * 1000 : Date.parse(retry) - Date.now();
+  judgmentBlockedUntil = Date.now() + Math.max(300000, Number.isFinite(delay) ? delay : 0);
+  throw new OrderJudgmentSourceBusyError(judgmentBlockedUntil - Date.now());
+}
 const caseTypesMemoryCache = new Map<
   OrdersCity,
   { types: CaseTypeOption[]; fetchedAt: number }
@@ -297,10 +314,9 @@ async function getCachedOrderJudgment(
         ? Buffer.from(doc.base64, 'base64')
         : null;
   } catch {
-    await collection.deleteOne({ judgmentId: normalizedId });
-    return null;
+    bytes = doc.base64 ? Buffer.from(doc.base64, 'base64') : null;
   }
-  if (!bytes) return null;
+  if (!bytes || bytes.subarray(0, 4).toString() !== '%PDF') return null;
 
   await collection.updateOne(
     { judgmentId: normalizedId },
@@ -1051,29 +1067,31 @@ async function downloadOrderJudgmentDirect(
     getJudgmentRequestContext(viewUrl);
   const cookieJar = new Map<string, string>();
 
-  const initRes = await fetch(startPageUrl, {
+  const initRes = await fetchWithTimeout(startPageUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0',
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
     cache: 'no-store',
-  });
+  }, 15000);
   updateCookieJar(cookieJar, initRes);
+  checkJudgmentSource(initRes);
   if (!initRes.ok) {
     throw new Error(`Failed to start eLegalix session: ${initRes.status}`);
   }
 
   const maxAttempts = 5;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const captchaRes = await fetch(`${baseAppUrl}/getData?action=generateCaptcha&_t=${Date.now()}`, {
+    const captchaRes = await fetchWithTimeout(`${baseAppUrl}/getData?action=generateCaptcha&_t=${Date.now()}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0',
         Referer: startPageUrl,
         Cookie: toCookieHeader(cookieJar),
       },
       cache: 'no-store',
-    });
+    }, 15000);
     updateCookieJar(cookieJar, captchaRes);
+    checkJudgmentSource(captchaRes);
     if (!captchaRes.ok) continue;
 
     const token = await captchaRes.text();
@@ -1089,7 +1107,7 @@ async function downloadOrderJudgmentDirect(
     form.set('subseq', parsed.searchParams.get('subseq') || 'no');
     form.set('securitycode', securityCode);
 
-    const fileRes = await fetch(formActionUrl, {
+    const fileRes = await fetchWithTimeout(formActionUrl, {
       method: 'POST',
       headers: {
         'User-Agent': 'Mozilla/5.0',
@@ -1101,8 +1119,9 @@ async function downloadOrderJudgmentDirect(
       },
       body: form.toString(),
       cache: 'no-store',
-    });
+    }, 15000);
     updateCookieJar(cookieJar, fileRes);
+    checkJudgmentSource(fileRes);
 
     if (fileRes.status === 403) {
       throw new Error('eLegalix rejected the PDF download request with 403');
@@ -1191,7 +1210,9 @@ async function downloadAndCacheOrderJudgment(
 ): Promise<OrderJudgmentDownload> {
   try {
     const direct = await downloadOrderJudgmentDirect(viewUrl, date);
-    await cacheOrderJudgment(direct, { viewUrl, date, source: 'direct' });
+    await cacheOrderJudgment(direct, { viewUrl, date, source: 'direct' }).catch(() => {
+      console.warn('[orders] PDF downloaded but could not be cached.');
+    });
     return direct;
   } catch (error) {
     if (!shouldTryJudgmentProxy(error)) {
@@ -1206,53 +1227,10 @@ async function downloadAndCacheOrderJudgment(
     );
   }
 
-  await cacheOrderJudgment(proxied, { viewUrl, date, source: 'proxy' });
+  await cacheOrderJudgment(proxied, { viewUrl, date, source: 'proxy' }).catch(() => {
+    console.warn('[orders] PDF downloaded but could not be cached.');
+  });
   return proxied;
-}
-
-function startOrderJudgmentPrefetch(entry: Pick<OrderJudgmentEntry, 'judgmentId' | 'viewUrl' | 'date'>) {
-  const judgmentId = String(entry.judgmentId || '').trim();
-  if (!judgmentId) return Promise.resolve();
-
-  const existing = orderJudgmentPrefetches.get(judgmentId);
-  if (existing) return existing;
-
-  const task = (async () => {
-    const cached = await getCachedOrderJudgmentMeta(judgmentId);
-    if (cached) return;
-    await downloadAndCacheOrderJudgment(entry.viewUrl, entry.date || undefined);
-  })()
-    .catch((error) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.log(`[orders] Unable to prepare judgment ${judgmentId}: ${message}`);
-    })
-    .finally(() => {
-      orderJudgmentPrefetches.delete(judgmentId);
-    });
-
-  orderJudgmentPrefetches.set(judgmentId, task);
-  return task;
-}
-
-async function prepareOrderJudgmentEntries(
-  entries: OrderJudgmentEntry[],
-  waitMs = Number(process.env.ORDERS_JUDGMENT_PREFETCH_WAIT_MS || 12000)
-): Promise<OrderJudgmentEntry[]> {
-  if (entries.length === 0) return entries;
-
-  const uniqueEntries = Array.from(
-    new Map(entries.map((entry) => [entry.judgmentId, entry])).values()
-  );
-  const tasks = uniqueEntries.map((entry) => startOrderJudgmentPrefetch(entry));
-
-  if (waitMs > 0) {
-    await Promise.race([
-      Promise.allSettled(tasks),
-      new Promise((resolve) => setTimeout(resolve, waitMs)),
-    ]);
-  }
-
-  return annotateOrderJudgmentEntries(entries);
 }
 
 async function annotateOrderJudgmentEntries(
@@ -1289,15 +1267,20 @@ export async function downloadOrderJudgment(viewUrl: string, date?: string): Pro
   const cached = await getCachedOrderJudgment(judgmentId);
   if (cached) return cached;
 
+  const existing = orderJudgmentPrefetches.get(judgmentId);
+  if (existing) return existing;
+  const task = judgmentQueue.then(async () => {
+    if (Date.now() < judgmentBlockedUntil) {
+      throw new OrderJudgmentSourceBusyError(judgmentBlockedUntil - Date.now());
+    }
+    return downloadAndCacheOrderJudgment(viewUrl, date);
+  });
+  judgmentQueue = task.catch(() => undefined);
+  orderJudgmentPrefetches.set(judgmentId, task);
   try {
-    return await downloadAndCacheOrderJudgment(viewUrl, date);
-  } catch (error) {
-    startOrderJudgmentPrefetch({ judgmentId, viewUrl, date: date || '' });
-    const message = error instanceof Error ? error.message : String(error);
-    console.log(`[orders] Judgment ${judgmentId} is not ready yet: ${message}`);
-    throw new OrderJudgmentPendingError(
-      'This court PDF is still being prepared. Please retry shortly.'
-    );
+    return await task;
+  } finally {
+    orderJudgmentPrefetches.delete(judgmentId);
   }
 }
 
@@ -1929,7 +1912,7 @@ export async function submitOrdersCaptchaChallenge(params: {
       caseYear: caseData.caseYear,
       details: caseData.details,
     }),
-    prepareOrderJudgmentEntries(caseData.orderJudgments),
+    annotateOrderJudgmentEntries(caseData.orderJudgments),
   ]);
 
   const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(
@@ -1970,7 +1953,7 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
       caseYear: caseData.caseYear,
       details: caseData.details,
     }),
-    prepareOrderJudgmentEntries(caseData.orderJudgments),
+    annotateOrderJudgmentEntries(caseData.orderJudgments),
   ]);
 
   const safeName = `${caseData.caseType}-${caseData.caseNo}-${caseData.caseYear}`.replace(

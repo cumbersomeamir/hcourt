@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { OrderJudgmentSourceBusyError } from '@/lib/orders';
 import {
   downloadOrderJudgment,
   isOrderJudgmentPendingError,
@@ -23,6 +24,11 @@ export async function POST(req: Request) {
     const result = await downloadOrderJudgment(viewUrl, date || undefined);
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    if (error instanceof OrderJudgmentSourceBusyError) {
+      return NextResponse.json({ success: false, code: error.code, error: error.message, retryAfterMs: error.retryAfterMs }, {
+        status: 503, headers: { 'Retry-After': String(Math.ceil(error.retryAfterMs / 1000)) },
+      });
+    }
     if (isOrderJudgmentPendingError(error)) {
       return NextResponse.json(
         {

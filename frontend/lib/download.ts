@@ -18,5 +18,5 @@ export function downloadBase64File(filename: string, mimeType: string, base64: s
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60000);
 }

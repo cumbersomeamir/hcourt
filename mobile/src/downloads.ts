@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { Platform, ToastAndroid } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
 import { isAllowedAppUrl } from './navigation';
@@ -62,6 +62,7 @@ export async function saveBase64File(filename: string, mimeType: string, base64:
         'Download',
         temporaryPath
       );
+      ToastAndroid.show('File saved in Downloads/Courtlens', ToastAndroid.LONG);
     } finally {
       await ReactNativeBlobUtil.fs.unlink(temporaryPath).catch(() => undefined);
     }
