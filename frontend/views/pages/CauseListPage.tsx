@@ -108,7 +108,7 @@ function readApiError(payload: unknown): string {
   return 'Request failed';
 }
 
-async function parseApiResult<T>(response: Response): Promise<T> {
+async function parseRawApiResult<T>(response: Response): Promise<T> {
   let payload: ApiSuccess<T> | ApiFailure | undefined;
   try {
     payload = (await response.json()) as ApiSuccess<T> | ApiFailure;
@@ -131,6 +131,12 @@ function formatPreviewColumnLabel(column: string): string {
 }
 
 export default function CauseListPage() {
+  const [cacheStatus, setCacheStatus] = useState<{ cachedAt?: string; cacheStale?: boolean } | null>(null);
+  async function parseApiResult<T>(response: Response): Promise<T> {
+    const value = await parseRawApiResult<T>(response);
+    setCacheStatus(value && typeof value === 'object' ? value as { cachedAt?: string; cacheStale?: boolean } : null);
+    return value;
+  }
   const [activeTile, setActiveTile] = useState<ActiveTile>(null);
   const [searchType, setSearchType] = useState<SearchType>('court');
   const [dates, setDates] = useState<DateOption[]>([]);
@@ -804,6 +810,9 @@ export default function CauseListPage() {
             </div>
           )}
 
+          {cacheStatus?.cachedAt && <p role="status" className="mt-4 rounded-xl border border-sky-400/20 bg-sky-500/5 p-3 text-sm text-sky-200">
+            {cacheStatus.cacheStale ? 'Showing saved data while a court refresh is pending. ' : ''}Last updated: {new Date(cacheStatus.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.
+          </p>}
           {activeTile === 'mediation' && (
             <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-cyan-200/20 bg-slate-900/55 p-4 sm:mt-10 sm:p-6">
               <h2 className="text-base font-semibold uppercase tracking-[0.08em] text-cyan-100 sm:text-lg">

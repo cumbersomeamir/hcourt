@@ -27,6 +27,8 @@ const openCourtDocument = (url: string) => {
 
 export type Document = { filename: string; base64: string; mimeType?: string };
 type OrdersResult = {
+  cachedAt?: string;
+  cacheStale?: boolean;
   caseInfo: {
     caseType: string;
     caseNo: string;
@@ -305,6 +307,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               </Text>
               <Text style={[s.accent, { color: '#fca5a5' }]}>{result.caseInfo.status}</Text>
               <Text style={s.muted}>{result.details.header}</Text>
+              {result.cachedAt && <Text style={s.muted}>{result.cacheStale ? 'Showing saved data; court refresh pending. ' : ''}Last updated: {new Date(result.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</Text>}
               <View style={s.row}>
                 {!result.orderJudgments?.length && <Button title="Download PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />}
                 <Button

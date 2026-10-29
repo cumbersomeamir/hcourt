@@ -1,3 +1,4 @@
+import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
   throw new Error('lib/causeListAllahabad.ts can only be used on the server');
@@ -26,23 +27,20 @@ const SOURCE_AGENT = new Agent({ connect: { timeout: 30_000 } });
 
 async function fetchSource(url: string, init?: RequestInit): Promise<Response> {
   let lastError: unknown;
+  const signal = init?.signal || AbortSignal.timeout(45_000);
 
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45_000);
     try {
       const response = await fetch(url, {
         ...init,
-        signal: init?.signal || controller.signal,
+        signal,
         dispatcher: SOURCE_AGENT,
       } as RequestInit);
       if (response.status < 500 || attempt === 3) return response;
       await response.body?.cancel();
     } catch (error) {
       lastError = error;
-      if (attempt === 3 || init?.signal?.aborted) throw error;
-    } finally {
-      clearTimeout(timeout);
+      if (attempt === 3 || signal.aborted) throw error;
     }
   }
 
@@ -317,7 +315,7 @@ async function loadCourtResultHtml(input: {
   return response.text();
 }
 
-export async function fetchAllahabadCauseListDates(listType?: string): Promise<{
+async function fetchAllahabadCauseListDatesSource(listType?: string): Promise<{
   listType: string;
   listTypeLabel: string;
   dates: CauseListDateOption[];
@@ -345,7 +343,7 @@ export async function fetchAllahabadCauseListDates(listType?: string): Promise<{
   };
 }
 
-export async function fetchAllahabadCourtOptions(input: {
+async function fetchAllahabadCourtOptionsSource(input: {
   listType?: string;
   listDate: string;
 }): Promise<{
@@ -373,7 +371,7 @@ export async function fetchAllahabadCourtOptions(input: {
   return { listType, listDate, options };
 }
 
-export async function fetchAllahabadCourtPdfLinks(input: {
+async function fetchAllahabadCourtPdfLinksSource(input: {
   listType?: string;
   listDate: string;
   courtNo: string;
@@ -416,7 +414,7 @@ export async function fetchAllahabadCourtPdfLinks(input: {
   };
 }
 
-export async function downloadAllahabadCourtPdf(pdfUrl: string): Promise<CauseListPdfDownload> {
+async function downloadAllahabadCourtPdfSource(pdfUrl: string): Promise<CauseListPdfDownload> {
   const url = String(pdfUrl || '').trim();
   if (!url) {
     throw new Error('pdfUrl is required');
@@ -801,7 +799,7 @@ async function buildCounselSearchResult(
   };
 }
 
-export async function fetchAllahabadCounselCauseList(input: {
+async function fetchAllahabadCounselCauseListSource(input: {
   listType?: string;
   listDate: string;
   counselName: string;
@@ -876,3 +874,23 @@ export async function submitAllahabadCounselCaptcha(input: {
   const challenge = await createCounselCaptchaChallenge(session.input, session.cookieJar);
   throw new CauseListCounselCaptchaRequiredError('Captcha did not match. Enter the new captcha.', challenge);
 }
+
+export const fetchAllahabadCauseListDates = (...args: Parameters<typeof fetchAllahabadCauseListDatesSource>) => cachedCourtRequest({
+  key: ['fetchAllahabadCauseListDates', args], source: 'www.allahabadhighcourt.in', ttlMs: 300000, load: () => fetchAllahabadCauseListDatesSource(...args),
+});
+
+export const fetchAllahabadCourtOptions = (...args: Parameters<typeof fetchAllahabadCourtOptionsSource>) => cachedCourtRequest({
+  key: ['fetchAllahabadCourtOptions', args], source: 'www.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchAllahabadCourtOptionsSource(...args),
+});
+
+export const fetchAllahabadCourtPdfLinks = (...args: Parameters<typeof fetchAllahabadCourtPdfLinksSource>) => cachedCourtRequest({
+  key: ['fetchAllahabadCourtPdfLinks', args], source: 'www.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchAllahabadCourtPdfLinksSource(...args),
+});
+
+export const fetchAllahabadCounselCauseList = (...args: Parameters<typeof fetchAllahabadCounselCauseListSource>) => cachedCourtRequest({
+  key: ['fetchAllahabadCounselCauseList', args], source: 'www.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchAllahabadCounselCauseListSource(...args),
+});
+
+export const downloadAllahabadCourtPdf = (...args: Parameters<typeof downloadAllahabadCourtPdfSource>) => cachedCourtRequest({
+  key: ['downloadAllahabadCourtPdf', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadAllahabadCourtPdfSource(...args),
+});

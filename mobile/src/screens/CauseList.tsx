@@ -19,7 +19,8 @@ import {
 import { saveBase64File, openBase64File } from '../downloads';
 import { type Document } from './Orders';
 
-type SearchResult = {
+type CacheInfo = { cachedAt?: string; cacheStale?: boolean };
+type SearchResult = CacheInfo & {
   links?: Array<{ label: string; url: string }>;
   courtLabel?: string;
   listDate: string;
@@ -45,12 +46,13 @@ export default function CauseListScreen() {
   const [code, setCode] = useState('');
   const action = useAction();
   const mediation = tile === 'mediation';
-  const dates = useRemote<{ result: { dates: Option[] } }>(
+  const dates = useRemote<{ result: CacheInfo & { dates: Option[] } }>(
     tile && !mediation ? `/api/cause-list/${tile}/dates?listType=Z` : null,
   );
-  const mediationData = useRemote<{ result: Record<string, MediationRow[]> }>(
+  const mediationData = useRemote<{ result: CacheInfo & { allahabad: MediationRow[]; lucknow: MediationRow[] } }>(
     mediation ? '/api/cause-list/mediation/list' : null,
   );
+  const cacheStatus = result || (mediation ? mediationData.data?.result : dates.data?.result);
   const selectedDate = date || dates.data?.result.dates[0]?.value || '';
   const reset = () => {
     setResult(null);
@@ -95,6 +97,7 @@ export default function CauseListScreen() {
     });
   return (
     <Page title="Cause List" bare contentStyle={{ paddingTop: 40 }}>
+      {cacheStatus?.cachedAt && <Text style={s.muted}>{cacheStatus.cacheStale ? 'Showing saved data; court refresh pending. ' : ''}Last updated: {new Date(cacheStatus.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</Text>}
       <Card
         style={{ borderRadius: 24, padding: 20, backgroundColor: '#0f172a80' }}
       >
@@ -208,7 +211,7 @@ export default function CauseListScreen() {
                   options={benches}
                   onChange={setCity}
                 />
-                {mediationData.data?.result[city]?.map((row, index) => (
+                {mediationData.data?.result[city === 'lucknow' ? 'lucknow' : 'allahabad']?.map((row, index) => (
                   <Card key={index}>
                     <Text style={s.heading}>{row.date}</Text>
                     {row.lists.map(link => (
@@ -221,7 +224,7 @@ export default function CauseListScreen() {
                     ))}
                   </Card>
                 ))}
-                {mediationData.data?.result[city]?.length === 0 && (
+                {mediationData.data?.result[city === 'lucknow' ? 'lucknow' : 'allahabad']?.length === 0 && (
                   <Text style={s.muted}>No mediation lists available.</Text>
                 )}
               </>

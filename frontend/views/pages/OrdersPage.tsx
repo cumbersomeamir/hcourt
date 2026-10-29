@@ -30,6 +30,7 @@ type OrdersResult = {
   excel: { filename: string; base64: string };
   servedFromCache?: boolean;
   cachedAt?: string;
+  cacheStale?: boolean;
   orderJudgments?: Array<{
     srNo: number;
     date: string;
@@ -648,7 +649,7 @@ export default function OrdersPage() {
           <div className="glass-card p-4 sm:p-6">
             {result.servedFromCache && (
               <div className="mb-4 rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                Showing the last successful court response while the source is slow.
+                {result.cacheStale ? 'Showing saved data while a court refresh is pending.' : 'Showing saved court data.'} {result.cachedAt && `Last updated: ${new Date(result.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.`}
               </div>
             )}
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">

@@ -7,7 +7,7 @@ import {
 } from '@/models/ordersModel';
 import { getDb } from '@/lib/mongodb';
 import { buildCaseSections } from '@/lib/caseDetails';
-import { getLatestStatusSnapshot, saveStatusSnapshot } from '@/lib/aiStore';
+import { getLatestStatusSnapshot } from '@/lib/aiStore';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -29,6 +29,7 @@ function cachedResult(snapshot: NonNullable<Awaited<ReturnType<typeof getLatestS
     pdf: { filename: '', base64: '' },
     excel: { filename: '', base64: '' },
     servedFromCache: true,
+    cacheStale: true,
     cachedAt: snapshot.fetchedAt.toISOString(),
   };
 }
@@ -49,13 +50,6 @@ export async function POST(req: Request) {
         caseNo: String(body.caseNo || '').trim(),
         caseYear: String(body.caseYear || '').trim(),
       };
-
-      try {
-        const snapshot = await getLatestStatusSnapshot(await getDb(), cacheInput);
-        if (snapshot && Date.now() - snapshot.fetchedAt.getTime() <= 10 * 60 * 1000) {
-          return NextResponse.json({ success: true, result: cachedResult(snapshot) });
-        }
-      } catch {}
     }
 
     let result;
@@ -84,16 +78,6 @@ export async function POST(req: Request) {
         caseYear: String(body.caseYear || ''),
         city: String(body.city || 'lucknow'),
       });
-    }
-
-    if (cacheInput) {
-      try {
-        await saveStatusSnapshot(await getDb(), {
-          caseKey: `${cacheInput.city}|${cacheInput.caseType}|${cacheInput.caseNo}|${cacheInput.caseYear}`,
-          ...cacheInput,
-          result,
-        });
-      } catch {}
     }
 
     return NextResponse.json({ success: true, result });

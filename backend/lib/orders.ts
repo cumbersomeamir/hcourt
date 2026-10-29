@@ -1,3 +1,4 @@
+import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
   throw new Error('lib/orders.ts can only be used on the server');
@@ -529,6 +530,7 @@ async function fetchCaseTypesLive(source: OrdersSourceConfig): Promise<CaseTypeO
         'User-Agent': 'Mozilla/5.0',
       },
       cache: 'no-store',
+      signal: AbortSignal.timeout(45000),
     },
     getCourtFetchTimeoutMs()
   );
@@ -674,6 +676,7 @@ async function fetchAllahabadCaptchaImage(
         Referer: source.caseNumberUrl,
       },
       cache: 'no-store',
+      signal: AbortSignal.timeout(45000),
     }
   );
   updateCookieJar(cookieJar, imageRes);
@@ -995,6 +998,7 @@ async function fetchOrderJudgments(
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
 
   if (!response.ok) return [];
@@ -1073,6 +1077,7 @@ async function downloadOrderJudgmentDirect(
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   }, 15000);
   updateCookieJar(cookieJar, initRes);
   checkJudgmentSource(initRes);
@@ -1089,6 +1094,7 @@ async function downloadOrderJudgmentDirect(
         Cookie: toCookieHeader(cookieJar),
       },
       cache: 'no-store',
+      signal: AbortSignal.timeout(45000),
     }, 15000);
     updateCookieJar(cookieJar, captchaRes);
     checkJudgmentSource(captchaRes);
@@ -1119,6 +1125,7 @@ async function downloadOrderJudgmentDirect(
       },
       body: form.toString(),
       cache: 'no-store',
+      signal: AbortSignal.timeout(45000),
     }, 15000);
     updateCookieJar(cookieJar, fileRes);
     checkJudgmentSource(fileRes);
@@ -1173,6 +1180,7 @@ async function downloadOrderJudgmentViaProxy(
     headers,
     body: JSON.stringify({ viewUrl, date }),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
 
   let payload: unknown = null;
@@ -1260,7 +1268,7 @@ async function annotateOrderJudgmentEntries(
   );
 }
 
-export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
+async function downloadOrderJudgmentSource(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
   if (!viewUrl) throw new Error('Missing judgment view URL');
 
   const { judgmentId } = getJudgmentRequestContext(viewUrl);
@@ -1305,6 +1313,7 @@ async function postAllahabadCaseInfoHtml(
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   updateCookieJar(cookieJar, response);
   if (!response.ok) return null;
@@ -1406,6 +1415,7 @@ async function fetchAllahabadCaseInfoHtml(
       'User-Agent': 'Mozilla/5.0',
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   updateCookieJar(cookieJar, initRes);
   if (!initRes.ok) {
@@ -1490,6 +1500,7 @@ async function buildCaseDataFromCaseInfo(params: {
     headers: detailsHeaders,
     body: detailsForm.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   if (!detailsRes.ok) {
     throw new Error(`Failed to fetch case details: ${detailsRes.status}`);
@@ -1837,6 +1848,7 @@ async function fetchCaseDataForOrders(input: OrdersFetchInput) {
       },
       body: form.toString(),
       cache: 'no-store',
+      signal: AbortSignal.timeout(45000),
     });
     if (!infoRes.ok) throw new Error(`Failed to fetch case info: ${infoRes.status}`);
     caseInfoHtml = await infoRes.text();
@@ -1958,7 +1970,7 @@ export async function submitOrdersCaptchaChallenge(params: {
   };
 }
 
-export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
+async function fetchOrdersSource(input: OrdersFetchInput): Promise<OrdersFetchResult> {
   const caseData = await fetchCaseDataForOrders(input);
 
   const [pdfBuf, xlsxBuf, orderJudgments] = await Promise.all([
@@ -1999,7 +2011,7 @@ export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchR
   };
 }
 
-export async function fetchOrderJudgmentsForCase(
+async function fetchOrderJudgmentsForCaseSource(
   input: OrdersFetchInput
 ): Promise<OrderJudgmentCaseFetchResult> {
   const caseData = await fetchCaseDataForOrders(input);
@@ -2017,4 +2029,41 @@ export async function fetchOrderJudgmentsForCase(
     },
     orderJudgments,
   };
+}
+
+export async function fetchOrders(input: OrdersFetchInput): Promise<OrdersFetchResult> {
+  const normalized = { city: input.city?.toLowerCase() === 'allahabad' ? 'allahabad' as const : 'lucknow' as const, caseType: input.caseType.trim(), caseNo: input.caseNo.trim(), caseYear: input.caseYear.trim() };
+  if (!normalized.caseType || !/^\d+$/.test(normalized.caseNo) || !/^\d{4}$/.test(normalized.caseYear)) throw new Error('Invalid case details');
+  return cachedCourtRequest({
+    key: ['case-status', normalized], source: normalized.city === 'allahabad' ? 'www.allahabadhighcourt.in' : 'hclko.allahabadhighcourt.in', ttlMs: 600000,
+    load: async () => {
+      const result = await fetchOrdersSource(normalized);
+      try {
+        const { saveStatusSnapshot } = await import('./aiStore');
+        await saveStatusSnapshot(await getDb(), { ...normalized, caseKey: `${normalized.city}|${normalized.caseType}|${normalized.caseNo}|${normalized.caseYear}`, result });
+      } catch {}
+      return result;
+    },
+    fallback: async () => {
+      const { getLatestStatusSnapshot } = await import('./aiStore');
+      const snapshot = await getLatestStatusSnapshot(await getDb(), normalized);
+      return snapshot ? { fetchedAt: snapshot.fetchedAt, value: {
+        city: snapshot.city, caseInfo: snapshot.caseInfo, details: { ...snapshot.details, sections: snapshot.details.sections || buildCaseSections(snapshot.details) },
+        orderJudgments: snapshot.orderJudgments, pdf: { filename: '', base64: '' }, excel: { filename: '', base64: '' },
+      } } : null;
+    },
+  });
+}
+
+export const fetchOrderJudgmentsForCase = (input: OrdersFetchInput) => cachedCourtRequest({
+  key: ['case-judgments', input], source: input.city === 'allahabad' ? 'www.allahabadhighcourt.in' : 'hclko.allahabadhighcourt.in', ttlMs: 600000,
+  load: () => fetchOrderJudgmentsForCaseSource(input),
+});
+
+export async function downloadOrderJudgment(viewUrl: string, date?: string): Promise<OrderJudgmentDownload> {
+  const { judgmentId, parsed } = getJudgmentRequestContext(viewUrl);
+  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.hostname !== 'elegalix.allahabadhighcourt.in') throw new Error('Unsupported court document URL');
+  const cached = await getCachedOrderJudgment(judgmentId);
+  if (cached) return cached;
+  return cachedCourtRequest({ key: ['judgment-pdf', judgmentId], source: parsed.hostname, ttlMs: 365 * 86400000, load: () => downloadOrderJudgmentSource(viewUrl, date) });
 }

@@ -1,3 +1,4 @@
+import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
   throw new Error('lib/causeListMediation.ts can only be used on the server');
@@ -91,12 +92,13 @@ function parseMediationRows($: cheerio.CheerioAPI, paneSelector: string): Mediat
   return rows;
 }
 
-export async function fetchMediationCauseLists(): Promise<MediationListResult> {
+async function fetchMediationCauseListsSource(): Promise<MediationListResult> {
   const response = await fetch(VIEW_URL, {
     headers: {
       'User-Agent': USER_AGENT,
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(response, 'Failed to load mediation cause list page');
   const html = await response.text();
@@ -108,7 +110,7 @@ export async function fetchMediationCauseLists(): Promise<MediationListResult> {
   };
 }
 
-export async function downloadMediationListFile(fileUrl: string): Promise<MediationDownloadResult> {
+async function downloadMediationListFileSource(fileUrl: string): Promise<MediationDownloadResult> {
   const target = String(fileUrl || '').trim();
   if (!target) {
     throw new Error('fileUrl is required');
@@ -154,3 +156,11 @@ export async function downloadMediationListFile(fileUrl: string): Promise<Mediat
     base64: bytes.toString('base64'),
   };
 }
+
+export const fetchMediationCauseLists = (...args: Parameters<typeof fetchMediationCauseListsSource>) => cachedCourtRequest({
+  key: ['fetchMediationCauseLists', args], source: 'www2.allahabadhighcourt.in', ttlMs: 300000, load: () => fetchMediationCauseListsSource(...args),
+});
+
+export const downloadMediationListFile = (...args: Parameters<typeof downloadMediationListFileSource>) => cachedCourtRequest({
+  key: ['downloadMediationListFile', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadMediationListFileSource(...args),
+});

@@ -1,3 +1,4 @@
+import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
   throw new Error('lib/causeListLucknow.ts can only be used on the server');
@@ -140,6 +141,7 @@ async function loadInput1Html(listType?: string): Promise<string> {
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(response, 'Failed to load Lucknow cause list input page');
   return response.text();
@@ -167,6 +169,7 @@ async function loadCourtOptionsHtml(input: {
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(response, 'Failed to load Lucknow court options');
   return response.text();
@@ -200,6 +203,7 @@ async function loadCourtResultHtml(input: {
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(response, 'Failed to fetch Lucknow court list');
   return response.text();
@@ -308,7 +312,7 @@ async function buildCounselExcel(input: {
   return Buffer.from(buffer);
 }
 
-export async function fetchLucknowCauseListDates(listType?: string): Promise<{
+async function fetchLucknowCauseListDatesSource(listType?: string): Promise<{
   listType: string;
   listTypeLabel: string;
   dates: LucknowDateOption[];
@@ -336,7 +340,7 @@ export async function fetchLucknowCauseListDates(listType?: string): Promise<{
   };
 }
 
-export async function fetchLucknowCourtOptions(input: {
+async function fetchLucknowCourtOptionsSource(input: {
   listType?: string;
   listDate: string;
 }): Promise<{
@@ -368,7 +372,7 @@ export async function fetchLucknowCourtOptions(input: {
   return { listType, listDate, options };
 }
 
-export async function fetchLucknowCourtPdfLinks(input: {
+async function fetchLucknowCourtPdfLinksSource(input: {
   listType?: string;
   listDate: string;
   courtNo: string;
@@ -411,7 +415,7 @@ export async function fetchLucknowCourtPdfLinks(input: {
   };
 }
 
-export async function downloadLucknowCourtPdf(pdfUrl: string): Promise<LucknowPdfDownload> {
+async function downloadLucknowCourtPdfSource(pdfUrl: string): Promise<LucknowPdfDownload> {
   const url = String(pdfUrl || '').trim();
   if (!url) {
     throw new Error('pdfUrl is required');
@@ -451,7 +455,7 @@ export async function downloadLucknowCourtPdf(pdfUrl: string): Promise<LucknowPd
   };
 }
 
-export async function fetchLucknowCounselCauseList(input: {
+async function fetchLucknowCounselCauseListSource(input: {
   listType?: string;
   listDate: string;
   counselName: string;
@@ -478,6 +482,7 @@ export async function fetchLucknowCounselCauseList(input: {
     },
     body: initForm.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(initResponse, 'Failed to initialize Lucknow counsel search');
 
@@ -497,6 +502,7 @@ export async function fetchLucknowCounselCauseList(input: {
     },
     body: form.toString(),
     cache: 'no-store',
+    signal: AbortSignal.timeout(45000),
   });
   ensureOk(response, 'Failed to fetch Lucknow counsel list');
   const html = await response.text();
@@ -545,3 +551,23 @@ export async function fetchLucknowCounselCauseList(input: {
     },
   };
 }
+
+export const fetchLucknowCauseListDates = (...args: Parameters<typeof fetchLucknowCauseListDatesSource>) => cachedCourtRequest({
+  key: ['fetchLucknowCauseListDates', args], source: 'hclko.allahabadhighcourt.in', ttlMs: 300000, load: () => fetchLucknowCauseListDatesSource(...args),
+});
+
+export const fetchLucknowCourtOptions = (...args: Parameters<typeof fetchLucknowCourtOptionsSource>) => cachedCourtRequest({
+  key: ['fetchLucknowCourtOptions', args], source: 'hclko.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchLucknowCourtOptionsSource(...args),
+});
+
+export const fetchLucknowCourtPdfLinks = (...args: Parameters<typeof fetchLucknowCourtPdfLinksSource>) => cachedCourtRequest({
+  key: ['fetchLucknowCourtPdfLinks', args], source: 'hclko.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchLucknowCourtPdfLinksSource(...args),
+});
+
+export const fetchLucknowCounselCauseList = (...args: Parameters<typeof fetchLucknowCounselCauseListSource>) => cachedCourtRequest({
+  key: ['fetchLucknowCounselCauseList', args], source: 'hclko.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchLucknowCounselCauseListSource(...args),
+});
+
+export const downloadLucknowCourtPdf = (...args: Parameters<typeof downloadLucknowCourtPdfSource>) => cachedCourtRequest({
+  key: ['downloadLucknowCourtPdf', args], source: 'hclko.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadLucknowCourtPdfSource(...args),
+});
