@@ -1,3 +1,4 @@
+import { courtFetch as fetch } from './courtFetch';
 export function courtDownloadUrl(value: string, hosts: string[]): string {
   const url = new URL(value);
   if (url.protocol !== 'https:' || url.port || url.username || url.password ||

@@ -1,3 +1,4 @@
+import { courtFetch as fetch } from '@/lib/courtFetch';
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { Agent } from 'undici';

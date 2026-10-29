@@ -38,7 +38,7 @@ let indexesEnsured = false;
 const DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 
 function getDefaultTrackedOrderMinCheckIntervalMs() {
-  const configured = Number(process.env.TRACKED_ORDERS_MIN_CHECK_INTERVAL_MS || '');
+  const configured = Number(process.env.TRACKED_ORDERS_MIN_CHECK_INTERVAL_MS || DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS);
   return Number.isFinite(configured) && configured >= 0
     ? configured
     : DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS;
@@ -84,7 +84,7 @@ async function processTrackedOrderCases(
   };
   const nowMs = Date.now();
   const minCheckIntervalMs = Math.max(
-    0,
+    DEFAULT_TRACKED_ORDER_MIN_CHECK_INTERVAL_MS,
     options?.minCheckIntervalMs ?? getDefaultTrackedOrderMinCheckIntervalMs()
   );
 

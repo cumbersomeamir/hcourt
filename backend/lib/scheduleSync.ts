@@ -1,3 +1,4 @@
+import { courtFetch as fetch } from './courtFetch';
 import { Db, ObjectId } from 'mongodb';
 import { parseCourtSchedule } from './parser';
 import { detectChanges } from './changeDetector';
@@ -11,9 +12,9 @@ const COURT_VIEW_URLS: Record<CourtBench, string> = {
   allahabad: 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewAllahabad.do',
   lucknow: 'https://courtview2.allahabadhighcourt.in/courtview/CourtViewLucknow.do',
 };
-const DEFAULT_STALE_AFTER_MS = 45_000;
+const DEFAULT_STALE_AFTER_MS = 60_000;
 const COURT_FETCH_TIMEOUT_MS = 15_000;
-const COURT_FETCH_RETRIES = 2;
+const COURT_FETCH_RETRIES = 1;
 
 type ScheduleDocument = {
   _id?: ObjectId;
@@ -174,6 +175,18 @@ async function syncScheduleInternal(
   bench: CourtBench,
   runTrackedOrders: boolean
 ): Promise<ScheduleSyncResult> {
+  try {
+    await db.collection<{ _id: string; until: Date }>('court_request_leases').findOneAndUpdate(
+      { _id: `schedule:${bench}`, until: { $lte: new Date() } },
+      { $set: { until: new Date(Date.now() + 60000) } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) {
+      throw new Error('Showing saved court data while the shared refresh is pending.');
+    }
+    throw error;
+  }
   const response = await fetchCourtView(bench);
 
   const html = await response.text();
@@ -285,7 +298,7 @@ export async function syncSchedule({
       warning: stale ? 'Showing saved court data while refreshing.' : undefined };
   }
 
-  if (!force && isFresh(latestBeforeSync, maxAgeMs)) {
+  if (isFresh(latestBeforeSync, force ? 60000 : maxAgeMs)) {
     return {
       schedule: latestBeforeSync as ScheduleDocument,
       changes: [],

@@ -1,3 +1,4 @@
+import { courtFetch as fetch } from './courtFetch';
 import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
