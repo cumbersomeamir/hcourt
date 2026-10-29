@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
-import { downloadBase64File } from '@/lib/download';
+import { downloadBase64File, downloadBlobFile } from '@/lib/download';
 
 const cinzel = Cinzel({
   subsets: ['latin'],
@@ -357,18 +357,19 @@ export default function CauseListPage() {
     try {
       const response = await fetch(`/api/cause-list/${activeBench}/court-download`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/octet-stream' },
+        signal: AbortSignal.timeout(90000),
         body: JSON.stringify({ pdfUrl: selectedPdfUrl }),
       });
-      const result = await parseApiResult<{
-        filename: string;
-        mimeType: string;
-        base64: string;
-      }>(response);
-      downloadBase64File(result.filename, result.mimeType, result.base64);
+      if (!response.ok) {
+        const failure = await response.json();
+        throw new Error(failure.error || 'Unable to download this file.');
+      }
+      const filename = response.headers.get('content-disposition')?.match(/filename="([^"\r\n]+)"/)?.[1] || 'cause-list.pdf';
+      downloadBlobFile(filename, await response.blob());
       setInfo('PDF downloaded.');
     } catch (e) {
-      setError(courtSourceError(e, 'Unable to download the court PDF.'));
+      setError(e instanceof Error && ['TimeoutError', 'AbortError'].includes(e.name) ? 'Download timed out. Please retry or select an individual court.' : e instanceof Error ? e.message : 'Unable to download the court PDF.');
     } finally {
       setDownloadingPdf(false);
     }
@@ -469,18 +470,19 @@ export default function CauseListPage() {
     try {
       const response = await fetch('/api/cause-list/mediation/download', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Accept: 'application/octet-stream' },
+        signal: AbortSignal.timeout(90000),
         body: JSON.stringify({ fileUrl }),
       });
-      const result = await parseApiResult<{
-        filename: string;
-        mimeType: string;
-        base64: string;
-      }>(response);
-      downloadBase64File(result.filename, result.mimeType, result.base64);
+      if (!response.ok) {
+        const failure = await response.json();
+        throw new Error(failure.error || 'Unable to download this file.');
+      }
+      const filename = response.headers.get('content-disposition')?.match(/filename="([^"\r\n]+)"/)?.[1] || 'mediation-list';
+      downloadBlobFile(filename, await response.blob());
       setInfo('Mediation list downloaded.');
     } catch (e) {
-      setError(courtSourceError(e, 'Unable to download the mediation list.'));
+      setError(e instanceof Error && ['TimeoutError', 'AbortError'].includes(e.name) ? 'Download timed out. Please retry.' : e instanceof Error ? e.message : 'Unable to download the mediation list.');
     } finally {
       setDownloadingMediationUrl(null);
     }

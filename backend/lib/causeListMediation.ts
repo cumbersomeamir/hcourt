@@ -131,6 +131,7 @@ export async function downloadMediationListFile(fileUrl: string): Promise<Mediat
       Referer: VIEW_URL,
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(60000),
   });
   ensureOk(response, 'Failed to download mediation file');
 
@@ -144,7 +145,7 @@ export async function downloadMediationListFile(fileUrl: string): Promise<Mediat
   const headerMime = normalizeText(response.headers.get('content-type') || '');
   const mimeType = headerMime || guessMimeType(parsed.toString());
 
-  await uploadMediaToR2({ bytes, filename, contentType: mimeType, folder: 'cause-lists/mediation' });
+  void uploadMediaToR2({ bytes, filename, contentType: mimeType, folder: 'cause-lists/mediation' }).catch(() => console.warn('[cause-list] Download completed; storage copy failed.'));
 
   return {
     filename,

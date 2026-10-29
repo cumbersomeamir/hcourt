@@ -423,6 +423,7 @@ export async function downloadLucknowCourtPdf(pdfUrl: string): Promise<LucknowPd
       Referer: VIEW_LIST_URL,
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(60000),
   });
   ensureOk(response, 'Failed to download cause list PDF');
 
@@ -440,7 +441,7 @@ export async function downloadLucknowCourtPdf(pdfUrl: string): Promise<LucknowPd
     filename = `cause-list-lucknow-${Date.now()}.pdf`;
   }
 
-  await uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/lucknow' });
+  void uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/lucknow' }).catch(() => console.warn('[cause-list] Download completed; storage copy failed.'));
 
   return {
     filename,

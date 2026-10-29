@@ -33,14 +33,14 @@ async function fetchSource(url: string, init?: RequestInit): Promise<Response> {
     try {
       const response = await fetch(url, {
         ...init,
-        signal: controller.signal,
+        signal: init?.signal || controller.signal,
         dispatcher: SOURCE_AGENT,
       } as RequestInit);
       if (response.status < 500 || attempt === 3) return response;
       await response.body?.cancel();
     } catch (error) {
       lastError = error;
-      if (attempt === 3) throw error;
+      if (attempt === 3 || init?.signal?.aborted) throw error;
     } finally {
       clearTimeout(timeout);
     }
@@ -428,6 +428,7 @@ export async function downloadAllahabadCourtPdf(pdfUrl: string): Promise<CauseLi
       Referer: VIEW_LIST_URL,
     },
     cache: 'no-store',
+    signal: AbortSignal.timeout(60000),
   });
   ensureOk(response, 'Failed to download cause list PDF');
 
@@ -445,7 +446,7 @@ export async function downloadAllahabadCourtPdf(pdfUrl: string): Promise<CauseLi
     filename = `cause-list-${Date.now()}.pdf`;
   }
 
-  await uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/allahabad' });
+  void uploadMediaToR2({ bytes, filename, contentType: 'application/pdf', folder: 'cause-lists/allahabad' }).catch(() => console.warn('[cause-list] Download completed; storage copy failed.'));
 
   return {
     filename,
