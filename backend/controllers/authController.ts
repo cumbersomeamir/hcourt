@@ -1,3 +1,4 @@
+import { rateLimit, readRequestJson } from '@/lib/requestSecurity';
 import { OAuth2Client } from 'google-auth-library';
 import { NextResponse } from 'next/server';
 import { createNativeSession } from '@/lib/auth';
@@ -7,12 +8,14 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
+    const limited = await rateLimit('google-auth', 120);
+    if (limited) return limited;
     const clientId = process.env.GOOGLE_WEB_CLIENT_ID?.trim();
     if (!clientId) {
       throw new Error('GOOGLE_WEB_CLIENT_ID is not configured.');
     }
 
-    const { idToken } = await request.json();
+    const { idToken } = await readRequestJson(request, 15000);
     if (typeof idToken !== 'string' || !idToken.trim()) {
       return NextResponse.json({ success: false, error: 'Google ID token is required.' }, { status: 400 });
     }
@@ -42,9 +45,9 @@ export async function POST(request: Request) {
         },
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Google sign-in failed.' },
+      { success: false, error: 'Google sign-in failed.' },
       { status: 401 }
     );
   }

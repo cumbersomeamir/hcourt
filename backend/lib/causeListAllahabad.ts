@@ -1,3 +1,4 @@
+import { courtDownloadUrl, fetchCourtDownload, readCourtDownload } from './courtDownload';
 import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
@@ -420,7 +421,7 @@ async function downloadAllahabadCourtPdfSource(pdfUrl: string): Promise<CauseLis
     throw new Error('pdfUrl is required');
   }
 
-  const response = await fetchSource(url, {
+  const response = await fetchCourtDownload(url, ['www2.allahabadhighcourt.in'], {
     headers: {
       'User-Agent': USER_AGENT,
       Referer: VIEW_LIST_URL,
@@ -430,7 +431,7 @@ async function downloadAllahabadCourtPdfSource(pdfUrl: string): Promise<CauseLis
   });
   ensureOk(response, 'Failed to download cause list PDF');
 
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const bytes = await readCourtDownload(response);
   if (bytes.length < 8 || bytes.slice(0, 4).toString() !== '%PDF') {
     throw new Error('Downloaded file is not a valid PDF');
   }
@@ -891,6 +892,9 @@ export const fetchAllahabadCounselCauseList = (...args: Parameters<typeof fetchA
   key: ['fetchAllahabadCounselCauseList', args], source: 'www.allahabadhighcourt.in', ttlMs: 600000, load: () => fetchAllahabadCounselCauseListSource(...args),
 });
 
-export const downloadAllahabadCourtPdf = (...args: Parameters<typeof downloadAllahabadCourtPdfSource>) => cachedCourtRequest({
-  key: ['downloadAllahabadCourtPdf', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadAllahabadCourtPdfSource(...args),
-});
+export const downloadAllahabadCourtPdf = (value: string) => {
+  const args: [string] = [courtDownloadUrl(value, ['www2.allahabadhighcourt.in'])];
+  return cachedCourtRequest({
+  key: ['downloadAllahabadCourtPdf-validated', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadAllahabadCourtPdfSource(...args),
+  });
+};

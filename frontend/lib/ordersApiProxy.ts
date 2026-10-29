@@ -38,29 +38,45 @@ export async function proxyOrdersRequest(
     method,
     headers,
     cache: 'no-store',
+    signal: AbortSignal.any([request.signal, AbortSignal.timeout(95000)]),
   };
 
   if (method !== 'GET' && method !== 'HEAD') {
-    init.body = await request.arrayBuffer();
+    const maxBytes = 1024 * 1024;
+    if (Number(request.headers.get('content-length')) > maxBytes) return Response.json({ success: false, error: 'Request too large.' }, { status: 413 });
+    const reader = request.body?.getReader();
+    if (reader) {
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      try {
+        for (;;) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          size += value.byteLength;
+          if (size > maxBytes) { await reader.cancel(); return Response.json({ success: false, error: 'Request too large.' }, { status: 413 }); }
+          chunks.push(value);
+        }
+      } finally { reader.releaseLock(); }
+      init.body = Buffer.concat(chunks);
+    }
   }
 
   let upstream: Response;
   try {
     upstream = await fetch(buildUpstreamUrl(pathname, request.url), init);
-  } catch (error) {
+  } catch {
     return Response.json(
       {
         success: false,
         code: 'backend_unreachable',
         error: unavailableMessage,
-        details: error instanceof Error ? error.message : 'Unknown upstream error',
       },
       { status: 502 }
     );
   }
 
   const responseHeaders = new Headers();
-  if (authorization) responseHeaders.set('Cache-Control', 'no-store');
+  responseHeaders.set('Cache-Control', 'no-store');
   const upstreamContentType = upstream.headers.get('content-type');
   const upstreamContentDisposition = upstream.headers.get('content-disposition');
 

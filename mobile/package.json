@@ -11,7 +11,8 @@
     "ios:submit": "npx eas-cli@latest submit --platform ios --profile production --latest --non-interactive",
     "lint": "eslint .",
     "start": "react-native start",
-    "test": "jest"
+    "test": "jest",
+    "postinstall": "node scripts/patch-metro-image-size.cjs"
   },
   "dependencies": {
     "@invertase/react-native-apple-authentication": "2.5.1",
@@ -50,5 +51,9 @@
   },
   "engines": {
     "node": ">= 22.11.0"
+  },
+  "overrides": {
+    "deepmerge": "4.1.1",
+    "image-size": "2.0.4"
   }
 }

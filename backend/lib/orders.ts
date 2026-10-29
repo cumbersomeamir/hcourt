@@ -1782,7 +1782,8 @@ async function buildPdf(detailsHtml: string) {
   cleanupStalePlaywrightArtifacts();
   const browser = await launchChromiumForPdf();
   try {
-    const page = await browser.newPage();
+    const page = await browser.newPage({ javaScriptEnabled: false });
+    await page.route('**/*', route => route.abort());
     await page.setContent(
       `<!doctype html>
       <html>

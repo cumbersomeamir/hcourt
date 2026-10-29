@@ -26,8 +26,9 @@ export function createNativeSession(user: AuthenticatedUser) {
 export function getAuthenticatedUser(request: Request): AuthenticatedUser | null {
   const value = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1] || readSessionCookie(request);
   if (!value) return null;
+  if (value.length > 4096 || value.split('.').length !== 2) return null;
   const [content, receivedSignature] = value.split('.');
-  if (!content || !receivedSignature) return null;
+  if (!content || !/^[A-Za-z0-9_-]{43}$/.test(receivedSignature || '')) return null;
 
   const expectedSignature = crypto.createHmac('sha256', getSessionSecret()).update(content).digest('base64url');
   if (
@@ -37,7 +38,7 @@ export function getAuthenticatedUser(request: Request): AuthenticatedUser | null
 
   try {
     const session = JSON.parse(Buffer.from(content, 'base64url').toString('utf8')) as NativeSession;
-    if (!session.userId || !session.email || session.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (typeof session.userId !== 'string' || !session.userId || typeof session.email !== 'string' || !session.email || !Number.isFinite(session.exp) || session.exp <= Math.floor(Date.now() / 1000)) return null;
     return { userId: session.userId, email: session.email };
   } catch {
     return null;

@@ -1,3 +1,5 @@
+import { getAuthenticatedUser } from '@/lib/auth';
+import { readRequestJson } from '@/lib/requestSecurity';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
 import { normalizeCaseIds, normalizeTrackedOrderCases } from '@/lib/tracking';
@@ -8,10 +10,13 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
+    const actor = getAuthenticatedUser(request);
+    if (!actor) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const body = await readRequestJson(request, 100000);
     const { email, name, caseIds, trackedOrderCases } = body;
 
-    if (!email || !name) {
+    if (typeof email !== 'string' || email !== actor.email) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    if (typeof name !== 'string' || !name.trim() || name.length > 200) {
       return NextResponse.json(
         { success: false, error: 'Email and name are required' },
         { status: 400 }
@@ -73,6 +78,8 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const actor = getAuthenticatedUser(request);
+    if (!actor) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId');
     const email = searchParams.get('email');
@@ -88,7 +95,9 @@ export async function GET(request: Request) {
     const usersCollection = db.collection('users');
     const { ObjectId } = await import('mongodb');
 
-    const query: { _id?: InstanceType<typeof ObjectId>; email?: string } = {};
+    if (email !== undefined && email !== null && email !== actor.email) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    if (userId && (typeof userId !== 'string' || !ObjectId.isValid(userId))) return NextResponse.json({ success: false, error: 'Invalid user ID' }, { status: 400 });
+    const query: { _id?: InstanceType<typeof ObjectId>; email: string } = { email: actor.email };
     if (userId) {
       query._id = new ObjectId(userId);
     } else if (email) {
@@ -125,7 +134,9 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const body = await request.json();
+    const actor = getAuthenticatedUser(request);
+    if (!actor) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const body = await readRequestJson(request, 100000);
     const { userId, email, caseIds, trackedOrderCases } = body;
 
     if (!userId && !email) {
@@ -159,7 +170,9 @@ export async function PATCH(request: Request) {
     const usersCollection = db.collection('users');
     const { ObjectId } = await import('mongodb');
 
-    const query: { _id?: InstanceType<typeof ObjectId>; email?: string } = {};
+    if (email !== undefined && email !== null && email !== actor.email) return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+    if (userId && (typeof userId !== 'string' || !ObjectId.isValid(userId))) return NextResponse.json({ success: false, error: 'Invalid user ID' }, { status: 400 });
+    const query: { _id?: InstanceType<typeof ObjectId>; email: string } = { email: actor.email };
     if (userId) {
       query._id = new ObjectId(userId);
     } else if (email) {

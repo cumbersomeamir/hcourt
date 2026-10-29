@@ -1,3 +1,4 @@
+import { readRequestJson } from '@/lib/requestSecurity';
 import { NextResponse } from 'next/server';
 import {
   findLawyerProfile,
@@ -12,11 +13,11 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const user = getAuthenticatedUser(request);
-    const { searchParams } = new URL(request.url);
+    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     const profile = await findLawyerProfile({
-      profileKey: user ? null : searchParams.get('profileKey'),
-      userId: user?.userId || searchParams.get('userId'),
-      email: user?.email || searchParams.get('email'),
+      profileKey: null,
+      userId: user.userId,
+      email: user.email,
     });
 
     return NextResponse.json({
@@ -34,11 +35,12 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = getAuthenticatedUser(request);
-    const body = await request.json();
+    if (!user) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    const body = await readRequestJson(request, 20000);
     const profile = await upsertLawyerProfile({
-      profileKey: user ? null : body.profileKey,
-      userId: user?.userId || body.userId,
-      email: user?.email || body.email,
+      profileKey: null,
+      userId: user.userId,
+      email: user.email,
       counselName: body.counselName,
       aliases: body.aliases,
       chamberAliases: body.chamberAliases,

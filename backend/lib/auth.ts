@@ -22,8 +22,9 @@ function encodeSession(session: NativeSession) {
 }
 
 function decodeSession(value: string): NativeSession | null {
+  if (value.length > 4096 || value.split('.').length !== 2) return null;
   const [content, receivedSignature] = value.split('.');
-  if (!content || !receivedSignature) return null;
+  if (!content || !/^[A-Za-z0-9_-]{43}$/.test(receivedSignature || '')) return null;
 
   const expectedProof = crypto
     .createHmac('sha256', getSessionSecret())
@@ -38,7 +39,7 @@ function decodeSession(value: string): NativeSession | null {
 
   try {
     const session = JSON.parse(Buffer.from(content, 'base64url').toString('utf8')) as NativeSession;
-    if (!session.userId || !session.email || session.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (typeof session.userId !== 'string' || !session.userId || typeof session.email !== 'string' || !session.email || !Number.isFinite(session.exp) || session.exp <= Math.floor(Date.now() / 1000)) return null;
     return session;
   } catch {
     return null;

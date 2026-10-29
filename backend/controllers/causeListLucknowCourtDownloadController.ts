@@ -1,3 +1,4 @@
+import { rateLimit, readRequestJson } from '@/lib/requestSecurity';
 import { NextResponse } from 'next/server';
 import { downloadLucknowCourtPdf } from '@/models/causeListModel';
 
@@ -6,7 +7,9 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const limited = await rateLimit('court-downloads', 300);
+    if (limited) return limited;
+    const body = await readRequestJson(req, 10000);
     const pdfUrl = String(body.pdfUrl || '').trim();
     if (!pdfUrl) {
       return NextResponse.json(
@@ -25,6 +28,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ success: true, result });
   } catch (error) {
+    if (error instanceof Error && /Only official court|Invalid URL/.test(error.message)) return NextResponse.json({ success: false, error: 'Invalid court document URL.' }, { status: 400 });
     if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)) {
       return NextResponse.json({ success: false, error: 'The court download took too long. Please retry or choose an individual court instead of All Courts.' }, { status: 504 });
     }

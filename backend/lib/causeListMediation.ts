@@ -1,3 +1,4 @@
+import { courtDownloadUrl, fetchCourtDownload, readCourtDownload } from './courtDownload';
 import { cachedCourtRequest } from './courtCache';
 // Server-only module - ensure this is not imported in client code
 if (typeof window !== 'undefined') {
@@ -127,7 +128,7 @@ async function downloadMediationListFileSource(fileUrl: string): Promise<Mediati
     throw new Error('Only official mediation source downloads are allowed');
   }
 
-  const response = await fetch(parsed.toString(), {
+  const response = await fetchCourtDownload(parsed.toString(), ['www2.allahabadhighcourt.in'], {
     headers: {
       'User-Agent': USER_AGENT,
       Referer: VIEW_URL,
@@ -137,7 +138,7 @@ async function downloadMediationListFileSource(fileUrl: string): Promise<Mediati
   });
   ensureOk(response, 'Failed to download mediation file');
 
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const bytes = await readCourtDownload(response);
   if (bytes.length === 0) {
     throw new Error('Downloaded file is empty');
   }
@@ -161,6 +162,9 @@ export const fetchMediationCauseLists = (...args: Parameters<typeof fetchMediati
   key: ['fetchMediationCauseLists', args], source: 'www2.allahabadhighcourt.in', ttlMs: 300000, load: () => fetchMediationCauseListsSource(...args),
 });
 
-export const downloadMediationListFile = (...args: Parameters<typeof downloadMediationListFileSource>) => cachedCourtRequest({
-  key: ['downloadMediationListFile', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadMediationListFileSource(...args),
-});
+export const downloadMediationListFile = (value: string) => {
+  const args: [string] = [courtDownloadUrl(value, ['www2.allahabadhighcourt.in'])];
+  return cachedCourtRequest({
+  key: ['downloadMediationListFile-validated', args], source: 'www2.allahabadhighcourt.in', ttlMs: 86400000, load: () => downloadMediationListFileSource(...args),
+  });
+};

@@ -1,3 +1,4 @@
+import { getAuthenticatedUser } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
 import { Document, ObjectId, WithId } from 'mongodb';
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50') || 50));
     const caseIdsParam = searchParams.get('caseIds');
     const orderTrackingKeysParam = searchParams.get('orderTrackingKeys');
     const userId = searchParams.get('userId');
@@ -34,12 +35,16 @@ export async function GET(request: Request) {
     }
 
     if (!caseIdsParam && !orderTrackingKeysParam && userId) {
+      const actor = getAuthenticatedUser(request);
+      if (!actor) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+      if (!ObjectId.isValid(userId)) return NextResponse.json({ success: false, error: 'Invalid user ID' }, { status: 400 });
       // Fetch from user account
       const db = await getDb();
       const usersCollection = db.collection('users');
 
       try {
-        const user = await usersCollection.findOne({ _id: new ObjectId(userId) });
+        const user = await usersCollection.findOne({ _id: new ObjectId(userId), email: actor.email });
+        if (!user) return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
         if (user) {
           trackedCaseIds = normalizeCaseIds(user.caseIds);
           trackedOrderTrackingKeys = normalizeTrackedOrderCases(user.trackedOrderCases).map(

@@ -160,20 +160,7 @@ const navItems: NavItem[] = [
       </svg>
     ),
   },
-  {
-    key: 'admin-map',
-    href: '/admin/data-map',
-    label: 'Admin Map',
-    title: 'Open Admin Data Map',
-    borderClass: 'border-slate-400/20',
-    textClass: 'text-slate-100',
-    iconClass: 'border-slate-400/20 bg-slate-500/10 text-slate-200',
-    icon: (
-      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-      </svg>
-    ),
-  },
+
 ];
 
 const moreNavKeys = new Set<NavKey>(['web-diary', 'ai-chat', 'admin-map']);
