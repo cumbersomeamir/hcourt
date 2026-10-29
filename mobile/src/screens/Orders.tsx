@@ -130,6 +130,15 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
         file.base64,
       );
     });
+  const downloadStatusPdf = () => action.run(async () => {
+    if (!result) return;
+    let pdf = result.pdf;
+    if (!pdf?.base64) {
+      const response = await api<{ result: Document }>('/api/orders/status-pdf', { caseInfo: result.caseInfo, details: result.details });
+      pdf = response.result;
+    }
+    await saveBase64File(pdf.filename, 'application/pdf', pdf.base64);
+  });
   const generateBrief = () =>
     action.run(async () => {
       if (!result) return;
@@ -282,6 +291,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               <Text style={[s.accent, { color: '#fca5a5' }]}>{result.caseInfo.status}</Text>
               <Text style={s.muted}>{result.details.header}</Text>
               <View style={s.row}>
+                <Button title="Download Case Status PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />
                 <Button
                   title="Case Brief"
                   disabled={action.busy}

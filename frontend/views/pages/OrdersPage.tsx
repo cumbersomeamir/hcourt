@@ -74,6 +74,27 @@ export default function OrdersPage() {
   const [result, setResult] = useState<OrdersResult | null>(null);
   const [brief, setBrief] = useState<{ result: OrdersResult; text: string } | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
+  const [statusPdfLoading, setStatusPdfLoading] = useState(false);
+  const downloadStatusPdf = async () => {
+    if (!result || statusPdfLoading) return;
+    setStatusPdfLoading(true);
+    setError(null);
+    try {
+      let pdf = result.pdf;
+      if (!pdf?.base64) {
+        const response = await fetch('/api/orders/status-pdf', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(60000),
+          body: JSON.stringify({ caseInfo: result.caseInfo, details: result.details, cachedAt: result.cachedAt }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success || !data.result?.base64) throw new Error(data.error || 'Unable to generate case-status PDF.');
+        pdf = data.result;
+      }
+      downloadBase64File(pdf.filename, 'application/pdf', pdf.base64);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Unable to download case-status PDF.');
+    } finally { setStatusPdfLoading(false); }
+  };
   const generateBrief = async () => {
     if (!result || briefLoading) return;
     setBriefLoading(true);
@@ -634,6 +655,10 @@ export default function OrdersPage() {
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
+                  <button
+                    onClick={downloadStatusPdf} disabled={statusPdfLoading}
+                    className="inline-flex items-center justify-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200 sm:text-sm"
+                  >{statusPdfLoading ? 'Creating Case Status PDF...' : 'Download Case Status PDF'}</button>
                   <button
                     onClick={generateBrief}
                     disabled={briefLoading}

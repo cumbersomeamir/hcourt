@@ -1751,6 +1751,22 @@ async function launchChromiumForPdf() {
   }
 }
 
+export async function buildCaseStatusPdf(record: {
+  caseInfo: { caseNo: string; caseYear: string; caseType?: string; status?: string; petitionerVsRespondent?: string };
+  details: { header?: string; keyValues: Array<{ key: string; value: string }>; listingHistory: Array<Record<string, string>>; iaDetails: Array<Record<string, string>>; sections?: CaseDetailSection[] };
+  cachedAt?: string;
+}) {
+  const escape = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!));
+  const sections = record.details.sections?.length ? record.details.sections : buildCaseSections(record.details);
+  const html = `<h1>Courtlens — Case Status</h1><h2>${escape(record.details.header || `${record.caseInfo.caseType || ''} ${record.caseInfo.caseNo}/${record.caseInfo.caseYear}`)}</h2>
+    <p>Status: <strong>${escape(record.caseInfo.status || 'Not available')}</strong></p><p>${escape(record.caseInfo.petitionerVsRespondent)}</p>
+    ${record.cachedAt ? `<p>Source snapshot: ${escape(record.cachedAt)}</p>` : ''}
+    <p>Case-status information only. This is not the order/judgment text or a certified court copy.</p>
+    ${sections.map(section => `<h3>${escape(section.title)}</h3><table><thead><tr>${section.columns.map(column => `<th>${escape(column)}</th>`).join('')}</tr></thead><tbody>${section.rows.map(row => `<tr>${section.columns.map((_, index) => `<td style="white-space:pre-wrap">${escape(row[index] || '—')}</td>`).join('')}</tr>`).join('')}</tbody></table>`).join('')}`;
+  const bytes = await buildPdf(html);
+  return { filename: `case-status-${safeFileToken(record.caseInfo.caseNo)}-${safeFileToken(record.caseInfo.caseYear)}.pdf`, base64: bytes.toString('base64') };
+}
+
 async function buildPdf(detailsHtml: string) {
   cleanupStalePlaywrightArtifacts();
   const browser = await launchChromiumForPdf();
