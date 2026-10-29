@@ -1,6 +1,6 @@
 import { Text } from '../typography';
 import { useState } from 'react';
-import { Alert, Linking, Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
 import { useAction, useRemote, useWorkspace } from '../workspace';
 import {
   benches,
@@ -121,22 +121,13 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
     });
   const downloadJudgment = (viewUrl: string, date: string, preview: boolean) =>
     action.run(async () => {
-      let file: Document;
-      let fallback = false;
-      try {
-        const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl, date });
-        file = response.result;
-      } catch (error) {
-        if (!result) throw error;
-        file = await loadStatusPdf();
-        fallback = true;
-      }
+      const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl, date });
+      const file = response.result;
       await (preview ? openBase64File : saveBase64File)(
         file.filename,
         file.mimeType || 'application/pdf',
         file.base64,
       );
-      if (fallback) Alert.alert('Case-status report', 'Original judgment unavailable. This PDF contains case-status details, not the judgment text.');
     });
   const loadStatusPdf = async () => {
     if (!result) throw new Error('Fetch case details first.');
@@ -174,16 +165,8 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
   const downloadAllJudgments = () =>
     action.run(async () => {
       for (const item of result?.orderJudgments || []) {
-        let file: Document;
-        try {
-          const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl: item.viewUrl, date: item.date });
-          file = response.result;
-        } catch {
-          const statusPdf = await loadStatusPdf();
-          await saveBase64File(statusPdf.filename, 'application/pdf', statusPdf.base64);
-          Alert.alert('Case-status report', 'Some original judgments could not be downloaded. A case-status report was downloaded instead; it does not contain judgment text.');
-          return;
-        }
+        const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl: item.viewUrl, date: item.date });
+        const file = response.result;
         await saveBase64File(
           file.filename,
           file.mimeType || 'application/pdf',
@@ -373,9 +356,14 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                         <Text style={{ color: '#e2e8f0', fontSize: 12 }}>{value}</Text>
                       </View>
                     ))}
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Download judgment dated ${item.date}`} disabled={action.busy} onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} style={{ flex: 1, minHeight: 44, padding: 8, justifyContent: 'center', borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569', opacity: action.busy ? 0.4 : 1 }}>
-                      <Text style={{ color: '#7dd3fc', fontSize: 12, textDecorationLine: 'underline' }}>View</Text>
-                    </Pressable>
+                    <View style={{ flex: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569' }}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Download judgment dated ${item.date}`} disabled={action.busy} onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} style={{ minHeight: 44, padding: 8, justifyContent: 'center', opacity: action.busy ? 0.4 : 1 }}>
+                        <Text style={{ color: '#7dd3fc', fontSize: 12, textDecorationLine: 'underline' }}>View</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="link" onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} disabled={action.busy} style={{ minHeight: 44, padding: 8, justifyContent: 'center' }}>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' }}>Court link</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 ))}
               </View>

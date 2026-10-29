@@ -413,12 +413,7 @@ export default function OrdersPage() {
         documentStatus: 'not_cached',
         documentMessage: 'Open the official court website to download this document.',
       });
-      try {
-        await downloadStatusPdf();
-        setDownloadNotice('Original judgment unavailable. Downloaded the case-status report instead; it does not contain the judgment text.');
-      } catch (failure) {
-        setError(failure instanceof Error ? failure.message : 'Unable to download the PDF.');
-      }
+      setError(e instanceof Error ? e.message : 'Original order/judgment is currently unavailable. Please retry or open the court link.');
     } finally {
       setJudgmentLoadingId(null);
     }
@@ -452,12 +447,7 @@ export default function OrdersPage() {
         throw new Error('One or more court PDFs are temporarily unavailable.');
       }
     } catch (e) {
-      try {
-        await downloadStatusPdf();
-        setDownloadNotice('Some original judgments could not be downloaded. A case-status report was downloaded instead; it does not contain judgment text.');
-      } catch (failure) {
-        setError(failure instanceof Error ? failure.message : 'Unable to download PDFs.');
-      }
+      setError(e instanceof Error ? e.message : 'Unable to download original judgments. Please retry later.');
     } finally {
       setAllJudgmentsLoading(false);
     }
@@ -709,6 +699,7 @@ export default function OrdersPage() {
                         <button onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)} disabled={judgmentLoadingId !== null || allJudgmentsLoading} className="min-h-10 text-sky-300 underline underline-offset-4 hover:text-sky-200 disabled:opacity-40" aria-label={`Download judgment dated ${entry.date}`}>
                           {judgmentLoadingId === entry.judgmentId ? 'Downloading…' : 'View'}
                         </button>
+                        <a href={entry.viewUrl} target="_blank" rel="noreferrer" className="ml-4 inline-block text-xs text-slate-400 underline">Court link</a>
                       </td>
                     </tr>
                   ))}
