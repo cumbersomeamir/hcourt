@@ -693,67 +693,30 @@ export default function OrdersPage() {
               </section>
             )}
             {downloadNotice && <p role="status" className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-200">{downloadNotice}</p>}
-            {result.orderJudgments && result.orderJudgments.length > 0 && (
-              <div className="mt-5">
-                <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-sm sm:text-base font-semibold text-slate-200">
-                    Order/Judgment Documents
-                  </h3>
-                  {result.orderJudgments.length > 1 && <button
-                    onClick={downloadAllJudgments}
-                    disabled={allJudgmentsLoading || judgmentLoadingId !== null}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-40 w-full sm:w-auto"
-                  >
-                    {allJudgmentsLoading ? 'Downloading from court...' : 'Download All PDFs'}
-                  </button>}
-                </div>
-                <div className="space-y-2.5">
-                  {result.orderJudgments.map((entry) => (
-                    <div
-                      key={`${entry.judgmentId}-${entry.srNo}`}
-                      className="rounded-lg border border-slate-700/40 bg-slate-800/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-                    >
-                      <div className="text-xs sm:text-sm text-slate-300">
-                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-indigo-500/15 text-indigo-300 text-xs font-bold mr-2 border border-indigo-400/20">
-                          {entry.srNo}
-                        </span>
-                        {entry.date || 'Date unavailable'}
-                        {entry.documentStatus && (
-                          <span className="ml-2 text-[11px] text-slate-500">
-                            {entry.documentStatus === 'cached'
-                              ? 'PDF ready'
-                              : entry.documentStatus === 'fetching'
-                                ? 'Preparing PDF'
-                                : 'PDF not cached'}
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-                        <button
-                          onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
-                          disabled={judgmentLoadingId !== null || allJudgmentsLoading}
-                          className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
-                        >
-                          {judgmentLoadingId === entry.judgmentId
-                            ? statusPdfLoading ? 'Creating case-status PDF...' : 'Preparing court document...'
-                            : 'Download PDF'}
-                        </button>
-                        <a
-                          href={entry.viewUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-xl border border-slate-600/40 bg-slate-700/25 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-300 hover:bg-slate-700/40"
-                        >
-                          Open on Court Website
-                        </a>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <CourtCaseDetails sections={result.details.sections || [{ title: 'Case Status', columns: ['Particulars', 'Details'], rows: result.details.keyValues.map(({ key, value }) => [key, value]) }]} />
+            <section className="mt-6" aria-labelledby="order-judgment-heading">
+              <h3 id="order-judgment-heading" className="mb-3 text-center text-base font-semibold text-slate-200">Order/Judgment</h3>
+              <table className="w-full border-collapse text-left text-xs sm:text-sm">
+                <thead className="bg-sky-500/20 text-sky-200">
+                  <tr>{['#', 'Date', 'Order/Judgment'].map(label => <th key={label} scope="col" className="border border-slate-600 px-3 py-2">{label}</th>)}</tr>
+                </thead>
+                <tbody>
+                  {result.orderJudgments?.map(entry => (
+                    <tr key={`${entry.judgmentId}-${entry.srNo}`} className="bg-slate-900 text-slate-200">
+                      <td className="border border-slate-600 px-3 py-2">{entry.srNo}</td>
+                      <td className="border border-slate-600 px-3 py-2">{entry.date || 'Date unavailable'}</td>
+                      <td className="border border-slate-600 px-3 py-2">
+                        <button onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)} disabled={judgmentLoadingId !== null || allJudgmentsLoading} className="min-h-10 text-sky-300 underline underline-offset-4 hover:text-sky-200 disabled:opacity-40" aria-label={`Download judgment dated ${entry.date}`}>
+                          {judgmentLoadingId === entry.judgmentId ? 'Downloading…' : 'View'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {!result.orderJudgments?.length && <tr><td colSpan={3} className="border border-slate-600 px-3 py-3 text-slate-400">No orders or judgments available.</td></tr>}
+                </tbody>
+              </table>
+              {(result.orderJudgments?.length || 0) > 1 && <button onClick={downloadAllJudgments} disabled={allJudgmentsLoading || judgmentLoadingId !== null} className="mt-3 rounded-lg border border-sky-400/30 bg-sky-500/15 px-4 py-2 text-sm text-sky-200 disabled:opacity-40">{allJudgmentsLoading ? 'Downloading…' : 'Download All PDFs'}</button>}
+            </section>
           </div>
         )}
       </div>

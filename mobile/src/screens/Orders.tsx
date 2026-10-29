@@ -1,6 +1,6 @@
 import { Text } from '../typography';
 import { useState } from 'react';
-import { Alert, Linking, View } from 'react-native';
+import { Alert, Linking, Pressable, View } from 'react-native';
 import { useAction, useRemote, useWorkspace } from '../workspace';
 import {
   benches,
@@ -342,42 +342,6 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                 <CaseBrief text={brief.text} />
               </Card>
             )}
-            <Text style={s.heading}>Orders & Judgments</Text>
-            {(result.orderJudgments?.length || 0) > 1 && (
-              <Button
-                title="Download All PDFs"
-                disabled={action.busy}
-                onPress={() => void downloadAllJudgments()}
-              />
-            )}
-            {result.orderJudgments?.map(item => (
-              <Card key={item.judgmentId || item.viewUrl}>
-                <Text style={s.text}>
-                  #{item.srNo} · {item.date}
-                </Text>
-                <View style={s.row}>
-                  <Button
-                    title="View PDF"
-                    disabled={action.busy}
-                    onPress={() =>
-                      void downloadJudgment(item.viewUrl, item.date, true)
-                    }
-                  />
-                  <Button
-                    title="Download PDF"
-                    quiet
-                    disabled={action.busy}
-                    onPress={() =>
-                      void downloadJudgment(item.viewUrl, item.date, false)
-                    }
-                  />
-                  <Button title="Open on Court Website" quiet onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} disabled={action.busy} />
-                </View>
-              </Card>
-            ))}
-            {!result.orderJudgments?.length && (
-              <Text style={s.muted}>No judgments available.</Text>
-            )}
             <CourtCaseDetails
               sections={
                 result.details.sections || [
@@ -392,6 +356,32 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                 ]
               }
             />
+            <Card>
+              <Text style={[s.heading, { textAlign: 'center' }]}>Order/Judgment</Text>
+              <View style={{ borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#475569' }}>
+                <View style={{ flexDirection: 'row', backgroundColor: '#123047' }}>
+                  {['#', 'Date', 'Order/Judgment'].map((label, index) => (
+                    <View key={label} style={{ flex: index === 0 ? 0.4 : 1, padding: 8, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569' }}>
+                      <Text style={{ color: '#bae6fd', fontSize: 12, fontWeight: '600' }}>{label}</Text>
+                    </View>
+                  ))}
+                </View>
+                {result.orderJudgments?.map(item => (
+                  <View key={`${item.judgmentId}-${item.srNo}`} style={{ flexDirection: 'row', backgroundColor: '#0f172a' }}>
+                    {[String(item.srNo), item.date || '—'].map((value, index) => (
+                      <View key={index} style={{ flex: index === 0 ? 0.4 : 1, padding: 8, justifyContent: 'center', borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569' }}>
+                        <Text style={{ color: '#e2e8f0', fontSize: 12 }}>{value}</Text>
+                      </View>
+                    ))}
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Download judgment dated ${item.date}`} disabled={action.busy} onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} style={{ flex: 1, minHeight: 44, padding: 8, justifyContent: 'center', borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569', opacity: action.busy ? 0.4 : 1 }}>
+                      <Text style={{ color: '#7dd3fc', fontSize: 12, textDecorationLine: 'underline' }}>View</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+              {!result.orderJudgments?.length && <Text style={s.muted}>No orders or judgments available.</Text>}
+              {(result.orderJudgments?.length || 0) > 1 && <Button title="Download All PDFs" disabled={action.busy} onPress={() => void downloadAllJudgments()} />}
+            </Card>
           </>
         )}
       </>
