@@ -75,6 +75,7 @@ export default function OrdersPage() {
   const [brief, setBrief] = useState<{ result: OrdersResult; text: string } | null>(null);
   const [briefLoading, setBriefLoading] = useState(false);
   const [statusPdfLoading, setStatusPdfLoading] = useState(false);
+  const [downloadNotice, setDownloadNotice] = useState('');
   const downloadStatusPdf = async () => {
     if (!result || statusPdfLoading) return;
     setStatusPdfLoading(true);
@@ -92,7 +93,7 @@ export default function OrdersPage() {
       }
       downloadBase64File(pdf.filename, 'application/pdf', pdf.base64);
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'Unable to download case-status PDF.');
+      throw error;
     } finally { setStatusPdfLoading(false); }
   };
   const generateBrief = async () => {
@@ -204,6 +205,7 @@ export default function OrdersPage() {
       setLoading(true);
       setError(null);
       setResult(null);
+      setDownloadNotice('');
       resetCaptchaChallenge();
       const res = await fetch('/api/orders/fetch', {
         method: 'POST',
@@ -401,6 +403,7 @@ export default function OrdersPage() {
   const downloadJudgment = async (viewUrl: string, date: string, judgmentId: string) => {
     try {
       setJudgmentLoadingId(judgmentId);
+      setDownloadNotice('');
       setError(null);
       const pdf = await fetchJudgmentPdfWithPolling(viewUrl, date, judgmentId);
       downloadBase64File(pdf.filename, pdf.mimeType || 'application/pdf', pdf.base64);
@@ -409,7 +412,12 @@ export default function OrdersPage() {
         documentStatus: 'not_cached',
         documentMessage: 'Open the official court website to download this document.',
       });
-      setError(e instanceof Error ? e.message : 'Unable to download the court order or judgment.');
+      try {
+        await downloadStatusPdf();
+        setDownloadNotice('Original judgment unavailable. Downloaded the case-status report instead; it does not contain the judgment text.');
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Unable to download the PDF.');
+      }
     } finally {
       setJudgmentLoadingId(null);
     }
@@ -420,6 +428,7 @@ export default function OrdersPage() {
 
     try {
       setAllJudgmentsLoading(true);
+      setDownloadNotice('');
       setError(null);
       const failedDates: string[] = [];
 
@@ -442,7 +451,12 @@ export default function OrdersPage() {
         throw new Error('One or more court PDFs are temporarily unavailable.');
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Unable to download court order or judgment PDFs.');
+      try {
+        await downloadStatusPdf();
+        setDownloadNotice('Some original judgments could not be downloaded. A case-status report was downloaded instead; it does not contain judgment text.');
+      } catch (failure) {
+        setError(failure instanceof Error ? failure.message : 'Unable to download PDFs.');
+      }
     } finally {
       setAllJudgmentsLoading(false);
     }
@@ -655,10 +669,10 @@ export default function OrdersPage() {
                 )}
               </div>
               <div className="flex flex-col sm:flex-row gap-2 flex-shrink-0 w-full sm:w-auto">
-                  <button
-                    onClick={downloadStatusPdf} disabled={statusPdfLoading}
+                  {!result.orderJudgments?.length && <button
+                    onClick={() => void downloadStatusPdf().catch(error => setError(error instanceof Error ? error.message : 'Unable to download PDF.'))} disabled={statusPdfLoading}
                     className="inline-flex items-center justify-center rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200 sm:text-sm"
-                  >{statusPdfLoading ? 'Creating Case Status PDF...' : 'Download Case Status PDF'}</button>
+                  >{statusPdfLoading ? 'Creating PDF...' : 'Download PDF'}</button>}
                   <button
                     onClick={generateBrief}
                     disabled={briefLoading}
@@ -677,6 +691,7 @@ export default function OrdersPage() {
                 <CaseBrief text={brief.text} />
               </section>
             )}
+            {downloadNotice && <p role="status" className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-200">{downloadNotice}</p>}
             {result.orderJudgments && result.orderJudgments.length > 0 && (
               <div className="mt-5">
                 <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -715,11 +730,11 @@ export default function OrdersPage() {
                       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                         <button
                           onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)}
-                          disabled={judgmentLoadingId === entry.judgmentId || allJudgmentsLoading}
+                          disabled={judgmentLoadingId !== null || allJudgmentsLoading}
                           className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-500/15 border border-indigo-400/25 px-4 py-2 text-xs sm:text-sm font-semibold text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-40 w-full sm:w-auto"
                         >
                           {judgmentLoadingId === entry.judgmentId
-                            ? 'Preparing court document...'
+                            ? statusPdfLoading ? 'Creating case-status PDF...' : 'Preparing court document...'
                             : 'Download PDF'}
                         </button>
                         <a

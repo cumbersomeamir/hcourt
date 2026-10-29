@@ -1,6 +1,6 @@
 import { Text } from '../typography';
 import { useState } from 'react';
-import { Linking, View } from 'react-native';
+import { Alert, Linking, View } from 'react-native';
 import { useAction, useRemote, useWorkspace } from '../workspace';
 import {
   benches,
@@ -119,24 +119,34 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
     });
   const downloadJudgment = (viewUrl: string, date: string, preview: boolean) =>
     action.run(async () => {
-      const response = await api<{ result: Document }>('/api/orders/judgment', {
-        viewUrl,
-        date,
-      });
-      const file = response.result;
+      let file: Document;
+      let fallback = false;
+      try {
+        const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl, date });
+        file = response.result;
+      } catch (error) {
+        if (!result) throw error;
+        file = await loadStatusPdf();
+        fallback = true;
+      }
       await (preview ? openBase64File : saveBase64File)(
         file.filename,
         file.mimeType || 'application/pdf',
         file.base64,
       );
+      if (fallback) Alert.alert('Case-status report', 'Original judgment unavailable. This PDF contains case-status details, not the judgment text.');
     });
-  const downloadStatusPdf = () => action.run(async () => {
-    if (!result) return;
+  const loadStatusPdf = async () => {
+    if (!result) throw new Error('Fetch case details first.');
     let pdf = result.pdf;
     if (!pdf?.base64) {
       const response = await api<{ result: Document }>('/api/orders/status-pdf', { caseInfo: result.caseInfo, details: result.details });
       pdf = response.result;
     }
+    return pdf;
+  };
+  const downloadStatusPdf = () => action.run(async () => {
+    const pdf = await loadStatusPdf();
     await saveBase64File(pdf.filename, 'application/pdf', pdf.base64);
   });
   const generateBrief = () =>
@@ -162,11 +172,16 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
   const downloadAllJudgments = () =>
     action.run(async () => {
       for (const item of result?.orderJudgments || []) {
-        const response = await api<{ result: Document }>(
-          '/api/orders/judgment',
-          { viewUrl: item.viewUrl, date: item.date },
-        );
-        const file = response.result;
+        let file: Document;
+        try {
+          const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl: item.viewUrl, date: item.date });
+          file = response.result;
+        } catch {
+          const statusPdf = await loadStatusPdf();
+          await saveBase64File(statusPdf.filename, 'application/pdf', statusPdf.base64);
+          Alert.alert('Case-status report', 'Some original judgments could not be downloaded. A case-status report was downloaded instead; it does not contain judgment text.');
+          return;
+        }
         await saveBase64File(
           file.filename,
           file.mimeType || 'application/pdf',
@@ -291,7 +306,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               <Text style={[s.accent, { color: '#fca5a5' }]}>{result.caseInfo.status}</Text>
               <Text style={s.muted}>{result.details.header}</Text>
               <View style={s.row}>
-                <Button title="Download Case Status PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />
+                {!result.orderJudgments?.length && <Button title="Download PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />}
                 <Button
                   title="Case Brief"
                   disabled={action.busy}
