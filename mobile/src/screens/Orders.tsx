@@ -131,12 +131,11 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
     });
   const loadStatusPdf = async () => {
     if (!result) throw new Error('Fetch case details first.');
-    let pdf = result.pdf;
-    if (!pdf?.base64) {
-      const response = await api<{ result: Document }>('/api/orders/status-pdf', { caseInfo: result.caseInfo, details: result.details });
-      pdf = response.result;
-    }
-    return pdf;
+    const response = await api<{ result: Document }>('/api/orders/status-pdf', {
+      caseInfo: result.caseInfo, details: result.details, cachedAt: result.cachedAt,
+    });
+    if (!response.result?.base64) throw new Error('Unable to generate case-status PDF.');
+    return response.result;
   };
   const downloadStatusPdf = () => action.run(async () => {
     const pdf = await loadStatusPdf();
@@ -294,27 +293,13 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               {!!result.caseInfo.petitionerVsRespondent && <Text style={s.muted}>{result.caseInfo.petitionerVsRespondent}</Text>}
               {result.cachedAt && <Text style={s.muted}>{result.cacheStale ? 'Showing saved data; court refresh pending. ' : ''}Last updated: {new Date(result.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</Text>}
               <View style={s.row}>
-                {!result.orderJudgments?.length && <Button title="Download PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />}
+                <Button title={action.busy ? 'Please wait…' : 'Download PDF'} disabled={action.busy} onPress={() => void downloadStatusPdf()} />
                 <Button
                   title="Case Brief"
                   disabled={action.busy}
                   onPress={() => void generateBrief()}
                 />
-                {result.excel && (
-                  <Button
-                    title="Export Excel"
-                    disabled={action.busy}
-                    onPress={() =>
-                      void action.run(() =>
-                        saveBase64File(
-                          result.excel!.filename,
-                          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                          result.excel!.base64,
-                        ),
-                      )
-                    }
-                  />
-                )}
+
               </View>
             </Card>
             {brief?.result === result && (
