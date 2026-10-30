@@ -53,7 +53,6 @@ function AppLoadingScreen({ overlay = false }: { overlay?: boolean }) {
     <View style={overlay ? styles.pageLoadingOverlay : styles.loadingScreen} pointerEvents={overlay ? 'none' : 'auto'}>
       <View style={styles.loadingGlowTop} />
       <View style={styles.loadingGlowBottom} />
-      <View style={styles.loadingBrandMark}><Text style={styles.loadingBrandMarkText}>H</Text></View>
       <Text style={styles.loadingBrand}>Courtlens</Text>
       <View style={styles.loadingIndicator}><ActivityIndicator size="small" color="#7dd3fc" /></View>
       <Text style={styles.loadingTitle}>Preparing your workspace</Text>
@@ -537,7 +536,7 @@ function App() {
   let accountScreen: ReactNode = null;
   if (googleSignInRequired && session && showAccountSettings) {
     const accountName = profile?.counselName || session.user.name || 'Courtlens member';
-    const accountInitial = accountName.trim().charAt(0).toUpperCase() || 'H';
+    const accountInitial = accountName.trim().charAt(0).toUpperCase() || 'C';
 
     accountScreen = (
       <View style={styles.accountScreen}>
@@ -649,8 +648,6 @@ const styles = StyleSheet.create({
   pageLoadingOverlay: { alignItems: 'center', backgroundColor: '#081127', bottom: 0, justifyContent: 'center', left: 0, overflow: 'hidden', padding: 28, position: 'absolute', right: 0, top: 0, zIndex: 2 },
   loadingGlowTop: { backgroundColor: '#0c4a6e', borderRadius: 999, height: 250, opacity: 0.28, position: 'absolute', right: -125, top: -120, width: 250 },
   loadingGlowBottom: { backgroundColor: '#172554', borderRadius: 999, bottom: -150, height: 290, left: -170, opacity: 0.78, position: 'absolute', width: 290 },
-  loadingBrandMark: { alignItems: 'center', backgroundColor: '#0ea5e9', borderRadius: 18, height: 58, justifyContent: 'center', shadowColor: '#38bdf8', shadowOpacity: 0.4, shadowRadius: 18, width: 58 },
-  loadingBrandMarkText: { color: '#f8fafc', fontFamily: 'serif', fontSize: 33, fontWeight: '800' },
   loadingBrand: { color: '#f8fafc', fontSize: 18, fontWeight: '800', letterSpacing: 2.4, marginTop: 18 },
   loadingEyebrow: { color: '#7dd3fc', fontSize: 9, fontWeight: '800', letterSpacing: 2.1, marginTop: 5 },
   loadingIndicator: { alignItems: 'center', backgroundColor: '#102a47', borderColor: '#1e5276', borderRadius: 22, borderWidth: 1, height: 44, justifyContent: 'center', marginTop: 34, width: 44 },
@@ -662,8 +659,6 @@ const styles = StyleSheet.create({
   authGlowBottom: { backgroundColor: '#172554', borderRadius: 999, bottom: -170, height: 350, left: -210, opacity: 0.8, position: 'absolute', width: 350 },
   authContent: { flex: 1 },
   brandRow: { alignItems: 'center', flexDirection: 'row', gap: 11 },
-  brandMark: { alignItems: 'center', backgroundColor: '#0ea5e9', borderRadius: 12, height: 42, justifyContent: 'center', shadowColor: '#38bdf8', shadowOpacity: 0.32, shadowRadius: 14, width: 42 },
-  brandMarkText: { color: '#f8fafc', fontFamily: 'serif', fontSize: 25, fontWeight: '800' },
   brandName: { color: '#f8fafc', fontSize: 17, fontWeight: '800', letterSpacing: 1.8 },
   brandTagline: { color: '#7dd3fc', fontSize: 9, fontWeight: '700', letterSpacing: 1.8, marginTop: 2 },
   authHero: { marginTop: 88 },

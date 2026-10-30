@@ -285,11 +285,13 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
           <>
             <Card>
               <Text style={s.heading}>
-                {result.caseInfo.petitionerVsRespondent ||
-                  `${caseType} ${caseNo}/${caseYear}`}
+                {result.details.header || `${caseType} ${caseNo}/${caseYear}`}
               </Text>
-              <Text style={[s.accent, { color: '#fca5a5' }]}>{result.caseInfo.status}</Text>
-              <Text style={s.muted}>{result.details.header}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={s.muted}>Status:</Text>
+                <Text style={{ color: '#fca5a5', fontSize: 12, fontWeight: '700', borderWidth: 1, borderColor: '#7f3944', backgroundColor: '#211a2a', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4 }}>{result.caseInfo.status || '—'}</Text>
+              </View>
+              {!!result.caseInfo.petitionerVsRespondent && <Text style={s.muted}>{result.caseInfo.petitionerVsRespondent}</Text>}
               {result.cachedAt && <Text style={s.muted}>{result.cacheStale ? 'Showing saved data; court refresh pending. ' : ''}Last updated: {new Date(result.cachedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST</Text>}
               <View style={s.row}>
                 {!result.orderJudgments?.length && <Button title="Download PDF" disabled={action.busy} onPress={() => void downloadStatusPdf()} />}
@@ -316,8 +318,8 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               </View>
             </Card>
             {brief?.result === result && (
-              <Card>
-                <Text style={s.heading}>AI Case Brief</Text>
+              <Card style={{ backgroundColor: '#0c192c', borderColor: '#23445d', padding: 16, gap: 14 }}>
+                <Text style={[s.heading, { fontFamily: 'Manrope', color: '#bae6fd', fontSize: 18 }]}>AI Case Brief</Text>
                 <Text style={s.muted}>
                   Based on available case-status details. Full judgment text is
                   not included.
