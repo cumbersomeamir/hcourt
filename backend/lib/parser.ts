@@ -31,9 +31,10 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
     const $row = $(element);
     const cells = $row.find('td');
     
-    if (cells.length === 0) return;
+    if (cells.length < 2 || (cells.length < 5 && !/not\s+in\s+session/i.test($row.text()))) return;
 
     const courtNo = $(cells[0]).text().trim();
+    if (!courtNo) return;
     const serialNoText = $(cells[1]).text().trim();
     const listText = $(cells[2]).text().trim();
     const progressText = $(cells[3]).text().trim();
@@ -41,7 +42,7 @@ export function parseCourtSchedule(html: string): ParsedCourtCase[] {
     const caseDetailsText = caseDetailsCell.text().trim();
     
     // Check if court is in session
-    const isInSession = !serialNoText.includes('NOT in session') && !caseDetailsText.includes('NOT in session');
+    const isInSession = !/not\s+in\s+session/i.test(`${serialNoText} ${caseDetailsText}`);
     
     let serialNo: string | null = null;
     let list: string | null = null;

@@ -191,6 +191,7 @@ async function syncScheduleInternal(
 
   const html = await response.text();
   const parsedCourts = parseCourtSchedule(html);
+  if (!parsedCourts.length) throw new Error('Court returned no valid schedule rows; keeping saved data.');
   const courtsToStore = parsedCourts.map((court) => cloneCourt(court));
   const now = new Date();
   const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
@@ -284,7 +285,7 @@ export async function syncSchedule({
   source,
   bench = 'lucknow',
   staleAfterMs,
-  runTrackedOrders = true,
+  runTrackedOrders = false,
 }: ScheduleSyncOptions): Promise<ScheduleSyncResult> {
   const maxAgeMs = parseStaleAfterMs(staleAfterMs);
   const latestBeforeSync = await getLatestScheduleDocument(db, bench);
@@ -299,11 +300,16 @@ export async function syncSchedule({
   }
 
   if (isFresh(latestBeforeSync, force ? 60000 : maxAgeMs)) {
+    const historyInserted = source === 'worker' && latestBeforeSync
+      ? await appendCourtHistorySnapshot({
+        db, bench, date: latestBeforeSync.date, timestamp: new Date(latestBeforeSync.lastUpdated),
+        courts: latestBeforeSync.courts, source: 'worker',
+      }) : 0;
     return {
       schedule: latestBeforeSync as ScheduleDocument,
       changes: [],
       notificationsCreated: 0,
-      historyInserted: 0,
+      historyInserted,
       trackedOrders: null,
       refreshed: false,
       stale: false,

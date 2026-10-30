@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function getUtcDateString(date: Date): string {
-  return date.toISOString().split('T')[0];
+function getIndiaDateString(date: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(date);
 }
 
 function isCourtCase(value: unknown): value is CourtCase {
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const date = DATE_RE.test(dateParam) ? dateParam : getUtcDateString(new Date());
+    const date = DATE_RE.test(dateParam) ? dateParam : getIndiaDateString(new Date());
     const limit = Number.isFinite(limitParam)
       ? Math.min(Math.max(limitParam, 1), 500)
       : 200;

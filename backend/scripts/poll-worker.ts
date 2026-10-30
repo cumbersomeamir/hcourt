@@ -6,6 +6,7 @@
 
 import { getDb } from '../lib/mongodb';
 import { syncSchedule } from '../lib/scheduleSync';
+import { monitorTrackedOrderCases } from '../lib/trackedOrdersMonitor';
 import { GET as getWebDiary } from '../controllers/webDiaryController';
 import { getLatestWebDiarySnapshot } from '../lib/aiStore';
 const POLL_INTERVAL_MS = 30000; // 30 seconds
@@ -15,6 +16,19 @@ let isRunning = false;
 let pollTimeout: NodeJS.Timeout | null = null;
 let lastWebDiarySyncAt = 0;
 let diaryRunning = false;
+let trackedOrdersRunning = false;
+let lastTrackedOrdersSyncAt = 0;
+
+async function syncTrackedOrders() {
+  if (trackedOrdersRunning || Date.now() - lastTrackedOrdersSyncAt < 10 * 60000) return;
+  trackedOrdersRunning = true;
+  lastTrackedOrdersSyncAt = Date.now();
+  try {
+    await monitorTrackedOrderCases(await getDb());
+  } finally {
+    trackedOrdersRunning = false;
+  }
+}
 
 function getIndiaDate() {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -83,17 +97,16 @@ async function pollSchedule() {
     const db = await getDb();
     void syncWebDiary().catch((error) => console.error('[Worker] Diary sync failed:', error));
     await db.collection('schedules').createIndex({ lastUpdated: 1 }, { expireAfterSeconds: 604800 });
-    await syncSchedule({ db, force: true, source: 'worker', bench: 'allahabad', runTrackedOrders: false });
-    const result = await syncSchedule({
-      db,
-      force: true,
-      source: 'worker',
-    });
-
-    const duration = Date.now() - startTime;
-    console.log(
-      `[Worker] Poll completed in ${duration}ms - Changes: ${result.changes.length}, Notifications: ${result.notificationsCreated}, History: ${result.historyInserted}, Tracked Orders: ${result.trackedOrders?.trackedCases ?? 0}, Invalid Tracked Orders: ${result.trackedOrders?.invalidCases ?? 0}, Order Notifications: ${result.trackedOrders?.notifications ?? 0}, Refreshed: ${result.refreshed}, Stale: ${result.stale}${result.warning ? `, Warning: ${result.warning}` : ''}`
-    );
+    for (const bench of ['allahabad', 'lucknow'] as const) {
+      try {
+        const result = await syncSchedule({ db, force: true, source: 'worker', bench, runTrackedOrders: false });
+        console.log(`[Worker] ${bench}: Changes: ${result.changes.length}, History: ${result.historyInserted}, Refreshed: ${result.refreshed}, Stale: ${result.stale}`);
+      } catch (error) {
+        console.error(`[Worker] ${bench} sync failed:`, error instanceof Error ? error.message : 'Unknown error');
+      }
+    }
+    void syncTrackedOrders().catch(error => console.error('[Worker] Tracked orders sync failed:', error));
+    console.log(`[Worker] Poll completed in ${Date.now() - startTime}ms`);
   } catch (error) {
     console.error('[Worker] Error during poll:', error);
     if (error instanceof Error) {
