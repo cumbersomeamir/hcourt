@@ -686,6 +686,7 @@ export default function OrdersPage() {
             <CourtCaseDetails sections={result.details.sections || [{ title: 'Case Status', columns: ['Particulars', 'Details'], rows: result.details.keyValues.map(({ key, value }) => [key, value]) }]} />
             <section className="mt-6" aria-labelledby="order-judgment-heading">
               <h3 id="order-judgment-heading" className="mb-3 text-center text-base font-semibold text-slate-200">Order/Judgment</h3>
+              <p className="mb-3 text-xs text-slate-400">View opens the original court document. Complete the court security code if prompted to download the PDF.</p>
               <table className="w-full border-collapse text-left text-xs sm:text-sm">
                 <thead className="bg-sky-500/20 text-sky-200">
                   <tr>{['#', 'Date', 'Order/Judgment'].map(label => <th key={label} scope="col" className="border border-slate-600 px-3 py-2">{label}</th>)}</tr>
@@ -696,10 +697,8 @@ export default function OrdersPage() {
                       <td className="border border-slate-600 px-3 py-2">{entry.srNo}</td>
                       <td className="border border-slate-600 px-3 py-2">{entry.date || 'Date unavailable'}</td>
                       <td className="border border-slate-600 px-3 py-2">
-                        <button onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)} disabled={judgmentLoadingId !== null || allJudgmentsLoading} className="min-h-10 text-sky-300 underline underline-offset-4 hover:text-sky-200 disabled:opacity-40" aria-label={`Download judgment dated ${entry.date}`}>
-                          {judgmentLoadingId === entry.judgmentId ? 'Downloading…' : 'View'}
-                        </button>
-                        <a href={entry.viewUrl} target="_blank" rel="noreferrer" className="ml-4 inline-block text-xs text-slate-400 underline">Court link</a>
+                        <a href={entry.viewUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center text-sky-300 underline underline-offset-4" aria-label={`View original judgment dated ${entry.date}`}>View</a>
+                        <button onClick={() => downloadJudgment(entry.viewUrl, entry.date, entry.judgmentId)} disabled={judgmentLoadingId !== null || allJudgmentsLoading} className="ml-4 min-h-10 text-xs text-slate-300 underline disabled:opacity-40">{judgmentLoadingId === entry.judgmentId ? 'Downloading…' : 'Download PDF'}</button>
                       </td>
                     </tr>
                   ))}

@@ -341,6 +341,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
             />
             <Card>
               <Text style={[s.heading, { textAlign: 'center' }]}>Order/Judgment</Text>
+              <Text style={s.muted}>View opens the original court document. Complete the court security code if prompted to download the PDF.</Text>
               <View style={{ borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#475569' }}>
                 <View style={{ flexDirection: 'row', backgroundColor: '#123047' }}>
                   {['#', 'Date', 'Order/Judgment'].map((label, index) => (
@@ -357,11 +358,11 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                       </View>
                     ))}
                     <View style={{ flex: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569' }}>
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Download judgment dated ${item.date}`} disabled={action.busy} onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} style={{ minHeight: 44, padding: 8, justifyContent: 'center', opacity: action.busy ? 0.4 : 1 }}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`View original judgment dated ${item.date}`} disabled={action.busy} onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} style={{ minHeight: 44, padding: 8, justifyContent: 'center', opacity: action.busy ? 0.4 : 1 }}>
                         <Text style={{ color: '#7dd3fc', fontSize: 12, textDecorationLine: 'underline' }}>View</Text>
                       </Pressable>
-                      <Pressable accessibilityRole="link" onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} disabled={action.busy} style={{ minHeight: 44, padding: 8, justifyContent: 'center' }}>
-                        <Text style={{ color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' }}>Court link</Text>
+                      <Pressable accessibilityRole="button" onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} disabled={action.busy} style={{ minHeight: 44, padding: 8, justifyContent: 'center' }}>
+                        <Text style={{ color: '#94a3b8', fontSize: 12, textDecorationLine: 'underline' }}>Download PDF</Text>
                       </Pressable>
                     </View>
                   </View>

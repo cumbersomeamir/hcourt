@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { getDb } from './mongodb';
 
-type Lease = { _id: string; owner: string; until: Date };
+type Lease = { _id: string; owner: string; until: Date; failures?: number };
 
 export async function courtFetch(url: string, init?: RequestInit): Promise<Response> {
   const host = new URL(url).hostname;
@@ -12,6 +12,7 @@ export async function courtFetch(url: string, init?: RequestInit): Promise<Respo
   const id = `transport:${host}`;
   const owner = randomUUID();
   const deadline = Date.now() + 20000;
+  let failures = 0;
   for (;;) {
     init?.signal?.throwIfAborted();
     try {
@@ -20,7 +21,10 @@ export async function courtFetch(url: string, init?: RequestInit): Promise<Respo
         { $set: { owner, until: new Date(Date.now() + 120000) } },
         { upsert: true, returnDocument: 'after' },
       );
-      if (acquired) break;
+      if (acquired) {
+        failures = acquired.failures || 0;
+        break;
+      }
     } catch (error) {
       if ((error as { code?: number }).code !== 11000) throw error;
     }
@@ -35,18 +39,23 @@ export async function courtFetch(url: string, init?: RequestInit): Promise<Respo
     const response = await fetch(url, { ...init, signal: init?.signal
       ? AbortSignal.any([init.signal, AbortSignal.timeout(90000)]) : AbortSignal.timeout(90000) });
     if (response.status === 403 || response.status === 429 || response.status >= 500) {
+      failures = Math.min(failures + 1, 10);
       const retry = response.headers.get('retry-after') || '';
       const delay = /^\d+$/.test(retry) ? Number(retry) * 1000 : Date.parse(retry) - Date.now();
-      cooldown = Math.max(response.status === 403 || response.status === 429 ? 15 * 60000 : 60000,
+      const base = response.status === 403 || response.status === 429 ? 15 * 60000 : 60000;
+      cooldown = Math.max(Math.min(base * 2 ** (failures - 1), 6 * 3600000),
         Number.isFinite(delay) ? Math.min(delay, 24 * 3600000) : 0);
+    } else if (response.ok) {
+      failures = 0;
     }
     return response;
   } catch (error) {
-    cooldown = 60000;
+    failures = Math.min(failures + 1, 10);
+    cooldown = Math.min(60000 * 2 ** (failures - 1), 6 * 3600000);
     throw error;
   } finally {
     await locks.updateOne({ _id: id, owner }, {
-      $set: { owner: 'cooldown', until: new Date(Date.now() + cooldown) },
+      $set: { owner: 'cooldown', until: new Date(Date.now() + cooldown), failures },
     });
   }
 }
