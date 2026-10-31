@@ -69,7 +69,8 @@ export async function saveBase64File(filename: string, mimeType: string, base64:
     return;
   }
 
-  const destination = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${safeFilename}`;
+  const destination = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/${Date.now()}-${safeFilename}`;
   await ReactNativeBlobUtil.fs.mv(temporaryPath, destination);
-  ReactNativeBlobUtil.ios.previewDocument(destination);
+  if (mimeType === 'application/zip') ReactNativeBlobUtil.ios.presentOptionsMenu(destination);
+  else ReactNativeBlobUtil.ios.previewDocument(destination);
 }
