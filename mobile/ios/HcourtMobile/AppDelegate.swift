@@ -1,4 +1,5 @@
 import UIKit
+import GoogleSignIn
 import HotUpdater
 import React
 import React_RCTAppDelegate
@@ -38,7 +39,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     open url: URL,
     options: [UIApplication.OpenURLOptionsKey: Any] = [:]
   ) -> Bool {
-    RCTLinkingManager.application(app, open: url, options: options)
+    if GIDSignIn.sharedInstance.handle(url) {
+      return true
+    }
+    return RCTLinkingManager.application(app, open: url, options: options)
   }
 
 }
