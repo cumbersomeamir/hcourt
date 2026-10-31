@@ -83,3 +83,5 @@ yarn-error.log
 /.env.hotupdater
 
 !ota-public-key.pem
+# hot-updater
+.hot-updater/output

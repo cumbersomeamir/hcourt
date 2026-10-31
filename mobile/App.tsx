@@ -21,7 +21,7 @@ import { appleAuth, AppleButton } from '@invertase/react-native-apple-authentica
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import NativeWorkspace, { type WorkspaceHandle } from './src/NativeWorkspace';
 
-import { biometricLockEnabled, appWebUrl, googleIosClientId, googleWebClientId } from './src/config';
+import { biometricLockEnabled, appWebUrl, googleIosClientId, googleWebClientId, googleFallbackWebClientId } from './src/config';
 import { appUrlFromDeepLink } from './src/navigation';
 import { unlockWithBiometrics } from './src/biometricLock';
 import {
@@ -170,7 +170,15 @@ function App() {
       } else {
         await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
         await GoogleSignin.signOut();
-        const response = await GoogleSignin.signIn();
+        let response;
+        try {
+          response = await GoogleSignin.signIn();
+        } catch (error) {
+          const code = String((error as { code?: string | number }).code || '');
+          if (Platform.OS !== 'android' || !['10', 'DEVELOPER_ERROR'].includes(code)) throw error;
+          GoogleSignin.configure({ webClientId: googleFallbackWebClientId, offlineAccess: false });
+          response = await GoogleSignin.signIn();
+        }
         if (response.type !== 'success' || !response.data.idToken) return;
         nextSession = await exchangeGoogleIdToken(response.data.idToken);
       }

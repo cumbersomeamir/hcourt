@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     if (!clientId) {
       throw new Error('GOOGLE_WEB_CLIENT_ID is not configured.');
     }
+    const androidClientId = process.env.GOOGLE_ANDROID_WEB_CLIENT_ID?.trim();
 
     const { idToken } = await readRequestJson(request, 15000);
     if (typeof idToken !== 'string' || !idToken.trim()) {
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
 
     const ticket = await new OAuth2Client().verifyIdToken({
       idToken,
-      audience: clientId,
+      audience: androidClientId ? [clientId, androidClientId] : clientId,
     });
     const payload = ticket.getPayload();
     if (!payload?.sub || !payload.email || !payload.email_verified) {
