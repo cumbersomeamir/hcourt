@@ -42,12 +42,12 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>hcourt</string>
-				<string>com.googleusercontent.apps.452994705449-bregnuc3uei800eu0eqsieq1s3t9o5om</string>
+				<string>com.googleusercontent.apps.982394553106-v80q95rap1qhnc0ncgur3hqv0af4aja9</string>
 			</array>
 		</dict>
 	</array>
 	<key>GIDClientID</key>
-	<string>452994705449-bregnuc3uei800eu0eqsieq1s3t9o5om.apps.googleusercontent.com</string>
+	<string>982394553106-v80q95rap1qhnc0ncgur3hqv0af4aja9.apps.googleusercontent.com</string>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
