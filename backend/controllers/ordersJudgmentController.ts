@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       {
         success: false,
         code: 'document_download_failed',
-        error: 'Could not prepare this court PDF right now. Please retry shortly.',
+        error: 'The original order/judgment PDF is unavailable from the court. No case-status report has been substituted. Please retry later.',
       },
       { status: 502 }
     );

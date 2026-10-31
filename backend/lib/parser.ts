@@ -5,6 +5,18 @@ if (typeof window !== 'undefined') {
 
 import * as cheerio from 'cheerio';
 
+export function parseCourtDate(html: string): string {
+  const text = cheerio.load(html)('body').text();
+  const match = text.match(/Date\s*[:\-]+\s*(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})/i);
+  if (!match) throw new Error('Court display-board date is unavailable; keeping saved data.');
+  const date = `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`;
+  const parsed = new Date(`${date}T00:00:00Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    throw new Error('Court display-board date is invalid; keeping saved data.');
+  }
+  return date;
+}
+
 export interface ParsedCourtCase {
   courtNo: string;
   serialNo: string | null;

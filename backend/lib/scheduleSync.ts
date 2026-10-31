@@ -1,6 +1,6 @@
 import { courtFetch as fetch } from './courtFetch';
 import { Db, ObjectId } from 'mongodb';
-import { parseCourtSchedule } from './parser';
+import { parseCourtDate, parseCourtSchedule } from './parser';
 import { detectChanges } from './changeDetector';
 import { appendCourtHistorySnapshot } from './courtHistory';
 import { monitorTrackedOrderCases } from './trackedOrdersMonitor';
@@ -194,7 +194,7 @@ async function syncScheduleInternal(
   if (!parsedCourts.length) throw new Error('Court returned no valid schedule rows; keeping saved data.');
   const courtsToStore = parsedCourts.map((court) => cloneCourt(court));
   const now = new Date();
-  const dateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
+  const dateStr = parseCourtDate(html);
 
   const scheduleCollection = db.collection<ScheduleDocument>('schedules');
   const changesCollection = db.collection<ChangeRecord>('changes');
@@ -371,7 +371,7 @@ export async function getStoredScheduleByDate(
     state: CourtCase;
     lastUpdated: Date;
   }>([
-    { $match: { date } },
+    { $match: { date, $or: [{ bench }, { bench: { $exists: false } }] } },
     { $sort: { timestamp: -1 } },
     { $group: { _id: '$courtNo', state: { $first: '$state' }, lastUpdated: { $first: '$timestamp' } } },
     { $sort: { _id: 1 } },

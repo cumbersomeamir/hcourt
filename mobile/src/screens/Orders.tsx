@@ -1,5 +1,6 @@
 import { Text } from '../typography';
 import { useState } from 'react';
+import JSZip from 'jszip';
 import { Linking, Pressable, View } from 'react-native';
 import { useAction, useRemote, useWorkspace } from '../workspace';
 import {
@@ -101,6 +102,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
   const [challenge, setChallenge] = useState<Challenge | null>(null);
   const [code, setCode] = useState('');
   const action = useAction();
+  const [downloadNotice, setDownloadNotice] = useState('');
   const types = useRemote<{ types: Option[] }>(
     `/api/orders/case-types?city=${city}`,
   );
@@ -165,15 +167,29 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
     });
   const downloadAllJudgments = () =>
     action.run(async () => {
-      for (const item of result?.orderJudgments || []) {
-        const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl: item.viewUrl, date: item.date });
-        const file = response.result;
-        await saveBase64File(
-          file.filename,
-          file.mimeType || 'application/pdf',
-          file.base64,
-        );
+      const entries = [...new Map((result?.orderJudgments || []).map(item => [item.judgmentId, item])).values()];
+      const archive = new JSZip();
+      let completed = 0;
+      let failure = '';
+      for (const item of entries) {
+        setDownloadNotice(`Preparing original PDF ${completed + 1} of ${entries.length}…`);
+        try {
+          const response = await api<{ result: Document }>('/api/orders/judgment', { viewUrl: item.viewUrl, date: item.date });
+          const file = response.result;
+          if (!file?.base64?.startsWith('JVBERi0')) throw new Error('The court did not return a valid PDF.');
+          archive.file(`${completed + 1}-${file.filename.replace(/[\\/:*?"<>|]/g, '_')}`, file.base64, { base64: true });
+          completed++;
+        } catch (error) {
+          failure = error instanceof Error ? error.message : 'Court PDF unavailable.';
+          break;
+        }
       }
+      setDownloadNotice('');
+      if (!completed) throw new Error(failure || 'No original PDFs are available.');
+      if (completed < entries.length) archive.file('missing-orders.txt', entries.slice(completed).map(item => `${item.date} — judgment ${item.judgmentId}`).join('\n'));
+      const filename = `orders-${result?.caseInfo.caseType}-${result?.caseInfo.caseNo}-${result?.caseInfo.caseYear}${failure ? '-partial' : ''}.zip`;
+      await saveBase64File(filename, 'application/zip', await archive.generateAsync({ type: 'base64' }));
+      setDownloadNotice(`Downloaded ${completed} of ${entries.length} original PDFs in one ZIP.${failure ? ' Remaining documents are listed in missing-orders.txt. ' + failure : ''}`);
     });
   return (
     <Page
@@ -330,7 +346,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
             />
             <Card>
               <Text style={[s.heading, { textAlign: 'center' }]}>Order/Judgment</Text>
-              <Text style={s.muted}>View opens the original court document. Complete the court security code if prompted to download the PDF.</Text>
+              <Text style={s.muted}>View opens the original order/judgment PDF through Courtlens.</Text>
               <View style={{ borderTopWidth: 1, borderLeftWidth: 1, borderColor: '#475569' }}>
                 <View style={{ flexDirection: 'row', backgroundColor: '#123047' }}>
                   {['#', 'Date', 'Order/Judgment'].map((label, index) => (
@@ -347,7 +363,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                       </View>
                     ))}
                     <View style={{ flex: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: '#475569' }}>
-                      <Pressable accessibilityRole="button" accessibilityLabel={`View original judgment dated ${item.date}`} disabled={action.busy} onPress={() => void action.run(() => openCourtDocument(item.viewUrl))} style={{ minHeight: 44, padding: 8, justifyContent: 'center', opacity: action.busy ? 0.4 : 1 }}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={`View original judgment dated ${item.date}`} disabled={action.busy} onPress={() => void downloadJudgment(item.viewUrl, item.date, true)} style={{ minHeight: 44, padding: 8, justifyContent: 'center', opacity: action.busy ? 0.4 : 1 }}>
                         <Text style={{ color: '#7dd3fc', fontSize: 12, textDecorationLine: 'underline' }}>View</Text>
                       </Pressable>
                       <Pressable accessibilityRole="button" onPress={() => void downloadJudgment(item.viewUrl, item.date, false)} disabled={action.busy} style={{ minHeight: 44, padding: 8, justifyContent: 'center' }}>
@@ -358,6 +374,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                 ))}
               </View>
               {!result.orderJudgments?.length && <Text style={s.muted}>No orders or judgments available.</Text>}
+              {!!downloadNotice && <Text style={s.muted}>{downloadNotice}</Text>}
               {(result.orderJudgments?.length || 0) > 1 && <Button title="Download All PDFs" disabled={action.busy} onPress={() => void downloadAllJudgments()} />}
             </Card>
           </>

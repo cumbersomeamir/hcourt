@@ -16,21 +16,24 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
   const [history, setHistory] = useState<CourtHistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(date);
+  useEffect(() => { setSelectedDate(date); }, [date, courtNo, isOpen]);
 
   useEffect(() => {
-    if (!isOpen || !courtNo || !date) return;
+    if (!isOpen || !courtNo || !selectedDate) return;
 
     let active = true;
 
     const fetchHistory = async () => {
       try {
         setLoading(true);
+        setHistory([]);
         setError(null);
         const params = new URLSearchParams({
           courtNo,
           bench,
-          date,
-          limit: '200',
+          date: selectedDate,
+          limit: '500',
         });
 
         const response = await fetch(`/api/court-history?${params.toString()}`);
@@ -52,10 +55,12 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
     };
 
     fetchHistory();
+    const timer = window.setInterval(fetchHistory, 60000);
     return () => {
       active = false;
+      window.clearInterval(timer);
     };
-  }, [isOpen, courtNo, date, bench]);
+  }, [isOpen, courtNo, selectedDate, bench]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -82,7 +87,7 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
               <h2 className="text-base sm:text-lg font-semibold text-slate-100">
                 Court {courtNo} History
               </h2>
-              <p className="text-xs text-slate-400">Date: {date}</p>
+              <label className="text-xs text-slate-400">Date (IST): <input aria-label="History date" type="date" value={selectedDate} onChange={event => setSelectedDate(event.target.value)} className="rounded border border-slate-600 bg-slate-900 p-1 text-slate-100 [color-scheme:dark]" /></label>
             </div>
           </div>
           <button
@@ -121,7 +126,7 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-sm font-bold tabular-nums text-cyan-200">
-                      {new Date(entry.timestamp).toLocaleTimeString()}
+                      {new Date(entry.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
                     </div>
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-700/40 text-slate-400 border border-slate-600/20">
                       {entry.source}

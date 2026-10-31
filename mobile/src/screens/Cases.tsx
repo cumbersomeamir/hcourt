@@ -374,8 +374,8 @@ export function CourtScreen() {
       <Feedback {...remote} />
       {remote.data && (
         <Text style={s.muted}>
-          {remote.data.schedule.date} · Updated{' '}
-          {new Date(remote.data.schedule.lastUpdated).toLocaleTimeString()}
+          Display board date: {remote.data.schedule.date.split('-').reverse().join('-')} · Last checked{' '}
+          {new Date(remote.data.schedule.lastUpdated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
         </Text>
       )}
       {courts.map(court => (
@@ -403,11 +403,18 @@ export function HistoryScreen({ params }: { params: URLSearchParams }) {
   );
 }
 function HistoryContent({ params }: { params: URLSearchParams }) {
+  const [date, setDate] = useState(params.get('date') || '');
+  const [selectedDate, setSelectedDate] = useState(date);
+  const query = new URLSearchParams(params.toString());
+  query.set('date', selectedDate);
+  query.set('limit', '500');
   const remote = useRemote<{ history: CourtHistoryRecord[] }>(
-    `/api/court-history?${params.toString()}&limit=200`,
+    `/api/court-history?${query.toString()}`, 60000,
   );
   return (
     <>
+      <Field label="History date (YYYY-MM-DD, IST)" value={date} onChangeText={setDate} autoCapitalize="none" />
+      <Button title="Show history" disabled={!/^\d{4}-\d{2}-\d{2}$/.test(date) || remote.busy} onPress={() => { if (date === selectedDate) void remote.reload(); else setSelectedDate(date); }} />
       <Feedback {...remote} />
       {remote.data?.history.map((item, index) => (
         <View key={item._id || index} style={{ gap: 8 }}>
@@ -426,7 +433,7 @@ function HistoryContent({ params }: { params: URLSearchParams }) {
                 fontVariant: ['tabular-nums'],
               }}
             >
-              {new Date(item.timestamp).toLocaleTimeString()}
+              {new Date(item.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
             </Text>
             {(item.state || item).isInSession && (
               <>

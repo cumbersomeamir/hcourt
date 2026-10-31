@@ -24,10 +24,11 @@ export default function CourtTable({ courts, lastUpdated, historyDate, bench = '
 
   return (
     <div className="w-full">
+      {historyDate && <p className="mb-2 px-1 text-sm font-semibold text-cyan-200">Display board date: {historyDate.split('-').reverse().join('-')}</p>}
       {lastUpdated && (
         <div className="mb-3 sm:mb-4 text-xs sm:text-sm text-slate-400 px-1 flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400/60 animate-pulse-dot"></span>
-          Last updated: {new Date(lastUpdated).toLocaleString()}
+          Last checked: {new Date(lastUpdated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
         </div>
       )}
 
