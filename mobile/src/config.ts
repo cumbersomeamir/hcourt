@@ -15,5 +15,5 @@ if (appWebUrl.protocol !== 'https:') {
 
 export const biometricLockEnabled = Config.APP_ENABLE_BIOMETRIC_LOCK === 'true';
 
-export const googleWebClientId = Config.GOOGLE_WEB_CLIENT_ID?.trim() || '';
-export const googleIosClientId = Config.GOOGLE_IOS_CLIENT_ID?.trim() || '';
+export const googleWebClientId = '982394553106-peg6u74d76pr8383ipujsjv7bpkh1kqr.apps.googleusercontent.com';
+export const googleIosClientId = '982394553106-v80q95rap1qhnc0ncgur3hqv0af4aja9.apps.googleusercontent.com';

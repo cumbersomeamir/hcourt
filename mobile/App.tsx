@@ -1,3 +1,4 @@
+import { hotUpdater } from './src/hotUpdater';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -740,4 +741,8 @@ const styles = StyleSheet.create({
   buttonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
 
-export default App;
+export default hotUpdater.wrap({
+  updateStrategy: 'fingerprint',
+  reloadOnForceUpdate: true,
+  fallbackComponent: () => <AppLoadingScreen />,
+})(App);

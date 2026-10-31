@@ -1,0 +1,252 @@
+{
+  "ios": {
+    "engine": "hot-updater/interface@1",
+    "hash": "127c596ce21c4777768c816932e635a482121d3bc71e2dafaaf91ec444d1cfdd",
+    "sources": [
+      {
+        "type": "contents",
+        "id": "dependency:@hot-updater/react-native",
+        "contents": "@hot-updater/react-native@1.1.4",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "e2d71dba3ba8235bd1cd10e19eb91436bb39bd2b15c2107f452252e80411457f"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@invertase/react-native-apple-authentication",
+        "contents": "@invertase/react-native-apple-authentication@2.5.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "b76d02fcdc41ce2213e035442474a45f3974c4406af1ec617ba84fc727864a7f"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-community/blur",
+        "contents": "@react-native-community/blur@4.4.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "0919f2906b9502ac7c1b902928e9049beca75dc85b102852028cc4d646c83b68"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-community/netinfo",
+        "contents": "@react-native-community/netinfo@12.0.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "36017dfcab0b968688c1c7a605e1259b1ec58cbe901154c2c622a56e7289842e"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-google-signin/google-signin",
+        "contents": "@react-native-google-signin/google-signin@16.1.5",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "d7d0ae908ae02c19f05e44a1691416d0195e0831e9e9144ad3d33b0c8c3b653b"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-blob-util",
+        "contents": "react-native-blob-util@0.24.10",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "255b673af6549c8a109999ffdf6afb2e56d810ae9079093655fc6230521cda2d"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-config",
+        "contents": "react-native-config@1.7.2",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "33b13f68b21b2bb7b6bc6a19ba9e9cc9d741bde44cb3bbf6d1ebdcb006f765f7"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-keychain",
+        "contents": "react-native-keychain@10.0.0",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "2dc973e15313d3aa565b45071238ab3c478ab69da1b1c257487a7a4bf9203362"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-safe-area-context",
+        "contents": "react-native-safe-area-context@5.9.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "a78e9a4ea131d3c58f7be6761e6c122997e04cee18b1c2b913ce3dd25f170dba"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-svg",
+        "contents": "react-native-svg@15.16.0",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "9d7550726703785331903dc79a22f9292282c2ec77ff2de0e163af5b589ee9b6"
+      },
+      {
+        "type": "contents",
+        "id": "nativeVersion",
+        "contents": "1",
+        "reasons": [
+          "config"
+        ],
+        "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      {
+        "type": "contents",
+        "id": "runtime",
+        "contents": "react-native@0.87.1",
+        "reasons": [
+          "runtime"
+        ],
+        "hash": "b365f33551a2e51095b8284642d444d3bda3f8e339e8a0f3845a1079dd058f27"
+      }
+    ]
+  },
+  "android": {
+    "engine": "hot-updater/interface@1",
+    "hash": "b70d7125c1b3db382e57b4e11777124273ae56e75c86214d441e7f4f5d9260c6",
+    "sources": [
+      {
+        "type": "contents",
+        "id": "dependency:@hot-updater/react-native",
+        "contents": "@hot-updater/react-native@1.1.4",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "e2d71dba3ba8235bd1cd10e19eb91436bb39bd2b15c2107f452252e80411457f"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@invertase/react-native-apple-authentication",
+        "contents": "@invertase/react-native-apple-authentication@2.5.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "b76d02fcdc41ce2213e035442474a45f3974c4406af1ec617ba84fc727864a7f"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-community/blur",
+        "contents": "@react-native-community/blur@4.4.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "0919f2906b9502ac7c1b902928e9049beca75dc85b102852028cc4d646c83b68"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-community/netinfo",
+        "contents": "@react-native-community/netinfo@12.0.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "36017dfcab0b968688c1c7a605e1259b1ec58cbe901154c2c622a56e7289842e"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:@react-native-google-signin/google-signin",
+        "contents": "@react-native-google-signin/google-signin@16.1.5",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "d7d0ae908ae02c19f05e44a1691416d0195e0831e9e9144ad3d33b0c8c3b653b"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-blob-util",
+        "contents": "react-native-blob-util@0.24.10",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "255b673af6549c8a109999ffdf6afb2e56d810ae9079093655fc6230521cda2d"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-config",
+        "contents": "react-native-config@1.7.2",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "33b13f68b21b2bb7b6bc6a19ba9e9cc9d741bde44cb3bbf6d1ebdcb006f765f7"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-keychain",
+        "contents": "react-native-keychain@10.0.0",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "2dc973e15313d3aa565b45071238ab3c478ab69da1b1c257487a7a4bf9203362"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-safe-area-context",
+        "contents": "react-native-safe-area-context@5.9.1",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "a78e9a4ea131d3c58f7be6761e6c122997e04cee18b1c2b913ce3dd25f170dba"
+      },
+      {
+        "type": "contents",
+        "id": "dependency:react-native-svg",
+        "contents": "react-native-svg@15.16.0",
+        "reasons": [
+          "native-dependency"
+        ],
+        "hash": "9d7550726703785331903dc79a22f9292282c2ec77ff2de0e163af5b589ee9b6"
+      },
+      {
+        "type": "contents",
+        "id": "nativeVersion",
+        "contents": "1",
+        "reasons": [
+          "config"
+        ],
+        "hash": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b"
+      },
+      {
+        "type": "contents",
+        "id": "runtime",
+        "contents": "react-native@0.87.1",
+        "reasons": [
+          "runtime"
+        ],
+        "hash": "b365f33551a2e51095b8284642d444d3bda3f8e339e8a0f3845a1079dd058f27"
+      },
+      {
+        "type": "contents",
+        "id": "setting:android:hermesEnabled",
+        "contents": "true",
+        "reasons": [
+          "native-setting"
+        ],
+        "hash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      },
+      {
+        "type": "contents",
+        "id": "setting:android:newArchEnabled",
+        "contents": "true",
+        "reasons": [
+          "native-setting"
+        ],
+        "hash": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+      }
+    ]
+  },
+  "inputs": {
+    "adapter": "bare",
+    "nativeVersion": 1
+  }
+}

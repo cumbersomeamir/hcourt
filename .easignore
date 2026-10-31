@@ -16,7 +16,6 @@
 /.tmp-ideaverse-doc-review/
 /*.png
 /*.docx
-/mobile/android/
 /mobile/__tests__/
 /mobile/*.png
 
@@ -27,4 +26,13 @@
 **/*.ipa
 
 !/mobile/.env
+
+/ota-server/
+/outputs/
+**/.gradle/
 **/.cxx/
+**/keystore.properties
+**/*.keystore
+**/local.properties
+**/*.pem
+!/mobile/ota-public-key.pem

@@ -28,5 +28,20 @@
             <data android:scheme="hcourt" />
         </intent-filter>
       </activity>
+      <meta-data android:name="com.hotupdater.PUBLIC_KEY" android:value="-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAzVVgJyaTkklU3c/Tn0sF
+H6vYzsnFfVTSTDOG+R4/XzpRwhnEHOETynRloQQYr3qp86y2y5VfTurwdMOf/nCu
+k1GnGGGQ7f7QverjEyfSyowQoBURzB+/KCcBW1i/Nxr/oadxjGkAlcu0FDjYX4b4
+n2/9nV44CG7RXpiM1UuYR1ebHOY7Rw68GOgaQFEnFmkXLhvhtTkT0YlUdkS/b3W1
+yW2F8iOEz8/uLyg5tNC+QuyNKESe7YV+5sBKBVy98w1dZG93boU+NJc020ccIELw
+vuv5TTyi3E+8DxK31lcWGuowVFvLWkYk+j63JNgx66qvQqKlhmJ0XAjRGlLGOGpf
+8/dIUEc/J/OZvnNpSFGWJyALRZ/vug11LD86vpRGvKhZB8eTvcjpX+uCO/5dymtX
+iQ5JexzlGzlf7siaZo5JNgydAHq6fkpfhAh8AXtedcZV5Ogb2cDF/IWuoA3TtigV
+jFuoifmM7gIVvt66YM8vHgwMUxk2F2g4tIevlcW6+8Es6drUNYWemlEC7djQdv9e
+u4bGUD8yASbfF8wMgXf5zn56Bii130InPbxXQLWqDjNZckzb+vBTUf+pTAJTOE6W
++N/xBHnRn0My0Y+la1T7wN5D3+IIp7ibsAOdPmCm8eYOmKoKr1Rq8pEB6dEjaEtR
+JTGJfFgE05Gj6Uleqe/4cm0CAwEAAQ==
+-----END PUBLIC KEY-----" />
+      <meta-data android:name="com.hotupdater.CHANNEL" android:value="production" />
     </application>
 </manifest>

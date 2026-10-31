@@ -6,7 +6,8 @@
   "build": {
     "production": {
       "autoIncrement": true,
-      "distribution": "store"
+      "distribution": "store",
+      "node": "22.23.4"
     }
   },
   "submit": {

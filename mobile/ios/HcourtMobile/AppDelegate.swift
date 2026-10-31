@@ -1,4 +1,5 @@
 import UIKit
+import HotUpdater
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
@@ -51,7 +52,7 @@ class ReactNativeDelegate: RCTDefaultReactNativeFactoryDelegate {
 #if DEBUG
     RCTBundleURLProvider.sharedSettings().jsBundleURL(forBundleRoot: "index")
 #else
-    Bundle.main.url(forResource: "main", withExtension: "jsbundle")
+    HotUpdater.bundleURL()
 #endif
   }
 }
