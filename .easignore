@@ -29,6 +29,8 @@
 
 /ota-server/
 /outputs/
+/mobile/store.config.json
+/mobile/store/
 **/.gradle/
 **/.cxx/
 **/keystore.properties
