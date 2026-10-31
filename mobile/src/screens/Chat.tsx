@@ -1,4 +1,5 @@
 import { Text, useFont } from '../typography';
+import { confirmAiSharing } from '../aiConsent';
 import { useRef, useState, type ComponentRef } from 'react';
 import {
   KeyboardAvoidingView,
@@ -69,6 +70,7 @@ export default function ChatScreen() {
   const send = (prompt: string) =>
     action.run(async () => {
       if (!prompt.trim()) return;
+      if (!(await confirmAiSharing())) return;
       const message: Message = {
         id: `user-${Date.now()}`,
         role: 'user',

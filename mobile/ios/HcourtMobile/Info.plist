@@ -34,8 +34,6 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Courtlens uses Face ID only when the optional biometric lock is enabled.</string>
 	<key>CFBundleURLTypes</key>

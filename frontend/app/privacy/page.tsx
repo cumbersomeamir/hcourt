@@ -7,7 +7,7 @@ export default function PrivacyPage() {
     <div className="mt-8 space-y-5 leading-7">
       <p>Courtlens is operated by Tensorblue Technologies Private Limited, India.</p>
       <p>We process account details, lawyer profile information, tracked case references, AI chat messages, app diagnostics and usage analytics to provide sign-in, court monitoring, personalized assistance, security and support.</p>
-      <p>Court records are retrieved from official court sources. Files are stored in Cloudflare R2, application data in MongoDB, and AI requests may be processed by our configured cloud AI provider. We do not sell personal data.</p>
+      <p>Court records are retrieved from official court sources. Files are stored in Cloudflare R2 and application data in MongoDB. AI requests are processed by Microsoft Azure AI using OpenAI models. Messages, relevant conversation history, lawyer profile information and case details may be sent to this service to answer your request. Do not submit confidential information without permission. You can decline AI sharing in the mobile app and continue using non-AI features. We do not sell personal data.</p>
       <p>Data is protected in transit using HTTPS. AI conversations are retained for up to 30 days. Other account data is retained while the account is active or as legally required.</p>
       <p>You may request access, correction or deletion at <a className="text-cyan-300" href="mailto:info@tensorblue.com">info@tensorblue.com</a>.</p>
       <p>Courtlens is not an official app of the Allahabad High Court or any government authority. Verify important information against the official court record.</p>

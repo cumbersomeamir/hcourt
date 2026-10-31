@@ -18,6 +18,7 @@ import {
 import { saveBase64File, openBase64File } from '../downloads';
 import CourtCaseDetails from '../CourtCaseDetails';
 import CaseBrief from '../CaseBrief';
+import { confirmAiSharing } from '../aiConsent';
 
 const openCourtDocument = (url: string) => {
   const target = new URL(url);
@@ -144,6 +145,7 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
   const generateBrief = () =>
     action.run(async () => {
       if (!result) return;
+      if (!(await confirmAiSharing())) return;
       const caseRecord = {
         city,
         caseInfo: result.caseInfo,
