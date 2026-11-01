@@ -94,7 +94,8 @@ const NativeWorkspace = forwardRef<WorkspaceHandle, Props>(
           onAccount();
           return;
         }
-        setPaths(current => [...current, `${url.pathname}${url.search}`]);
+        const nextPath = `${url.pathname}${url.search}`;
+        setPaths(current => current[current.length - 1] === nextPath ? current : [...current, nextPath]);
       },
       [onAccount],
     );

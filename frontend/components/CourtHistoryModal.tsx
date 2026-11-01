@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CourtHistoryRecord } from '@/types/court';
 import { CourtSourceError, courtSourceError } from '@/views/components/CourtSourceStatus';
 
@@ -16,8 +16,14 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
   const [history, setHistory] = useState<CourtHistoryRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(date);
-  useEffect(() => { setSelectedDate(date); }, [date, courtNo, isOpen]);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const dates = useMemo(() => Array.from({ length: 6 }, (_, offset) => {
+    const value = new Date(today + 'T12:00:00Z');
+    value.setUTCDate(value.getUTCDate() - offset);
+    return value.toISOString().slice(0, 10);
+  }), [today]);
+  const [selectedDate, setSelectedDate] = useState(dates.includes(date) ? date : today);
+  useEffect(() => { setSelectedDate(dates.includes(date) ? date : today); }, [date, courtNo, isOpen, today, dates]);
 
   useEffect(() => {
     if (!isOpen || !courtNo || !selectedDate) return;

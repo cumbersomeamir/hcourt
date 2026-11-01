@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Script from 'next/script';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { clearWebAccount, saveWebAccount } from '@/lib/webAccount';
 import styles from './account.module.css';
@@ -15,6 +16,7 @@ type GoogleIdentity = { accounts: { id: {
 } } };
 
 export default function AccountPage() {
+  const router = useRouter();
   const [user, setUser] = useState<{ email: string } | null>(null);
   const [clientId, setClientId] = useState('');
   const [ready, setReady] = useState(false);
@@ -142,7 +144,7 @@ export default function AccountPage() {
           <div className={styles.legal}><Link href="/privacy">Privacy policy</Link><span>•</span><Link href="/delete-account">Delete account</Link></div>
         </div>
       </div> : editor ? <>
-        <header className={styles.header}><button disabled={busy} onClick={editor === 'setup' ? signOut : cancelEditor}>‹ Back</button><button disabled={busy} onClick={cancelEditor}>{editor === 'settings' ? 'Cancel' : 'Skip for now'}</button></header>
+        <header className={styles.header}><button disabled={busy} onClick={cancelEditor}>‹ Back</button><button disabled={busy} onClick={cancelEditor}>{editor === 'settings' ? 'Cancel' : 'Skip for now'}</button></header>
         <h1>Set up your <br />practice.</h1><p className={styles.description}>These details help Courtlens recognize your matters and personalize your workspace.</p>
         <div className={styles.linked}><span>G</span><div><small>SIGNED IN AS</small><p>{user.email}</p></div></div>
         <form className={styles.profileForm} onSubmit={saveProfile}>
@@ -153,7 +155,7 @@ export default function AccountPage() {
           <button className={styles.save} disabled={busy}>{busy ? 'Saving your profile...' : 'Save and continue'}</button><p className={styles.footnote}>You can update these details anytime from your account settings.</p>
         </form>
       </> : <>
-        <header className={styles.header}><Link href="/">‹ Dashboard</Link></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace, <br />your way.</h1>
+        <header className={styles.header}><button onClick={() => router.replace('/')}>‹ Back</button></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace, <br />your way.</h1>
         <div className={styles.identity}><span className={styles.avatar}>{accountName.trim().charAt(0).toUpperCase()}</span><div className={styles.rowCopy}><strong>{accountName}</strong><p>{user.email}</p><span className={styles.badge}>GOOGLE ACCOUNT</span></div></div>
         <div className={styles.settingsGrid}>
         <section><h2>YOUR PRACTICE</h2><div className={styles.card}>{row('P', 'Profile details', profile?.enrollmentNo || 'Add your professional details', 'cyan', openProfile)}</div></section>

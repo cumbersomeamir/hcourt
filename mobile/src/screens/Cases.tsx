@@ -213,7 +213,6 @@ export function CourtCard({
               >
                 <View style={{ flex: 1 }}>
                   <Text style={s.heading}>Court {court.courtNo} History</Text>
-                  <Text style={s.muted}>Date: {date}</Text>
                 </View>
                 <Button
                   title="Close"
@@ -397,14 +396,18 @@ export function CourtScreen() {
 export function HistoryScreen({ params }: { params: URLSearchParams }) {
   return (
     <Page title={`Court ${params.get('courtNo') || ''} History`}>
-      <Text style={s.muted}>{params.get('date')}</Text>
       <HistoryContent params={params} />
     </Page>
   );
 }
 function HistoryContent({ params }: { params: URLSearchParams }) {
-  const [date, setDate] = useState(params.get('date') || '');
-  const [selectedDate, setSelectedDate] = useState(date);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const dates = Array.from({ length: 6 }, (_, offset) => {
+    const value = new Date(today + 'T12:00:00Z');
+    value.setUTCDate(value.getUTCDate() - offset);
+    return value.toISOString().slice(0, 10);
+  });
+  const [selectedDate, setSelectedDate] = useState(dates.includes(params.get('date') || '') ? params.get('date')! : today);
   const query = new URLSearchParams(params.toString());
   query.set('date', selectedDate);
   query.set('limit', '500');
@@ -413,8 +416,7 @@ function HistoryContent({ params }: { params: URLSearchParams }) {
   );
   return (
     <>
-      <Field label="History date (YYYY-MM-DD, IST)" value={date} onChangeText={setDate} autoCapitalize="none" />
-      <Button title="Show history" disabled={!/^\d{4}-\d{2}-\d{2}$/.test(date) || remote.busy} onPress={() => { if (date === selectedDate) void remote.reload(); else setSelectedDate(date); }} />
+      <Select label="History date (IST)" value={selectedDate} onChange={setSelectedDate} options={dates.map(value => ({ value, label: value.split('-').reverse().join('-') + (value === today ? ' (Today)' : '') }))} />
       <Feedback {...remote} />
       {remote.data?.history.map((item, index) => (
         <View key={item._id || index} style={{ gap: 8 }}>

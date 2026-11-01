@@ -686,7 +686,6 @@ export default function OrdersPage() {
               </section>
             )}
             {downloadNotice && <p role="status" className="mt-4 rounded-xl border border-amber-400/25 bg-amber-500/10 p-3 text-sm text-amber-200">{downloadNotice}</p>}
-            <CourtCaseDetails sections={result.details.sections || [{ title: 'Case Status', columns: ['Particulars', 'Details'], rows: result.details.keyValues.map(({ key, value }) => [key, value]) }]} />
             <section className="mt-6" aria-labelledby="order-judgment-heading">
               <h3 id="order-judgment-heading" className="mb-3 text-center text-base font-semibold text-slate-200">Order/Judgment</h3>
               <p className="mb-3 text-xs text-slate-400">View downloads the original order/judgment PDF through Courtlens. Case-status reports are separate.</p>
@@ -710,6 +709,8 @@ export default function OrdersPage() {
               </table>
               {(result.orderJudgments?.length || 0) > 1 && <button onClick={downloadAllJudgments} disabled={allJudgmentsLoading || judgmentLoadingId !== null} className="mt-3 rounded-lg border border-sky-400/30 bg-sky-500/15 px-4 py-2 text-sm text-sky-200 disabled:opacity-40">{allJudgmentsLoading ? 'Downloading…' : 'Download All PDFs'}</button>}
             </section>
+            <CourtCaseDetails sections={result.details.sections || [{ title: 'Case Status', columns: ['Particulars', 'Details'], rows: result.details.keyValues.map(({ key, value }) => [key, value]) }]} />
+
           </div>
         )}
       </div>

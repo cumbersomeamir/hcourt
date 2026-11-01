@@ -330,20 +330,6 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
                 <CaseBrief text={brief.text} />
               </Card>
             )}
-            <CourtCaseDetails
-              sections={
-                result.details.sections || [
-                  {
-                    title: 'Case Status',
-                    columns: ['Particulars', 'Details'],
-                    rows: result.details.keyValues.map(({ key, value }) => [
-                      key,
-                      value,
-                    ]),
-                  },
-                ]
-              }
-            />
             <Card>
               <Text style={[s.heading, { textAlign: 'center' }]}>Order/Judgment</Text>
               <Text style={s.muted}>View opens the original order/judgment PDF through Courtlens.</Text>
@@ -377,6 +363,21 @@ export function OrdersScreen({ params }: { params: URLSearchParams }) {
               {!!downloadNotice && <Text style={s.muted}>{downloadNotice}</Text>}
               {(result.orderJudgments?.length || 0) > 1 && <Button title="Download All PDFs" disabled={action.busy} onPress={() => void downloadAllJudgments()} />}
             </Card>
+            <CourtCaseDetails
+              sections={
+                result.details.sections || [
+                  {
+                    title: 'Case Status',
+                    columns: ['Particulars', 'Details'],
+                    rows: result.details.keyValues.map(({ key, value }) => [
+                      key,
+                      value,
+                    ]),
+                  },
+                ]
+              }
+            />
+
           </>
         )}
       </>

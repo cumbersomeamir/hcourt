@@ -306,7 +306,7 @@ function App() {
 
   const openDashboard = useCallback(() => {
     setShowAccountSettings(false);
-    workspaceRef.current?.navigate('/');
+    setProfileEditorMode(null);
   }, []);
 
   const deleteAccountFromApp = useCallback(async () => {
@@ -554,7 +554,7 @@ function App() {
         <View style={styles.profileHeader}>
           <TouchableOpacity activeOpacity={0.8} style={styles.backButton} onPress={openDashboard}>
             <Text style={styles.backButtonArrow}>‹</Text>
-            <Text style={styles.backButtonText}>Dashboard</Text>
+            <Text style={styles.backButtonText}>Back</Text>
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={styles.accountScrollContent} showsVerticalScrollIndicator={false}>
