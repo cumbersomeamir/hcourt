@@ -20,6 +20,7 @@ type ScheduleDocument = {
   _id?: ObjectId;
   date: string;
   lastUpdated: Date;
+  firstObservedAt?: Date;
   courts: CourtCase[];
   source?: string;
   bench?: CourtBench;
@@ -137,7 +138,7 @@ function isFresh(schedule: ScheduleDocument | null, staleAfterMs: number): boole
 
 async function getLatestScheduleDocument(db: Db, bench: CourtBench): Promise<ScheduleDocument | null> {
   return db.collection<ScheduleDocument>('schedules').findOne(
-    bench === 'lucknow' ? { $or: [{ bench }, { bench: { $exists: false } }] } : { bench },
+    { bench, 'courts.0': { $exists: true } },
     { sort: { lastUpdated: -1 } }
   );
 }
@@ -195,6 +196,7 @@ async function syncScheduleInternal(
   const courtsToStore = parsedCourts.map((court) => cloneCourt(court));
   const now = new Date();
   const dateStr = parseCourtDate(html);
+  const historyInserted = await appendCourtHistorySnapshot({ db, bench, date: dateStr, timestamp: now, courts: courtsToStore, source });
 
   const scheduleCollection = db.collection<ScheduleDocument>('schedules');
   const changesCollection = db.collection<ChangeRecord>('changes');
@@ -244,6 +246,7 @@ async function syncScheduleInternal(
   } else {
     schedule = {
       date: dateStr,
+      firstObservedAt: now,
       lastUpdated: now,
       courts: courtsToStore,
       source,
@@ -256,15 +259,6 @@ async function syncScheduleInternal(
       _id: insertResult.insertedId,
     };
   }
-
-  const historyInserted = await appendCourtHistorySnapshot({
-    db,
-    bench,
-    date: dateStr,
-    timestamp: now,
-    courts: courtsToStore,
-    source,
-  });
 
   const trackedOrders = runTrackedOrders ? await monitorTrackedOrderCases(db) : null;
 
@@ -302,7 +296,7 @@ export async function syncSchedule({
   if (isFresh(latestBeforeSync, force ? 60000 : maxAgeMs)) {
     const historyInserted = source === 'worker' && latestBeforeSync
       ? await appendCourtHistorySnapshot({
-        db, bench, date: latestBeforeSync.date, timestamp: new Date(latestBeforeSync.lastUpdated),
+        db, bench, date: latestBeforeSync.date, timestamp: new Date(latestBeforeSync.firstObservedAt || latestBeforeSync.lastUpdated),
         courts: latestBeforeSync.courts, source: 'worker',
       }) : 0;
     return {
@@ -358,9 +352,7 @@ export async function getStoredScheduleByDate(
   bench: CourtBench = 'lucknow'
 ): Promise<ScheduleDocument | null> {
   const stored = await db.collection<ScheduleDocument>('schedules').findOne(
-    bench === 'lucknow'
-      ? { date, $or: [{ bench }, { bench: { $exists: false } }] }
-      : { date, bench },
+    { date, bench, 'courts.0': { $exists: true } },
     { sort: { lastUpdated: -1 } }
   );
   if (stored) return stored;
@@ -371,7 +363,7 @@ export async function getStoredScheduleByDate(
     state: CourtCase;
     lastUpdated: Date;
   }>([
-    { $match: { date, $or: [{ bench }, { bench: { $exists: false } }] } },
+    { $match: { date, bench } },
     { $sort: { timestamp: -1 } },
     { $group: { _id: '$courtNo', state: { $first: '$state' }, lastUpdated: { $first: '$timestamp' } } },
     { $sort: { _id: 1 } },

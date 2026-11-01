@@ -6,6 +6,7 @@
 
 import { getDb } from '../lib/mongodb';
 import { syncSchedule } from '../lib/scheduleSync';
+import { recoverStoredCourtHistory } from '../lib/courtHistory';
 import { monitorTrackedOrderCases } from '../lib/trackedOrdersMonitor';
 import { GET as getWebDiary } from '../controllers/webDiaryController';
 import { getLatestWebDiarySnapshot } from '../lib/aiStore';
@@ -18,6 +19,18 @@ let lastWebDiarySyncAt = 0;
 let diaryRunning = false;
 let trackedOrdersRunning = false;
 let lastTrackedOrdersSyncAt = 0;
+let historyRecoveryRunning = false;
+let lastHistoryRecoveryAt = 0;
+
+async function recoverHistory() {
+  if (historyRecoveryRunning || Date.now() - lastHistoryRecoveryAt < 3600000) return;
+  historyRecoveryRunning = true;
+  try {
+    const inserted = await recoverStoredCourtHistory(await getDb());
+    lastHistoryRecoveryAt = Date.now();
+    console.log(`[Worker] History recovery: ${inserted} saved observations restored`);
+  } finally { historyRecoveryRunning = false; }
+}
 
 async function syncTrackedOrders() {
   if (trackedOrdersRunning || Date.now() - lastTrackedOrdersSyncAt < 10 * 60000) return;
@@ -95,12 +108,14 @@ async function pollSchedule() {
   try {
     console.log(`[Worker] Starting poll at ${new Date().toISOString()}`);
     const db = await getDb();
+    void recoverHistory().catch(error => console.error('[Worker] History recovery failed:', error.message));
     void syncWebDiary().catch((error) => console.error('[Worker] Diary sync failed:', error));
     await db.collection('schedules').createIndex({ lastUpdated: 1 }, { expireAfterSeconds: 604800 });
     for (const bench of ['allahabad', 'lucknow'] as const) {
       try {
         const result = await syncSchedule({ db, force: true, source: 'worker', bench, runTrackedOrders: false });
         console.log(`[Worker] ${bench}: Changes: ${result.changes.length}, History: ${result.historyInserted}, Refreshed: ${result.refreshed}, Stale: ${result.stale}`);
+        if (result.stale) console.warn(`[Worker] ${bench}: ${result.warning || 'Court source is stale'}`);
       } catch (error) {
         console.error(`[Worker] ${bench} sync failed:`, error instanceof Error ? error.message : 'Unknown error');
       }

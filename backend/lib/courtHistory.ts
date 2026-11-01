@@ -46,6 +46,7 @@ function buildHistoryRecord(input: {
   source: string;
 }): CourtHistoryRecord {
   return {
+    _id: `${input.bench || 'lucknow'}:${input.date}:${input.courtNo}:${input.timestamp.getTime()}`,
     bench: input.bench || 'lucknow',
     date: input.date,
     courtNo: input.courtNo,
@@ -79,7 +80,7 @@ export async function appendCourtHistorySnapshot({ db, date, timestamp, courts, 
     const last = previous.get(courtNo);
     if (last && (new Date(last.timestamp).getTime() >= timestamp.getTime() || isSameCourtState(last.state, state))) continue;
     const record = buildHistoryRecord({ bench, date, courtNo, timestamp, state, source });
-    operations.push({ updateOne: { filter: { bench, date, courtNo, timestamp }, update: { $setOnInsert: record }, upsert: true } });
+    operations.push({ updateOne: { filter: { _id: record._id }, update: { $setOnInsert: record }, upsert: true } });
   }
   if (!operations.length) return 0;
   return (await collection.bulkWrite(operations, { ordered: false })).upsertedCount;
@@ -101,13 +102,59 @@ export async function getCourtHistory({
   bench = 'lucknow',
 }: GetCourtHistoryParams): Promise<CourtHistoryRecord[]> {
   const collection = db.collection<CourtHistoryRecord>('court_history');
-  let history = await collection
+  const history = await collection
     .find({ bench, courtNo, date })
     .sort({ timestamp: 1 })
     .toArray();
 
-  if (history.length === 0 && bench === 'lucknow') {
-    history = await collection.find({ courtNo, date, bench: { $exists: false } }).sort({ timestamp: 1 }).toArray();
+  return history.filter((record, index) => !index || !isSameCourtState(history[index - 1].state, record.state)).reverse().slice(0, limit);
+}
+
+export async function recoverStoredCourtHistory(db: Db): Promise<number> {
+  const locks = db.collection<{ _id: string; until: Date }>('court_request_leases');
+  const leaseUntil = new Date(Date.now() + 3600000);
+  try {
+    await locks.findOneAndUpdate({ _id: 'history-recovery:v1', until: { $lte: new Date() } }, { $set: { until: leaseUntil } }, { upsert: true });
+  } catch (error) {
+    if ((error as { code?: number }).code === 11000) return 0;
+    throw error;
   }
-  return history.reverse().slice(0, limit);
+  try {
+  const dates = Array.from({ length: 6 }, (_, offset) => {
+    const day = new Date();
+    day.setUTCDate(day.getUTCDate() - offset);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(day);
+  });
+  const snapshots = db.collection<{ bench: 'allahabad' | 'lucknow'; date: string; lastUpdated: Date; firstObservedAt?: Date; courts: CourtCase[] }>('schedules');
+  const history = db.collection<CourtHistoryRecord>('court_history');
+  let inserted = 0;
+  for (const bench of ['allahabad', 'lucknow'] as const) {
+    for (const date of dates) {
+      const previous = new Map<string, CourtCase>();
+      let operations: AnyBulkWriteOperation<CourtHistoryRecord>[] = [];
+      const cursor = snapshots.find({ bench, date, 'courts.0': { $exists: true } }).sort({ lastUpdated: 1 }).batchSize(50);
+      for await (const snapshot of cursor) {
+        const timestamp = new Date(snapshot.firstObservedAt || snapshot.lastUpdated);
+        if (!Number.isFinite(timestamp.getTime())) continue;
+        for (const court of snapshot.courts) {
+          if (!court.courtNo) continue;
+          const state = normalizeCourtState(court);
+          if (isSameCourtState(previous.get(court.courtNo), state)) continue;
+          previous.set(court.courtNo, state);
+          const record = buildHistoryRecord({ bench, date, courtNo: court.courtNo, timestamp, state, source: 'saved_snapshot' });
+          operations.push({ updateOne: { filter: { _id: record._id }, update: { $setOnInsert: record }, upsert: true } });
+        }
+        if (operations.length >= 500) {
+          inserted += (await history.bulkWrite(operations, { ordered: false })).upsertedCount;
+          operations = [];
+        }
+      }
+      if (operations.length) inserted += (await history.bulkWrite(operations, { ordered: false })).upsertedCount;
+    }
+  }
+  return inserted;
+  } catch (error) {
+    await locks.updateOne({ _id: 'history-recovery:v1', until: leaseUntil }, { $set: { until: new Date(Date.now() + 300000) } });
+    throw error;
+  }
 }
