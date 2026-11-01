@@ -139,9 +139,6 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
                     <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-sm font-bold tabular-nums text-cyan-200">
                       {new Date(entry.timestamp).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' })} IST
                     </div>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-700/40 text-slate-400 border border-slate-600/20">
-                      {entry.source}
-                    </span>
                   </div>
 
                   <div className="mt-2 text-sm">
