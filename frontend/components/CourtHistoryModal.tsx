@@ -93,7 +93,7 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
               <h2 className="text-base sm:text-lg font-semibold text-slate-100">
                 Court {courtNo} History
               </h2>
-              <label className="text-xs text-slate-400">Date (IST): <input aria-label="History date" type="date" value={selectedDate} onChange={event => setSelectedDate(event.target.value)} className="rounded border border-slate-600 bg-slate-900 p-1 text-slate-100 [color-scheme:dark]" /></label>
+              <p className="text-xs text-slate-400">Today and previous 5 days · IST</p>
             </div>
           </div>
           <button
@@ -105,6 +105,9 @@ export default function CourtHistoryModal({ isOpen, courtNo, date, onClose, benc
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
+          <div className="mb-4 flex flex-wrap gap-2" aria-label="History dates">
+            {dates.map(value => <button key={value} aria-pressed={selectedDate === value} onClick={() => setSelectedDate(value)} className={`rounded-lg border px-3 py-2 text-sm font-semibold ${selectedDate === value ? 'border-cyan-400 bg-cyan-400/15 text-cyan-100' : 'border-slate-600 bg-slate-900 text-slate-300'}`}>{value.split('-').reverse().join('-')}{value === today ? ' (Today)' : ''}</button>)}
+          </div>
           {loading ? (
             <div className="py-10 flex flex-col items-center">
               <div className="w-7 h-7 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin mb-3"></div>

@@ -487,18 +487,7 @@ export default function Home() {
                   </svg>
                   Cause List
                 </Link>
-                <details className="relative">
-                  <summary className={`${desktopNavItemClass} cursor-pointer list-none border-slate-600/40 hover:border-slate-400/40`}>
-                    More
-                  </summary>
-                  <div className="absolute left-0 z-20 mt-2 grid w-44 gap-1 rounded-xl border border-slate-700/60 bg-slate-950/95 p-2 shadow-xl backdrop-blur">
-                    <Link href="/ai-chat" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">AI Chat</Link>
-                    <Link href="/my-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">My Cases</Link>
-                    <Link href="/track-cases" className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800">
-                      {totalTrackedItems > 0 ? `Tracked (${totalTrackedItems})` : 'Track Cases'}
-                    </Link>
-                  </div>
-                </details>
+
                 <button onClick={() => fetchSchedule(true)} disabled={loading} className={`${desktopNavItemClass} border-slate-600/40 hover:border-slate-400/40 disabled:opacity-40`}>
                   <svg className={`w-4 h-4 text-slate-200 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

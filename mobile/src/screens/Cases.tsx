@@ -416,7 +416,10 @@ function HistoryContent({ params }: { params: URLSearchParams }) {
   );
   return (
     <>
-      <Select label="History date (IST)" value={selectedDate} onChange={setSelectedDate} options={dates.map(value => ({ value, label: value.split('-').reverse().join('-') + (value === today ? ' (Today)' : '') }))} />
+      <Text style={s.label}>Today and previous 5 days · IST</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        {dates.map(value => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: selectedDate === value }} onPress={() => setSelectedDate(value)} style={{ minHeight: 44, padding: 10, borderRadius: 8, borderWidth: 1, borderColor: selectedDate === value ? '#22d3ee' : '#475569', backgroundColor: selectedDate === value ? '#123047' : '#0f172a' }}><Text style={{ color: selectedDate === value ? '#cffafe' : '#cbd5e1', fontWeight: '600' }}>{value.split('-').reverse().join('-')}{value === today ? ' (Today)' : ''}</Text></Pressable>)}
+      </View>
       <Feedback {...remote} />
       {remote.data?.history.map((item, index) => (
         <View key={item._id || index} style={{ gap: 8 }}>
