@@ -96,6 +96,8 @@ export default function ClientErrorReporter() {
         }
         return response;
       } catch (error) {
+        const signal = init?.signal || (input instanceof Request ? input.signal : undefined);
+        if (signal?.aborted && error instanceof Error && error.name === "AbortError") throw error;
         const reason = normalizeReason(error);
         if (shouldReportFetch(requestUrl)) {
           postClientError({
