@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
 import CaseIdModal from '@/views/components/CaseIdModal';
@@ -68,6 +68,14 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [courtBench, setCourtBench] = useState<CourtBench>('lucknow');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState('');
+  const scheduleRequest = useRef<AbortController | null>(null);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const dates = Array.from({ length: 6 }, (_, offset) => {
+    const value = new Date(today + 'T12:00:00Z');
+    value.setUTCDate(value.getUTCDate() - offset);
+    return value.toISOString().slice(0, 10);
+  });
   const [scheduleDate, setScheduleDate] = useState<string>('');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -108,11 +116,15 @@ export default function Home() {
     'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border bg-slate-950/80';
 
   const fetchSchedule = async (force = false) => {
+    scheduleRequest.current?.abort();
+    const controller = new AbortController();
+    scheduleRequest.current = controller;
     try {
       setError(null);
       const params = new URLSearchParams();
       params.set('bench', courtBench);
-      if (force) {
+      if (selectedDate) params.set('date', selectedDate);
+      if (force && !selectedDate) {
         params.append('force', 'true');
       }
       if (shouldApplyScheduleFilter) {
@@ -135,8 +147,9 @@ export default function Home() {
         }
       } catch {}
 
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: controller.signal });
       const data = await response.json();
+      if (controller.signal.aborted) return;
       if (data.success && data.schedule) {
         try { sessionStorage.setItem(cacheKey, JSON.stringify(data.schedule)); } catch {}
         const courtsData = data.schedule.courts || [];
@@ -155,10 +168,11 @@ export default function Home() {
         setError(courtSourceError(data.error, 'Unable to load the court schedule.'));
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       console.error('Error fetching schedule:', error);
       setError(courtSourceError(error, 'Unable to load the court schedule.'));
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
@@ -265,11 +279,16 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    setLoading(true);
+    setCourts([]);
+    setFilteredCourts([]);
+    setLastUpdated(null);
+    setScheduleDate(selectedDate);
     fetchSchedule();
     checkNotifications();
 
     const scheduleInterval = setInterval(() => {
-      fetchSchedule();
+      if (!selectedDate) fetchSchedule();
     }, 30000);
 
     const notificationInterval = setInterval(() => {
@@ -277,11 +296,12 @@ export default function Home() {
     }, 10000);
 
     return () => {
+      scheduleRequest.current?.abort();
       clearInterval(scheduleInterval);
       clearInterval(notificationInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [courtBench, effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
+  }, [selectedDate, courtBench, effectiveTrackedCaseIds, trackedOrderTrackingKeys, scheduleFilterEnabled, userId]);
 
   useEffect(() => {
     if (courts.length > 0 && !searchTerm) {
@@ -548,9 +568,9 @@ export default function Home() {
                   </select>
                 </div>
                 <div className="rounded-2xl border border-slate-700/45 bg-slate-950/40 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Live Update</p>
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">{selectedDate ? 'Saved Court View' : 'Live Update'}</p>
                   <p className="mt-2 text-sm font-semibold text-emerald-300">
-                    {loading ? 'Checking court server...' : lastUpdated ? 'Court data updated' : 'Waiting for court data'}
+                    {loading ? (selectedDate ? 'Loading saved court view...' : 'Checking court server...') : lastUpdated ? 'Court data updated' : 'Waiting for court data'}
                   </p>
                   {lastUpdated && (
                     <p className="mt-1 text-xs text-slate-500">{lastUpdated.toLocaleTimeString()}</p>
@@ -568,6 +588,12 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        <label className="mb-5 block text-sm text-slate-300">Court view date (IST)
+          <select aria-label="Court view date" value={selectedDate} onChange={event => setSelectedDate(event.target.value)} className="mt-2 block w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-slate-100 [color-scheme:dark]">
+            {dates.map(value => <option key={value} value={value === today ? '' : value}>{value.split('-').reverse().join('-')}{value === today ? ' (Today — Live)' : ''}</option>)}
+          </select>
+        </label>
 
         {/* Search Bar */}
         <div className="mb-5 sm:mb-6">
@@ -677,7 +703,7 @@ export default function Home() {
 
         <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-500 px-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500/60 animate-pulse-dot"></span>
-          Schedule updates automatically every 30 seconds
+          {selectedDate ? 'Showing the last saved court board for the selected date' : 'Schedule updates automatically every 30 seconds'}
         </div>
       </div>
 

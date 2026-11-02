@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/models/mongodbModel';
 import { CourtCase } from '@/types/court';
 import { normalizeCaseIds } from '@/lib/tracking';
-import { syncSchedule } from '@/lib/scheduleSync';
+import { getStoredScheduleByDate, syncSchedule } from '@/lib/scheduleSync';
 
 // Server-only route configuration
 export const runtime = 'nodejs';
@@ -17,6 +17,16 @@ export async function GET(request: Request) {
     const forceRefresh = ['1', 'true', 'yes'].includes(
       String(searchParams.get('force') || '').toLowerCase()
     );
+
+    const date = searchParams.get('date');
+    if (date) {
+      const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+      const earliest = new Date(today + 'T12:00:00Z');
+      earliest.setUTCDate(earliest.getUTCDate() - 5);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < earliest.toISOString().slice(0, 10) || date > today || new Date(date + 'T12:00:00Z').toISOString().slice(0, 10) !== date) {
+        return NextResponse.json({ success: false, error: 'Choose today or one of the previous five dates.' }, { status: 400 });
+      }
+    }
 
     // Get tracked case IDs
     let trackedCaseIds: string[] = [];
@@ -41,7 +51,9 @@ export async function GET(request: Request) {
     }
 
     const db = await getDb();
-    const latestResult = await syncSchedule({
+    const latestResult = date
+      ? { schedule: await getStoredScheduleByDate(db, date, bench), refreshed: false, stale: false, warning: undefined }
+      : await syncSchedule({
       db,
       force: forceRefresh,
       source: forceRefresh ? 'schedule_latest_force' : 'schedule_latest',
@@ -52,7 +64,7 @@ export async function GET(request: Request) {
     if (!latestSchedule) {
       return NextResponse.json({
         success: false,
-        error: 'No schedule found',
+        error: date ? `No saved court view available for ${date}.` : 'No schedule found',
       }, { status: 404 });
     }
 

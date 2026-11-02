@@ -1,5 +1,5 @@
 import { Text } from '../typography';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {
   type CourtCase,
@@ -238,6 +238,13 @@ export function CourtCard({
 export function CourtScreen() {
   const { tracking } = useWorkspace();
   const [bench, setBench] = useState('lucknow');
+  const [selectedDate, setSelectedDate] = useState('');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+  const dates = Array.from({ length: 6 }, (_, offset) => {
+    const value = new Date(today + 'T12:00:00Z');
+    value.setUTCDate(value.getUTCDate() - offset);
+    return value.toISOString().slice(0, 10);
+  });
   const [query, setQuery] = useState('');
   const [tracked, setTracked] = useState(false);
   const profiles = buildSavedCaseProfiles(
@@ -248,12 +255,12 @@ export function CourtScreen() {
   const remote = useRemote<{
     schedule: { courts: CourtCase[]; date: string; lastUpdated: string };
   }>(
-    `/api/schedule/latest?bench=${bench}${
+    `/api/schedule/latest?bench=${bench}${selectedDate ? `&date=${selectedDate}` : ''}${
       tracked && ids.length
         ? `&caseIds=${encodeURIComponent(ids.join(','))}`
         : ''
     }`,
-    30000,
+    selectedDate ? 0 : 30000,
   );
   const alertParams = new URLSearchParams({ unreadOnly: 'true', limit: '1' });
   if (tracking?.id) alertParams.set('userId', tracking.id);
@@ -322,10 +329,13 @@ export function CourtScreen() {
         <Card
           style={{ backgroundColor: '#02061766', borderColor: '#33415573' }}
         >
-          <Text style={s.label}>LIVE UPDATE</Text>
+          <Select label="COURT VIEW DATE (IST)" value={selectedDate} onChange={setSelectedDate} options={dates.map(value => ({ value: value === today ? '' : value, label: value.split('-').reverse().join('-') + (value === today ? ' (Today — Live)' : '') }))} />
+        </Card>
+        <Card style={{ backgroundColor: '#02061766', borderColor: '#33415573' }}>
+          <Text style={s.label}>{selectedDate ? 'SAVED COURT VIEW' : 'LIVE UPDATE'}</Text>
           <Text style={{ fontSize: 14, color: '#6ee7b7', fontWeight: '600' }}>
             {remote.busy
-              ? 'Checking court server...'
+              ? (selectedDate ? 'Loading saved court view...' : 'Checking court server...')
               : remote.data
               ? 'Court data updated'
               : 'Waiting for court data'}
@@ -379,7 +389,7 @@ export function CourtScreen() {
       )}
       {courts.map(court => (
         <CourtCard
-          key={court.courtNo}
+          key={`${bench}:${selectedDate}:${court.courtNo}`}
           court={court}
           date={remote.data?.schedule.date}
           bench={bench}
@@ -408,6 +418,10 @@ function HistoryContent({ params }: { params: URLSearchParams }) {
     return value.toISOString().slice(0, 10);
   });
   const [selectedDate, setSelectedDate] = useState(dates.includes(params.get('date') || '') ? params.get('date')! : today);
+  const initialDate = params.get('date') || '';
+  const courtNo = params.get('courtNo');
+  const bench = params.get('bench');
+  useEffect(() => { setSelectedDate(initialDate || today); }, [initialDate, courtNo, bench, today]);
   const query = new URLSearchParams(params.toString());
   query.set('date', selectedDate);
   query.set('limit', '500');

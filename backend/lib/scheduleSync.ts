@@ -356,7 +356,6 @@ export async function getStoredScheduleByDate(
     { sort: { lastUpdated: -1 } }
   );
   if (stored) return stored;
-  if (bench !== 'lucknow') return null;
 
   const rows = await db.collection('court_history').aggregate<{
     _id: string;
