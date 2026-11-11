@@ -223,6 +223,10 @@ export default function AppHomePage() {
       </div>
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl flex-col px-3 py-3 sm:px-6 sm:py-6">
+        <header className="pb-3 sm:pb-5">
+          <h1 className="text-lg font-semibold text-slate-50 sm:text-2xl">Courtlens: Allahabad High Court &amp; Lucknow Bench Tools</h1>
+          <p className="mt-1 text-xs text-slate-400 sm:text-sm">Court activity boards, cause lists, orders, judgments, and tools to track your matters.</p>
+        </header>
         <section className="grid flex-1 auto-rows-[minmax(92px,1fr)] grid-cols-[repeat(2,minmax(0,1fr))] gap-2 py-1 sm:auto-rows-[minmax(168px,1fr)] sm:gap-4 sm:py-2 lg:grid-cols-4">
           {homeTiles.filter((tile) => tile.href !== '/status').map((tile) => (
             <Link

@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { publicPageMetadata } from '@/lib/seo';
+
+export const metadata = publicPageMetadata('/privacy', 'Privacy Policy', 'Read how Courtlens handles account information, service data, and privacy requests.');
 
 export default function PrivacyPage() {
   return <main className="mx-auto min-h-screen max-w-3xl px-5 py-12 text-slate-200">

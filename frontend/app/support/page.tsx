@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { publicPageMetadata } from '@/lib/seo';
+
+export const metadata = publicPageMetadata('/support', 'Support', 'Contact Courtlens support for technical issues, account help, and questions about the service.');
 
 export default function SupportPage() {
   return (

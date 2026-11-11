@@ -1,4 +1,7 @@
 import JudgmentViewerPage from '@/views/pages/JudgmentViewerPage';
+import { privatePageMetadata } from '@/lib/seo';
+
+export const metadata = privatePageMetadata;
 
 export default async function Page(props: {
   searchParams?: Promise<{

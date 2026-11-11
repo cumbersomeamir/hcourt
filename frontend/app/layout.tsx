@@ -6,6 +6,7 @@ import ClientErrorReporter from "@/components/ClientErrorReporter";
 import GlobalMobileNavigation from "@/views/components/GlobalMobileNavigation";
 import RoutePrefetcher from "@/views/components/RoutePrefetcher";
 import WebAccountLink from "@/components/WebAccountLink";
+import { siteUrl } from "@/lib/seo";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,8 +19,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Court View - High Court of Judicature at Allahabad",
-  description: "Online Court Activity Digital Display Board System",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Courtlens | Allahabad High Court & Lucknow Bench Tools",
+    template: "%s | Courtlens",
+  },
+  description: "Access Allahabad High Court and Lucknow Bench court activity boards, cause lists, orders, judgments, and case tracking tools with Courtlens.",
 };
 
 export default function RootLayout({
@@ -32,6 +37,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'WebSite',
+            name: 'Courtlens',
+            url: siteUrl,
+            description: 'Independent tools for Allahabad High Court and Lucknow Bench court activity, cause lists, orders, and case tracking.',
+          }) }}
+        />
         <Clarity />
         <ClientErrorReporter />
         <GlobalMobileNavigation />
