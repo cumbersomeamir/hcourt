@@ -6,6 +6,23 @@ const logsDir = path.join(rootDir, 'logs');
 module.exports = {
   apps: [
     {
+      name: 'hcourt-blog-worker',
+      cwd: path.join(rootDir, 'backend'),
+      script: 'npm',
+      args: 'run blogs:worker',
+      interpreter: 'none',
+      instances: 1,
+      autorestart: true,
+      restart_delay: 5000,
+      max_memory_restart: '500M',
+      env: { NODE_ENV: 'production' },
+      out_file: path.join(logsDir, 'blog-worker-out.log'),
+      error_file: path.join(logsDir, 'blog-worker-error.log'),
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      time: true,
+    },
+    {
       name: 'hcourt-backend',
       cwd: path.join(rootDir, 'backend'),
       script: 'npm',

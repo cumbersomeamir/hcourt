@@ -211,6 +211,21 @@ const homeTiles: HomeTile[] = [
       </svg>
     ),
   },
+  {
+    href: '/blogs',
+    title: 'Legal News & Blogs',
+    label: 'Journal',
+    description: 'Read court updates and Indian legal developments with links to official sources.',
+    className: 'sm:min-h-[180px]',
+    surfaceClassName: 'border-cyan-300/18 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/70',
+    glowClassName: 'bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.2),transparent_40%)]',
+    orbClassName: 'bg-cyan-300/25',
+    iconClassName: 'border-cyan-200/15 bg-cyan-200/10 text-cyan-50',
+    labelClassName: 'text-cyan-100/55',
+    titleClassName: 'text-slate-50',
+    ctaClassName: 'border-cyan-200/12 bg-cyan-100/8 text-cyan-50',
+    icon: <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 4h16v16H4zM8 8h8M8 12h8M8 16h5" /></svg>,
+  },
 ];
 
 export default function AppHomePage() {

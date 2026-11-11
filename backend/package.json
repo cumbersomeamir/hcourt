@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "blogs:worker": "node --env-file=.env.local --import tsx scripts/blog-worker.ts",
     "dev": "next dev -p 4000",
     "build": "next build",
     "start": "next start -p 4000",
