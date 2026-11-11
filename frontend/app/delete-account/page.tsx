@@ -1,5 +1,6 @@
 'use client';
 import { FormEvent, useState } from 'react';
+import BackLink from '@/components/BackLink';
 
 export default function DeleteAccountPage() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,7 @@ export default function DeleteAccountPage() {
     setMessage(response.ok ? 'Deletion request received. We will process it as soon as reasonably possible.' : 'Request could not be submitted. Email info@tensorblue.com.');
   };
   return <main className="mx-auto min-h-screen max-w-xl px-5 py-12 text-slate-200">
+    <BackLink className="mb-5 inline-block text-sm text-cyan-300">← Back</BackLink>
     <h1 className="text-3xl font-semibold text-white">Delete your Courtlens account</h1>
     <p className="mt-4 leading-7 text-slate-400">Submit the email used for Courtlens. Account, profile, tracked-case and AI-chat data will be deleted, except records we must retain by law.</p>
     <form onSubmit={submit} className="mt-8 space-y-4">

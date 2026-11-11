@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { TrackedOrderCase } from '@/types/court';
@@ -338,13 +338,12 @@ export default function TrackCasesPage() {
       <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 sm:pb-20 sm:pt-10">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Link
-              href="/"
+            <BackLink
               className="inline-flex items-center gap-2 rounded-full border border-slate-700/40 bg-slate-950/35 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 transition-colors hover:bg-slate-900/70"
             >
               <span aria-hidden="true">←</span>
-              Dashboard
-            </Link>
+              Back
+            </BackLink>
             <p className="mt-4 text-xs uppercase tracking-[0.28em] text-emerald-300/75">
               Tracking Workspace
             </p>

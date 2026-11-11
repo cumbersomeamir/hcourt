@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
@@ -105,12 +105,11 @@ export default function JudgmentViewerPage(props: {
             </h1>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <Link
-              href="/ai-chat"
+            <BackLink fallbackHref="/orders"
               className="inline-flex items-center rounded-full border border-slate-700/50 bg-slate-950/35 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 transition-colors hover:bg-slate-900/70"
             >
-              Back to AI Chat
-            </Link>
+              Back
+            </BackLink>
             {blobUrl && (
               <a
                 href={downloadHref}

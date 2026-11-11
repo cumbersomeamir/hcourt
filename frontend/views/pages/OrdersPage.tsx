@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import Image from 'next/image';
 import JSZip from 'jszip';
 import { useSearchParams } from 'next/navigation';
@@ -462,15 +462,14 @@ export default function OrdersPage() {
         {/* Back link */}
         <div className="mb-4 sm:mb-6">
           <div className="flex items-center gap-4 mb-3 sm:mb-4">
-            <Link
-              href="/court-view"
+            <BackLink
               className="text-cyan-400 hover:text-cyan-300 text-sm font-medium flex items-center gap-1.5 group"
             >
               <svg className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Court View
-            </Link>
+              Back
+            </BackLink>
           </div>
           <div className="glass-card-lg p-5 sm:p-8">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">

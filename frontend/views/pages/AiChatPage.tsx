@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { useEffect, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
@@ -378,13 +379,12 @@ export default function AiChatPage() {
         <div className="mx-auto max-w-[1400px] px-4 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <Link
-                href="/"
+              <BackLink
                 className="inline-flex items-center gap-2 rounded-full border border-slate-700/40 bg-slate-950/35 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300 transition-colors hover:bg-slate-900/70"
               >
                 <span aria-hidden="true">←</span>
-                Dashboard
-              </Link>
+                Back
+              </BackLink>
             </div>
             <WorkspaceNavigation
               current="ai-chat"

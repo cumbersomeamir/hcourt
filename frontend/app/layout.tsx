@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Clarity from "@/components/Clarity";
@@ -7,6 +8,7 @@ import GlobalMobileNavigation from "@/views/components/GlobalMobileNavigation";
 import RoutePrefetcher from "@/views/components/RoutePrefetcher";
 import WebAccountLink from "@/components/WebAccountLink";
 import { siteUrl } from "@/lib/seo";
+import NavigationHistoryTracker from "@/components/NavigationHistoryTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +50,7 @@ export default function RootLayout({
           }) }}
         />
         <Clarity />
+        <Suspense fallback={null}><NavigationHistoryTracker /></Suspense>
         <ClientErrorReporter />
         <GlobalMobileNavigation />
         <RoutePrefetcher />

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { Cinzel, Manrope } from 'next/font/google';
 
 const cinzel = Cinzel({
@@ -39,6 +40,7 @@ export default function StatusPage() {
       className={`min-h-screen ${manrope.className}`}
     >
       <div className="mx-auto max-w-6xl px-4 pb-16 pt-10 sm:pt-14">
+        <BackLink className="mb-4 inline-flex text-sm font-medium text-cyan-400 hover:text-cyan-300">← Back</BackLink>
         <div className="glass-card-lg p-5 sm:p-8">
           <div className="mx-auto max-w-4xl text-center">
             <p className="text-xs tracking-[0.28em] text-orange-300/80 sm:text-sm">

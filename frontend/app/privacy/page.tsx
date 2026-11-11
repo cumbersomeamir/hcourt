@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { publicPageMetadata } from '@/lib/seo';
 
 export const metadata = publicPageMetadata('/privacy', 'Privacy Policy', 'Read how Courtlens handles account information, service data, and privacy requests.');
@@ -15,6 +16,6 @@ export default function PrivacyPage() {
       <p>You may request access, correction or deletion at <a className="text-cyan-300" href="mailto:info@tensorblue.com">info@tensorblue.com</a>.</p>
       <p>Courtlens is not an official app of the Allahabad High Court or any government authority. Verify important information against the official court record.</p>
     </div>
-    <div className="mt-10 flex gap-4"><Link className="text-cyan-300" href="/delete-account">Request account deletion</Link><Link className="text-cyan-300" href="/">Back to Courtlens</Link></div>
+    <div className="mt-10 flex gap-4"><Link className="text-cyan-300" href="/delete-account">Request account deletion</Link><BackLink className="text-cyan-300">← Back</BackLink></div>
   </main>;
 }

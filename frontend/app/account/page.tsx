@@ -5,6 +5,7 @@ import Script from 'next/script';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { clearWebAccount, saveWebAccount } from '@/lib/webAccount';
+import { navigateBack } from '@/lib/navigation';
 import styles from './account.module.css';
 
 type LawyerProfile = { counselName: string; enrollmentNo: string | null; aliases: string[]; chamberAliases: string[] };
@@ -123,7 +124,7 @@ export default function AccountPage() {
   };
   const cancelEditor = () => {
     setError('');
-    if (editor === 'setup') window.location.assign('/');
+    if (editor === 'setup') navigateBack(router);
     else setEditor(null);
   };
   const row = (icon: string, title: string, description: string, tone = 'slate', action?: () => void, href?: string) => {
@@ -135,6 +136,7 @@ export default function AccountPage() {
     <Script src="https://accounts.google.com/gsi/client" onReady={() => setReady(true)} onError={() => setError('Google could not load. Check your connection and refresh.')} />
     <div className={`${styles.content} ${!user ? styles.loginContent : editor ? styles.profileContent : styles.settingsContent}`}>
       {loading ? <p role="status">Loading account…</p> : !user ? <div className={styles.login}>
+        <header className={styles.header}><button disabled={busy} onClick={() => navigateBack(router)}>‹ Back</button></header>
         <div className={styles.brand}><div><strong>Courtlens</strong></div></div>
         <div className={styles.hero}><h1>Practice with clarity.<br /><span>Move with confidence.</span></h1><p className={styles.description}>One secure place for your matters, court updates, and the work that matters next.</p></div>
         <div className={styles.benefits}><p>A workspace tailored to your practice</p><p>Secure access to your tracked matters</p></div>
@@ -155,7 +157,7 @@ export default function AccountPage() {
           <button className={styles.save} disabled={busy}>{busy ? 'Saving your profile...' : 'Save and continue'}</button><p className={styles.footnote}>You can update these details anytime from your account settings.</p>
         </form>
       </> : <>
-        <header className={styles.header}><button onClick={() => router.replace('/')}>‹ Back</button></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace, <br />your way.</h1>
+        <header className={styles.header}><button onClick={() => navigateBack(router)}>‹ Back</button></header><p className={styles.eyebrow}>ACCOUNT & SETTINGS</p><h1>Your workspace, <br />your way.</h1>
         <div className={styles.identity}><span className={styles.avatar}>{accountName.trim().charAt(0).toUpperCase()}</span><div className={styles.rowCopy}><strong>{accountName}</strong><p>{user.email}</p><span className={styles.badge}>GOOGLE ACCOUNT</span></div></div>
         <div className={styles.settingsGrid}>
         <section><h2>YOUR PRACTICE</h2><div className={styles.card}>{row('P', 'Profile details', profile?.enrollmentNo || 'Add your professional details', 'cyan', openProfile)}</div></section>

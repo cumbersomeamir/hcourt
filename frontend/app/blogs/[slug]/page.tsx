@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getBlog } from '@/models/blog';
@@ -35,7 +35,7 @@ export default async function BlogPage({ params }: Props) {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-5 py-8 sm:py-12">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
-      <Link href="/blogs" className="text-sm text-cyan-300 hover:text-cyan-100">← All blogs</Link>
+      <BackLink fallbackHref="/blogs" className="text-sm text-cyan-300 hover:text-cyan-100">← Back</BackLink>
       <article className="mt-6 rounded-[1.7rem] border border-slate-700/50 bg-slate-900/70 p-5 sm:p-8">
         <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{article.category}</p>
         <h1 className="mt-3 text-3xl font-semibold leading-tight text-slate-50 sm:text-4xl">{article.title}</h1>

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import Image from 'next/image';
 import { getBlogs } from '@/models/blog';
 import { publicPageMetadata } from '@/lib/seo';
@@ -12,7 +13,7 @@ export default async function BlogsPage() {
   try { articles = await getBlogs(); } catch { unavailable = true; }
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-4 py-6 sm:px-6 sm:py-10">
-      <Link href="/" className="text-sm text-cyan-300 hover:text-cyan-100">← Home</Link>
+      <BackLink className="text-sm text-cyan-300 hover:text-cyan-100">← Back</BackLink>
       <header className="mt-6 rounded-[1.7rem] border border-cyan-300/18 bg-gradient-to-br from-slate-900 via-slate-950 to-cyan-950/50 p-6 sm:p-9">
         <p className="text-xs uppercase tracking-[0.28em] text-cyan-300">Courtlens Journal</p>
         <h1 className="mt-3 text-3xl font-semibold text-slate-50 sm:text-4xl">Legal News &amp; Blogs</h1>

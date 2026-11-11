@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { useEffect, useMemo, useState } from 'react';
 import { Cinzel, Manrope } from 'next/font/google';
 import { CourtCase, Notification } from '@/types/court';
@@ -263,12 +264,11 @@ export default function CaseProfilePage({ caseSlug }: CaseProfilePageProps) {
                 This case no longer exists in the current saved tracking list.
               </p>
               <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-                <Link
-                  href="/my-cases"
+                <BackLink fallbackHref="/my-cases"
                   className="inline-flex items-center justify-center rounded-2xl border border-cyan-400/25 bg-cyan-500/15 px-6 py-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/25"
                 >
-                  Back to My Cases
-                </Link>
+                  Back
+                </BackLink>
                 <Link
                   href="/track-cases"
                   className="inline-flex items-center justify-center rounded-2xl border border-slate-600/30 bg-slate-900/40 px-6 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800/65"
@@ -304,12 +304,11 @@ export default function CaseProfilePage({ caseSlug }: CaseProfilePageProps) {
                 >
                   Manage Tracking
                 </Link>
-                <Link
-                  href="/my-cases"
+                <BackLink fallbackHref="/my-cases"
                   className="inline-flex items-center justify-center rounded-2xl border border-slate-600/30 bg-slate-900/40 px-5 py-3 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800/65"
                 >
-                  Back to My Cases
-                </Link>
+                  Back
+                </BackLink>
               </div>
             </div>
 

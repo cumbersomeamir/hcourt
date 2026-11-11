@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { publicPageMetadata } from '@/lib/seo';
 
 export const metadata = publicPageMetadata('/support', 'Support', 'Contact Courtlens support for technical issues, account help, and questions about the service.');
@@ -6,7 +7,7 @@ export const metadata = publicPageMetadata('/support', 'Support', 'Contact Court
 export default function SupportPage() {
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-5 py-12 text-slate-200">
-      <Link href="/" className="text-sm text-cyan-300">Back to home</Link>
+      <BackLink className="text-sm text-cyan-300">← Back</BackLink>
       <h1 className="mt-6 text-3xl font-semibold text-white">Courtlens Support</h1>
       <p className="mt-6 leading-7">For questions, technical issues, or account help, contact Tensorblue Technologies Private Limited.</p>
       <a href="mailto:info@tensorblue.com" className="mt-3 inline-block text-cyan-300">info@tensorblue.com</a>

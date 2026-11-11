@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import BackLink from '@/components/BackLink';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import CourtTable from '@/views/components/CourtTable';
 import NotificationsPanel from '@/views/components/NotificationsPanel';
@@ -455,6 +456,7 @@ export default function Home() {
         </>
       )}
       <div className="mx-auto max-w-7xl px-3 sm:px-6 py-6 sm:py-10">
+        <BackLink className="mb-4 inline-flex text-sm font-medium text-cyan-400 hover:text-cyan-300">← Back</BackLink>
         <header className="mb-6 hidden lg:block">
           <div className="relative overflow-hidden rounded-[1.75rem] border border-slate-700/50 bg-slate-950/60 shadow-[0_24px_70px_rgba(2,6,23,0.42)] backdrop-blur-2xl">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(15,23,42,0.96),rgba(15,23,42,0.74)_48%,rgba(8,145,178,0.12))]" />
