@@ -183,6 +183,9 @@ export async function syncBlogNews(dryRun = false) {
   try {
     for (const item of await discoverBlogNews()) {
       if (published >= 3) break;
+      const dayStart = new Date(Math.floor((Date.now() + 19800000) / 86400000) * 86400000 - 19800000);
+      const dailyPublished = await articles.countDocuments({ status: 'published', publishedAt: { $gte: dayStart.toISOString(), $lt: new Date(dayStart.getTime() + 86400000).toISOString() } });
+      if (dailyPublished >= 10) break;
       const id = hash(item.url);
       if (await articles.findOne({ _id: id }) || ((await jobs.findOne({ _id: id }))?.attempts || 0) >= 3) { skipped++; continue; }
       try {
