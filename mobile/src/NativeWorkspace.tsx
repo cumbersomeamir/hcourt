@@ -41,6 +41,7 @@ import { JudgmentScreen, OrdersScreen, StatusScreen } from './screens/Orders';
 import DiaryScreen from './screens/Diary';
 import CauseListScreen from './screens/CauseList';
 import ChatScreen from './screens/Chat';
+import BlogsScreen from './screens/Blogs';
 
 export type WorkspaceHandle = {
   navigate: (path: string) => void;
@@ -62,6 +63,7 @@ const navigationColors: Record<string, string[]> = {
   '/ai-chat': ['#60a5fa', '#3b82f6', '#bfdbfe'],
   '/my-cases': ['#22d3ee', '#06b6d4', '#a5f3fc'],
   '/track-cases': ['#34d399', '#10b981', '#a7f3d0'],
+  '/blogs': ['#a78bfa', '#8b5cf6', '#ddd6fe'],
 };
 
 const NativeWorkspace = forwardRef<WorkspaceHandle, Props>(
@@ -198,6 +200,8 @@ const NativeWorkspace = forwardRef<WorkspaceHandle, Props>(
     )
       screen = <MyCasesScreen slug={path.split('/')[2]} />;
     else if (path === '/ai-chat') screen = <ChatScreen />;
+    else if (path === '/blogs' || path.startsWith('/blogs/'))
+      screen = <BlogsScreen key={path} slug={path.split('/')[2]} onBack={() => setPaths(currentPaths => currentPaths.length > 1 ? currentPaths.slice(0, -1) : ['/'])} />;
     else if (path === '/notifications')
       screen = (
         <Page title="Notifications">
@@ -311,6 +315,7 @@ const NativeWorkspace = forwardRef<WorkspaceHandle, Props>(
                       '/ai-chat',
                       '/my-cases',
                       '/track-cases',
+                      '/blogs',
                     ].map(route => {
                       const tile = tiles.find(item => item.path === route)!;
                       const [border, background, foreground] =
